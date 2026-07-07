@@ -664,6 +664,28 @@ git commit -m "feat: add Product dataclass and TextSectionScraper base class"
 
 ---
 
+## Design Amendment (recorded during Task 5 execution)
+
+Live research during Task 5 found that real bank websites commonly spread retail
+credit categories across **separate pages** rather than one page with four
+adjacent headings (SQB's avtokredit content, for example, lives at a different
+path than its other retail products). `TextSectionScraper` (Task 4) is amended
+with an optional `CATEGORY_URLS: dict[str, str] | None` class attribute:
+
+- **Default (`None`):** unchanged single-page behavior — `run()` fetches `self.url`
+  once, `parse()` splits it into sections via `CATEGORY_HEADINGS`. Existing Task 4
+  tests must keep passing unmodified.
+- **When set:** `run()` fetches each category's own URL from `CATEGORY_URLS` instead
+  of `self.url`, and applies the matching `CATEGORY_HEADINGS` entry (if present) to
+  narrow the fetched page to a section, or uses the whole page text if no heading
+  entry exists for that category.
+
+Every bank scraper task (5-9) may set `CATEGORY_URLS` instead of (or alongside)
+`CATEGORY_HEADINGS` once research shows categories live on separate pages. This
+amendment does not change `Product`, `BaseScraper`, or any other task's interface.
+
+---
+
 ## Task 5: SQB scraper
 
 **Files:**
