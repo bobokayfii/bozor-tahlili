@@ -16,7 +16,7 @@ class IpotekaBankScraper(TextSectionScraper):
         Shu sababli Overdraft sahifasi eng yaqin funksional analog sifatida
         ishlatilgan (aylanma shaxsiy kredit liniyasi, ish haqi loyihasi
         ishtirokchilariga). BU TAXMIN (best-guess mapping), tasdiqlanmagan —
-        NBU'ning kredit_karta->Overdraft yechimidagi bir xil mantiq.
+        NBU'ning kredit_karta->Overdraft yechimidagi bir xil mantiq. Fixture'dagi raqamlar taxminiy va real emas.
       - istemol_krediti -> "consumer" manzili qidiruv natijalarida "Iste'mol
         krediti" sarlavhasi bilan mavjud va URL sifatida real, lekin
         WebFetch orqali sahifa matnini olishga urinishlarda har safar boshqa
