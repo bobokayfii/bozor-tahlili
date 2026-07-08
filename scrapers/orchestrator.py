@@ -19,32 +19,33 @@ def run_all_scrapers(session: Session) -> None:
 
         try:
             products = scraper.run()
+
+            for product in products:
+                session.add(
+                    ProductRow(
+                        bank=product.bank,
+                        category=product.category,
+                        product_name=product.product_name,
+                        rate_min=product.rate_min,
+                        rate_max=product.rate_max,
+                        term_min_months=product.term_min_months,
+                        term_max_months=product.term_max_months,
+                        amount_max_som=product.amount_max_som,
+                        requires_collateral=product.requires_collateral,
+                        down_payment_pct=product.down_payment_pct,
+                        source_url=product.source_url,
+                        scraped_at=product.scraped_at,
+                    )
+                )
+
+            run.status = "success"
+            run.products_found = len(products)
+            run.finished_at = datetime.now(timezone.utc)
+            session.commit()
         except Exception as exc:
+            session.rollback()
             run.status = "failed"
             run.error_message = str(exc)
             run.finished_at = datetime.now(timezone.utc)
             session.commit()
             continue
-
-        for product in products:
-            session.add(
-                ProductRow(
-                    bank=product.bank,
-                    category=product.category,
-                    product_name=product.product_name,
-                    rate_min=product.rate_min,
-                    rate_max=product.rate_max,
-                    term_min_months=product.term_min_months,
-                    term_max_months=product.term_max_months,
-                    amount_max_som=product.amount_max_som,
-                    requires_collateral=product.requires_collateral,
-                    down_payment_pct=product.down_payment_pct,
-                    source_url=product.source_url,
-                    scraped_at=product.scraped_at,
-                )
-            )
-
-        run.status = "success"
-        run.products_found = len(products)
-        run.finished_at = datetime.now(timezone.utc)
-        session.commit()

@@ -36,6 +36,30 @@ class FailingScraper(BaseScraper):
         raise RuntimeError("sayt javob bermadi")
 
 
+class BadPersistenceScraper(BaseScraper):
+    """run() succeeds but returns a Product whose `category` is None,
+    which violates the non-nullable `category` column on ProductRow and
+    raises an IntegrityError during flush/commit (persistence phase, not
+    inside run())."""
+
+    bank_name = "BadPersistenceBank"
+    url = "https://badpersistence.uz"
+
+    def parse(self, html: str) -> list[Product]:
+        return []
+
+    def run(self) -> list[Product]:
+        return [
+            Product(
+                bank="BadPersistenceBank", category=None, product_name="broken",
+                rate_min=10.0, rate_max=15.0, term_min_months=6, term_max_months=24,
+                amount_max_som=100_000_000, requires_collateral=False,
+                down_payment_pct=None, source_url=self.url,
+                scraped_at=datetime.now(timezone.utc),
+            )
+        ]
+
+
 def test_run_all_scrapers_persists_products_and_logs_success(db_session):
     with patch("scrapers.orchestrator.ALL_SCRAPERS", [WorkingScraper]):
         run_all_scrapers(db_session)
@@ -67,3 +91,24 @@ def test_run_all_scrapers_continues_after_one_bank_fails(db_session):
     assert db_session.query(ProductRow).count() == 1
     statuses = {r.bank: r.status for r in db_session.query(ScrapeRunRow).all()}
     assert statuses == {"FailingBank": "failed", "WorkingBank": "success"}
+
+
+def test_run_all_scrapers_isolates_persistence_failure_from_other_banks(db_session):
+    """A scraper whose run() succeeds but whose returned Product fails during
+    persistence (commit-time IntegrityError) must not crash run_all_scrapers
+    or prevent subsequent banks from being processed. This exercises the
+    error-isolation guarantee for the persistence phase, not just run()."""
+    with patch(
+        "scrapers.orchestrator.ALL_SCRAPERS", [BadPersistenceScraper, WorkingScraper]
+    ):
+        run_all_scrapers(db_session)
+
+    products = db_session.query(ProductRow).all()
+    assert len(products) == 1
+    assert products[0].bank == "WorkingBank"
+
+    runs = {r.bank: r for r in db_session.query(ScrapeRunRow).all()}
+    assert runs["BadPersistenceBank"].status == "failed"
+    assert runs["BadPersistenceBank"].error_message is not None
+    assert runs["BadPersistenceBank"].finished_at is not None
+    assert runs["WorkingBank"].status == "success"
