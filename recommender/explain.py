@@ -43,6 +43,6 @@ def explain_recommendation(criteria: Criteria, ranked: list[ScoredProduct]) -> s
             messages=[{"role": "user", "content": prompt}],
             timeout=10,
         )
-        return response.choices[0].message.content
+        return response.choices[0].message.content or "\n".join(lines)
     except Exception:
         return "\n".join(lines)

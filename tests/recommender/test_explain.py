@@ -38,3 +38,15 @@ def test_explain_recommendation_falls_back_to_score_list_on_api_error():
 
     assert "SQB" in result
     assert "NBU" in result
+
+
+def test_explain_recommendation_falls_back_to_score_list_when_content_is_none():
+    fake_response = MagicMock()
+    fake_response.choices[0].message.content = None
+
+    with patch("recommender.explain.get_client") as mock_get_client:
+        mock_get_client.return_value.chat.completions.create.return_value = fake_response
+        result = explain_recommendation(make_criteria(), make_ranked())
+
+    assert "SQB" in result
+    assert "NBU" in result
