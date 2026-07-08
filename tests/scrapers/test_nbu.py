@@ -27,3 +27,8 @@ def test_nbu_scraper_parses_all_four_categories():
     categories = {p.category for p in products}
     assert categories == {"avtokredit", "mikroqarz", "kredit_karta", "istemol_krediti"}
     assert all(p.bank == "NBU" for p in products)
+
+    avtokredit = next(p for p in products if p.category == "avtokredit")
+    # Guards against the "imtiyozli davr" (grace period) figure being
+    # mis-extracted as the term minimum (previously 6 instead of 12).
+    assert avtokredit.term_min_months == 12

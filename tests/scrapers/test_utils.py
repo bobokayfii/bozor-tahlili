@@ -43,6 +43,13 @@ def test_extract_term_months_finds_range():
     assert extract_term_months(text) == [12, 60]
 
 
+def test_extract_term_months_excludes_grace_period_figure_when_range_present():
+    # Reproduces the NBU bug: a grace-period ("imtiyozli davr") figure phrased
+    # as a bare "N oygacha" must not pollute the main term range.
+    text = "Muddati: 12 oydan 60 oygacha. Imtiyozli davr: 6 oygacha."
+    assert extract_term_months(text) == [12, 60]
+
+
 def test_extract_amount_som_parses_million():
     text = "Kredit miqdori: 800 mln.so'mgacha"
     assert extract_amount_som(text) == 800_000_000

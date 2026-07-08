@@ -44,10 +44,26 @@ def extract_percentages(text: str) -> list[float]:
     return seen
 
 
+_TERM_RANGE_RE = re.compile(r"(\d{1,3})\s*oydan\s*(\d{1,3})\s*oygacha")
+_TERM_SINGLE_RE = re.compile(r"(\d{1,3})\s*oygacha")
+
+
 def extract_term_months(text: str) -> list[int]:
-    matches = re.findall(r"(\d{1,3})\s*oy", text)
-    values = sorted({int(m) for m in matches if int(m) <= 120})
-    return values
+    """Muddat oralig'ini "N oydan M oygacha" (masalan, "12 oydan 60 oygacha")
+    range shaklidan topadi. Agar range topilmasa, yagona "N oygacha"
+    ko'rsatkichiga tushadi.
+
+    Range topilganda undan tashqaridagi bitta "N oygacha" iboralari (masalan,
+    "Imtiyozli davr: 6 oygacha" kabi imtiyozli davr ko'rsatkichlari) e'tiborga
+    olinmaydi — aks holda ular asosiy muddat oralig'iga aralashib, noto'g'ri
+    term_min/term_max qiymatlarini keltirib chiqaradi.
+    """
+    range_matches = _TERM_RANGE_RE.findall(text)
+    if range_matches:
+        values = {int(lo) for lo, hi in range_matches} | {int(hi) for lo, hi in range_matches}
+    else:
+        values = {int(m) for m in _TERM_SINGLE_RE.findall(text)}
+    return sorted(v for v in values if v <= 120)
 
 
 def extract_amount_som(text: str) -> int | None:
