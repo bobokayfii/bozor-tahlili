@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
@@ -38,10 +38,34 @@ def _row_to_dict(row: ProductRow) -> dict:
     }
 
 
+def _latest_per_bank_category_query():
+    """ProductRow append-only jadval bo'lgani uchun har bir scrape ishga
+    tushirilganda (bank, category) juftligi uchun yangi qator qo'shiladi.
+    Bu subquery har bir (bank, category) juftligi uchun eng so'nggi
+    scraped_at qiymatini topadi va ProductRow'ga qaytarib bog'laydi, shunda
+    faqat eng so'nggi mos mahsulotlar tanlanadi (eski tarixiy qatorlar
+    filtrlanadi)."""
+    latest = (
+        select(
+            ProductRow.bank,
+            ProductRow.category,
+            func.max(ProductRow.scraped_at).label("scraped_at"),
+        )
+        .group_by(ProductRow.bank, ProductRow.category)
+        .subquery()
+    )
+    return select(ProductRow).join(
+        latest,
+        (ProductRow.bank == latest.c.bank)
+        & (ProductRow.category == latest.c.category)
+        & (ProductRow.scraped_at == latest.c.scraped_at),
+    )
+
+
 @app.get("/products")
 def list_products(category: str | None = None, bank: str | None = None):
     with SessionLocal() as session:
-        query = select(ProductRow)
+        query = _latest_per_bank_category_query()
         if category:
             query = query.where(ProductRow.category == category)
         if bank:
@@ -59,9 +83,8 @@ def recommend(request: RecommendRequest):
         collateral_ok=request.collateral_ok,
     )
     with SessionLocal() as session:
-        rows = session.execute(
-            select(ProductRow).where(ProductRow.category == request.category)
-        ).scalars().all()
+        query = _latest_per_bank_category_query().where(ProductRow.category == request.category)
+        rows = session.execute(query).scalars().all()
 
     ranked = top_recommendations(criteria, rows)
     explanation = explain_recommendation(criteria, ranked)

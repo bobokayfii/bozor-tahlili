@@ -36,6 +36,63 @@ def test_list_products_returns_seeded_row(client):
     assert data[0]["bank"] == "SQB"
 
 
+def test_list_products_returns_only_latest_scrape_per_bank_category(client):
+    with api_main.SessionLocal() as session:
+        session.add(ProductRow(
+            bank="HamkorBank", category="avtokredit", product_name="Hamkor Avtokredit (old)",
+            rate_min=10.0, rate_max=15.0, term_min_months=12, term_max_months=36,
+            amount_max_som=100_000_000, requires_collateral=False,
+            down_payment_pct=None, source_url="https://hamkor.uz",
+            scraped_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ))
+        session.add(ProductRow(
+            bank="HamkorBank", category="avtokredit", product_name="Hamkor Avtokredit (new)",
+            rate_min=20.0, rate_max=25.0, term_min_months=12, term_max_months=36,
+            amount_max_som=100_000_000, requires_collateral=False,
+            down_payment_pct=None, source_url="https://hamkor.uz",
+            scraped_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        ))
+        session.commit()
+
+    response = client.get("/products", params={"category": "avtokredit"})
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["rate_min"] == 20.0
+    assert data[0]["product_name"] == "Hamkor Avtokredit (new)"
+
+
+def test_recommend_uses_only_latest_scrape_per_bank_category(client):
+    with api_main.SessionLocal() as session:
+        session.add(ProductRow(
+            bank="HamkorBank", category="avtokredit", product_name="Hamkor Avtokredit (old)",
+            rate_min=10.0, rate_max=15.0, term_min_months=12, term_max_months=36,
+            amount_max_som=100_000_000, requires_collateral=False,
+            down_payment_pct=None, source_url="https://hamkor.uz",
+            scraped_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ))
+        session.add(ProductRow(
+            bank="HamkorBank", category="avtokredit", product_name="Hamkor Avtokredit (new)",
+            rate_min=20.0, rate_max=25.0, term_min_months=12, term_max_months=36,
+            amount_max_som=100_000_000, requires_collateral=False,
+            down_payment_pct=None, source_url="https://hamkor.uz",
+            scraped_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        ))
+        session.commit()
+
+    response = client.post("/recommend", json={
+        "category": "avtokredit",
+        "amount_som": 50_000_000,
+        "term_months": 12,
+        "collateral_ok": True,
+    })
+    assert response.status_code == 200
+    data = response.json()
+    hamkor_matches = [r for r in data["recommendations"] if r["bank"] == "HamkorBank"]
+    assert len(hamkor_matches) == 1
+    assert hamkor_matches[0]["product_name"] == "Hamkor Avtokredit (new)"
+
+
 def test_recommend_returns_ranked_list_and_explanation(client, monkeypatch):
     monkeypatch.setattr(
         api_main, "explain_recommendation", lambda criteria, ranked: "test tushuntirish"
