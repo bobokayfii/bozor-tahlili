@@ -35,6 +35,9 @@ def run_all_scrapers(session: Session) -> None:
                         down_payment_pct=product.down_payment_pct,
                         source_url=product.source_url,
                         scraped_at=product.scraped_at,
+                        grace_period_months=product.grace_period_months,
+                        payment_method=product.payment_method,
+                        special_terms=product.special_terms,
                     )
                 )
 

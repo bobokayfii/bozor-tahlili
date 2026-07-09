@@ -112,3 +112,34 @@ def test_run_all_scrapers_isolates_persistence_failure_from_other_banks(db_sessi
     assert runs["BadPersistenceBank"].error_message is not None
     assert runs["BadPersistenceBank"].finished_at is not None
     assert runs["WorkingBank"].status == "success"
+
+
+def test_run_all_scrapers_persists_new_optional_fields(db_session):
+    class ScraperWithExtras(BaseScraper):
+        bank_name = "ExtrasBank"
+        url = "https://extras.uz"
+
+        def parse(self, html: str) -> list[Product]:
+            return []
+
+        def run(self) -> list[Product]:
+            return [
+                Product(
+                    bank="ExtrasBank", category="ipoteka_tijorat", product_name="test",
+                    rate_min=20.0, rate_max=25.0, term_min_months=12, term_max_months=240,
+                    amount_max_som=1_700_000_000, requires_collateral=True,
+                    down_payment_pct=25.0, source_url="https://extras.uz",
+                    scraped_at=datetime.now(timezone.utc),
+                    grace_period_months=6,
+                    payment_method="annuitet_yoki_differensial",
+                    special_terms="Sotib olinayotgan uy-joy garov sifatida olinadi.",
+                )
+            ]
+
+    with patch("scrapers.orchestrator.ALL_SCRAPERS", [ScraperWithExtras]):
+        run_all_scrapers(db_session)
+
+    product = db_session.query(ProductRow).one()
+    assert product.grace_period_months == 6
+    assert product.payment_method == "annuitet_yoki_differensial"
+    assert "garov" in product.special_terms
