@@ -9,19 +9,35 @@ export function App() {
   const [categories, setCategories] = useState<Category[]>([])
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [products, setProducts] = useState<Product[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchCategories().then((data) => {
-      setCategories(data)
-      if (data.length > 0) {
-        setActiveCategory(data[0].key)
-      }
-    })
+    fetchCategories()
+      .then((data) => {
+        setCategories(data)
+        if (data.length > 0) {
+          setActiveCategory(data[0].key)
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Kategoriyalarni yuklab bo'lmadi")
+      })
   }, [])
 
   useEffect(() => {
     if (!activeCategory) return
-    fetchProducts(activeCategory).then(setProducts)
+    let ignore = false
+    setError(null)
+    fetchProducts(activeCategory)
+      .then((data) => {
+        if (!ignore) setProducts(data)
+      })
+      .catch((err) => {
+        if (!ignore) setError(err instanceof Error ? err.message : "Mahsulotlarni yuklab bo'lmadi")
+      })
+    return () => {
+      ignore = true
+    }
   }, [activeCategory])
 
   const activeLabel = categories.find((c) => c.key === activeCategory)?.label ?? 'Bozor Tahlili'
@@ -31,6 +47,7 @@ export function App() {
       <Sidebar categories={categories} activeCategory={activeCategory} onSelect={setActiveCategory} />
       <main className="main-content">
         <h1>{activeLabel}</h1>
+        {error && <p className="error-state">{error}</p>}
         <ProductTable products={products} />
         {activeCategory && <RecommendPanel category={activeCategory} />}
       </main>

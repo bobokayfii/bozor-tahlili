@@ -101,6 +101,11 @@ body {
   color: #8891a5;
 }
 
+.rate-best {
+  color: var(--color-positive);
+  font-weight: 700;
+}
+
 .recommend-panel button[type='submit'] {
   border: 1.5px solid var(--color-accent);
   color: var(--color-accent);

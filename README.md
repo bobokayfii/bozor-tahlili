@@ -93,7 +93,7 @@ testlari xotiradagi (`sqlite:///:memory:`) bazadan foydalanadi.
 
 Coverage maqsadi (loyihaning asosiy mantig'i uchun): `db/`, `recommender/`,
 `scrapers/orchestrator.py`, `api/` — 80%+. Scraper HTML-parsing modullari va
-dashboard uchun to'liq branch coverage talab qilinmaydi (mos ravishda
+frontend uchun to'liq branch coverage talab qilinmaydi (mos ravishda
 fixture-asoslangan va smoke testlar bilan qoplangan).
 
 ## Ma'lumotlarni scraping qilish (bir martalik, qo'lda)

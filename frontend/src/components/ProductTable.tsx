@@ -9,6 +9,8 @@ export function ProductTable({ products }: ProductTableProps) {
     return <p className="empty-state">Bu kategoriya uchun hozircha ma'lumot yo'q.</p>
   }
 
+  const bestRate = Math.min(...products.map((product) => product.rate_min))
+
   return (
     <table className="product-table">
       <thead>
@@ -24,7 +26,7 @@ export function ProductTable({ products }: ProductTableProps) {
           <tr key={`${product.bank}-${product.product_name}-${index}`}>
             <td>{product.bank}</td>
             <td>{product.product_name}</td>
-            <td>
+            <td className={product.rate_min === bestRate ? 'rate-best' : undefined}>
               {product.rate_min}% – {product.rate_max}%
             </td>
             <td>
