@@ -16,9 +16,9 @@ scrapers/      Har bir bank uchun alohida scraper + umumiy base.py interfeysi
                va orchestrator.py (barchasini ketma-ket ishga tushiradi)
 recommender/   Qoida-asoslangan scoring (scoring.py) + OpenAI tushuntirish (explain.py)
 api/           FastAPI backend (GET /products, POST /recommend)
-dashboard/     Streamlit UI
+frontend/      React/Vite/TypeScript UI
 scheduler.py   APScheduler orqali muntazam scraping
-tests/         pytest testlari (db/, recommender/, scrapers/, api/, dashboard/)
+tests/         pytest testlari (db/, recommender/, scrapers/, api/)
 data/          SQLite fayli (bank_products.db) — .gitignore'da, repo'ga kirmaydi
 ```
 
@@ -129,13 +129,18 @@ Ma'lumotlar `data/bank_products.db` (SQLite) fayliga tarix sifatida qo'shiladi
 API ishga tushgach, `http://localhost:8000/docs` orqali Swagger UI'da
 `GET /products` va `POST /recommend` endpointlarini sinab ko'rish mumkin.
 
-## Dashboard'ni ishga tushirish
+## Frontend'ni ishga tushirish
 
 API alohida terminalda ishlab turgan holda:
 
 ```bash
-.venv\Scripts\python.exe -m streamlit run dashboard/app.py
+cd frontend
+npm install   # birinchi marta
+npm run dev
 ```
+
+Brauzerda `http://localhost:5173` ochiladi. Kategoriya sidebar'da tanlanadi,
+taqqoslash jadvali va "Tavsiya olish" bo'limi asosiy panelda ko'rsatiladi.
 
 ## Scheduler'ni ishga tushirish (muntazam scraping uchun)
 
@@ -171,13 +176,13 @@ kerak:
      (top-3, ball bilan saralangan) va `explanation` (OpenAI matni yoki
      `OPENAI_API_KEY` bo'lmasa/OpenAI xato bersa — faqat reyting matni)
      qaytishini tekshiring.
-3. **Dashboard**: API ishlab turganida, alohida terminalda
-   `streamlit run dashboard/app.py` buyrug'ini ishga tushiring. Brauzerda
-   ochilgan sahifada:
-   - Kategoriya tanlang va mahsulotlar jadvali to'g'ri to'ldirilishini
-     tekshiring (yoki ma'lumot yo'q bo'lsa — "Bu kategoriya uchun hozircha
-     ma'lumot yo'q." xabari chiqishini tekshiring).
-   - "Tavsiya olish" formasida summa, muddat va garov mezonlarini kiritib
+3. **Frontend**: API ishlab turganida, alohida terminalda
+   `cd frontend && npm run dev` buyrug'ini ishga tushiring. Brauzerda
+   `http://localhost:5173` sahifasida:
+   - Kategoriya sidebar'da tanlang va mahsulotlar jadvali to'g'ri to'ldirilishini
+     tekshiring (yoki ma'lumot yo'q bo'lsa — "hozircha ma'lumot yo'q" xabari
+     chiqishini tekshiring).
+   - "Tavsiya olish" panelida summa, muddat va garov mezonlarini kiritib
      yuboring — natijada top-3 bank va tushuntirish matni ko'rsatilishini
      tasdiqlang.
 4. Yuqoridagi qadamlarning barchasi haqiqiy internet ulanishi, ishlaydigan
