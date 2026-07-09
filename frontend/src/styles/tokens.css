@@ -5,6 +5,7 @@
   --color-text-muted: #a9b6cf;
   --color-border: #eceef3;
   --color-positive: #1a7f4a;
+  --color-error: #c0392b;
   --font-heading: 'Fraunces', serif;
   --font-body: 'Inter', sans-serif;
 }
@@ -99,6 +100,10 @@ body {
 
 .empty-state {
   color: #8891a5;
+}
+
+.error-state {
+  color: var(--color-error);
 }
 
 .rate-best {
