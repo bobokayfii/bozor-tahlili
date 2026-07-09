@@ -24,6 +24,9 @@ class ProductRow(Base):
     down_payment_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     source_url: Mapped[str] = mapped_column(String(500))
     scraped_at: Mapped[datetime] = mapped_column(DateTime)
+    grace_period_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payment_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    special_terms: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ScrapeRunRow(Base):

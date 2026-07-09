@@ -29,6 +29,9 @@ class Product:
     down_payment_pct: float | None
     source_url: str
     scraped_at: datetime
+    grace_period_months: int | None = None
+    payment_method: str | None = None
+    special_terms: str | None = None
 
 
 class BaseScraper(ABC):

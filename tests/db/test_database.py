@@ -17,3 +17,47 @@ def test_init_db_creates_tables_and_session_works(tmp_path):
         ))
         session.commit()
         assert session.query(ProductRow).count() == 1
+
+
+def test_init_db_adds_new_columns_to_existing_products_table(tmp_path):
+    from sqlalchemy import inspect, text
+
+    db_path = tmp_path / "legacy.db"
+    engine = get_engine(db_path)
+    with engine.begin() as conn:
+        conn.execute(text(
+            """
+            CREATE TABLE products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bank VARCHAR(100),
+                category VARCHAR(50),
+                product_name VARCHAR(200),
+                rate_min FLOAT,
+                rate_max FLOAT,
+                term_min_months INTEGER,
+                term_max_months INTEGER,
+                amount_max_som INTEGER,
+                requires_collateral BOOLEAN,
+                down_payment_pct FLOAT,
+                source_url VARCHAR(500),
+                scraped_at DATETIME
+            )
+            """
+        ))
+    engine.dispose()
+
+    engine_v2 = get_engine(db_path)
+    init_db(engine_v2)
+
+    inspector = inspect(engine_v2)
+    columns = {col["name"] for col in inspector.get_columns("products")}
+    assert "grace_period_months" in columns
+    assert "payment_method" in columns
+    assert "special_terms" in columns
+
+
+def test_init_db_migration_is_idempotent(tmp_path):
+    db_path = tmp_path / "twice.db"
+    engine = get_engine(db_path)
+    init_db(engine)
+    init_db(engine)  # must not raise "duplicate column" on second call
