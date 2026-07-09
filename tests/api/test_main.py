@@ -107,3 +107,32 @@ def test_recommend_returns_ranked_list_and_explanation(client, monkeypatch):
     data = response.json()
     assert data["explanation"] == "test tushuntirish"
     assert data["recommendations"][0]["bank"] == "SQB"
+
+
+def test_list_categories_returns_eleven_entries(client):
+    response = client.get("/categories")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 11
+    keys = {c["key"] for c in data}
+    assert "avtokredit" in keys
+    assert "ipoteka_davlat" in keys
+    assert data[0]["schema"] == "credit"
+
+
+def test_products_response_includes_new_optional_fields(client):
+    response = client.get("/products", params={"category": "mikroqarz"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["grace_period_months"] is None
+    assert data[0]["payment_method"] is None
+    assert data[0]["special_terms"] is None
+
+
+def test_cors_allows_configured_frontend_origin(client):
+    response = client.get(
+        "/products",
+        params={"category": "mikroqarz"},
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"

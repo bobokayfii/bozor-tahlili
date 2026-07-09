@@ -1,15 +1,24 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
+from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
 from recommender.explain import explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
 
 app = FastAPI(title="Bank Mahsulot Tahlili API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 _engine = get_engine()
 init_db(_engine)
@@ -34,6 +43,9 @@ def _row_to_dict(row: ProductRow) -> dict:
         "term_max_months": row.term_max_months,
         "amount_max_som": row.amount_max_som,
         "requires_collateral": row.requires_collateral,
+        "grace_period_months": row.grace_period_months,
+        "payment_method": row.payment_method,
+        "special_terms": row.special_terms,
         "scraped_at": row.scraped_at.isoformat(),
     }
 
@@ -72,6 +84,11 @@ def list_products(category: str | None = None, bank: str | None = None):
             query = query.where(ProductRow.bank == bank)
         rows = session.execute(query).scalars().all()
         return [_row_to_dict(row) for row in rows]
+
+
+@app.get("/categories")
+def list_categories():
+    return [{"key": c.key, "label": c.label_uz, "schema": c.schema} for c in CATEGORIES]
 
 
 @app.post("/recommend")
