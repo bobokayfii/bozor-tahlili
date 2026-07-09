@@ -57,7 +57,36 @@ def test_init_db_adds_new_columns_to_existing_products_table(tmp_path):
 
 
 def test_init_db_migration_is_idempotent(tmp_path):
+    from sqlalchemy import inspect, text
+
     db_path = tmp_path / "twice.db"
     engine = get_engine(db_path)
-    init_db(engine)
-    init_db(engine)  # must not raise "duplicate column" on second call
+    with engine.begin() as conn:
+        conn.execute(text(
+            """
+            CREATE TABLE products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bank VARCHAR(100),
+                category VARCHAR(50),
+                product_name VARCHAR(200),
+                rate_min FLOAT,
+                rate_max FLOAT,
+                term_min_months INTEGER,
+                term_max_months INTEGER,
+                amount_max_som INTEGER,
+                requires_collateral BOOLEAN,
+                down_payment_pct FLOAT,
+                source_url VARCHAR(500),
+                scraped_at DATETIME
+            )
+            """
+        ))
+
+    init_db(engine)  # first call: triggers real ALTER TABLE ADD COLUMN for the 3 missing columns
+    init_db(engine)  # second call: columns already present, must not raise "duplicate column"
+
+    inspector = inspect(engine)
+    columns = {col["name"] for col in inspector.get_columns("products")}
+    assert "grace_period_months" in columns
+    assert "payment_method" in columns
+    assert "special_terms" in columns
