@@ -14,6 +14,7 @@ export interface Product {
   term_max_months: number
   amount_max_som: number
   requires_collateral: boolean
+  down_payment_pct: number | null
   grace_period_months: number | null
   payment_method: string | null
   special_terms: string | null
