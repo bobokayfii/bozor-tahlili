@@ -40,7 +40,8 @@ export function App() {
     }
   }, [activeCategory])
 
-  const activeLabel = categories.find((c) => c.key === activeCategory)?.label ?? 'Bozor Tahlili'
+  const activeCategoryData = categories.find((c) => c.key === activeCategory)
+  const activeLabel = activeCategoryData?.label ?? 'Bozor Tahlili'
 
   return (
     <div className="app-shell">
@@ -48,7 +49,7 @@ export function App() {
       <main className="main-content">
         <h1>{activeLabel}</h1>
         {error && <p className="error-state">{error}</p>}
-        <ProductTable products={products} />
+        <ProductTable products={products} schema={activeCategoryData?.schema} />
         {activeCategory && <RecommendPanel category={activeCategory} />}
       </main>
     </div>
