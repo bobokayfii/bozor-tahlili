@@ -13,21 +13,92 @@ const sampleProduct: Product = {
   term_max_months: 60,
   amount_max_som: 800_000_000,
   requires_collateral: true,
-  grace_period_months: null,
-  payment_method: null,
+  down_payment_pct: 30,
+  grace_period_months: 3,
+  payment_method: 'Annuitet',
   special_terms: null,
   scraped_at: '2026-07-08T10:00:00Z',
 }
 
+const cheaperProduct: Product = {
+  ...sampleProduct,
+  bank: 'NBU',
+  product_name: 'NBU Avtokredit',
+  rate_min: 20.9,
+  rate_max: 23.9,
+}
+
 describe('ProductTable', () => {
+  it('shows a loading skeleton instead of the empty-state message while loading', () => {
+    render(<ProductTable products={[]} isLoading />)
+    expect(screen.getByLabelText('Yuklanmoqda')).toBeInTheDocument()
+    expect(
+      screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+    ).not.toBeInTheDocument()
+  })
+
   it('shows the empty-state message when there are no products', () => {
     render(<ProductTable products={[]} />)
-    expect(screen.getByText("Bu kategoriya uchun hozircha ma'lumot yo'q.")).toBeInTheDocument()
+    expect(
+      screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+    ).toBeInTheDocument()
   })
 
   it('renders one row per product with bank and rate range', () => {
     render(<ProductTable products={[sampleProduct]} />)
     expect(screen.getByText('SQB')).toBeInTheDocument()
     expect(screen.getByText('24.9% – 27.9%')).toBeInTheDocument()
+  })
+
+  it('ranks products by cheapest rate first and flags the SQB row', () => {
+    render(<ProductTable products={[sampleProduct, cheaperProduct]} />)
+    const rows = screen.getAllByText(/^0[12]$/)
+    expect(rows[0]).toHaveTextContent('01')
+    expect(screen.getByText('NBU').closest('.rate-row')).toHaveClass('is-best')
+    expect(screen.getByText('Biz')).toBeInTheDocument()
+    expect(screen.getByText('SQB').closest('.rate-row')).toHaveClass('is-house')
+  })
+
+  it('defaults to the credit_down_payment column set when no schema prop is given', () => {
+    render(<ProductTable products={[sampleProduct]} />)
+    expect(screen.getByText("Boshlang'ich badal")).toBeInTheDocument()
+    expect(screen.getByText('30%')).toBeInTheDocument()
+    expect(screen.getByText('Annuitet')).toBeInTheDocument()
+    expect(screen.getByText('Bor')).toBeInTheDocument()
+    expect(screen.getByText('3 oy')).toBeInTheDocument()
+    expect(screen.getByText('Kredit miqdori')).toBeInTheDocument()
+    expect(screen.getByText("800 mln so'm")).toBeInTheDocument()
+  })
+
+  it('falls back to a dash for missing optional fields', () => {
+    const productWithoutExtras: Product = {
+      ...sampleProduct,
+      requires_collateral: false,
+      down_payment_pct: null,
+      payment_method: null,
+      grace_period_months: null,
+    }
+    render(<ProductTable products={[productWithoutExtras]} />)
+    expect(screen.getAllByText('—')).toHaveLength(3)
+    expect(screen.getByText("Yo'q")).toBeInTheDocument()
+  })
+
+  it('renders the credit_special_terms column set: Maxsus shartlari shown, Boshlang\'ich badal hidden', () => {
+    const microloanProduct: Product = {
+      ...sampleProduct,
+      category: 'mikroqarz',
+      down_payment_pct: null,
+      special_terms: 'Kredit yuklamasi hisobga olinadi',
+    }
+    render(<ProductTable products={[microloanProduct]} schema="credit_special_terms" />)
+    expect(screen.getByText('Maxsus shartlari')).toBeInTheDocument()
+    expect(screen.getByText('Kredit yuklamasi hisobga olinadi')).toBeInTheDocument()
+    expect(screen.queryByText("Boshlang'ich badal")).not.toBeInTheDocument()
+  })
+
+  it('renders the credit_down_payment column set: Boshlang\'ich badal shown, Maxsus shartlari hidden', () => {
+    render(<ProductTable products={[sampleProduct]} schema="credit_down_payment" />)
+    expect(screen.getByText("Boshlang'ich badal")).toBeInTheDocument()
+    expect(screen.queryByText('Maxsus shartlari')).not.toBeInTheDocument()
   })
 })
