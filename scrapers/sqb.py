@@ -17,3 +17,12 @@ class SQBScraper(TextSectionScraper):
         "kredit_karta": "https://sqb.uz/uz/individuals/credits/credit-card-new-uz/",
         "istemol_krediti": "https://sqb.uz/uz/individuals/credits/consumer-credit-new-uz/",
     }
+    # consumer-credit-new-uz sahifasida "Foiz stavkasi:" jadvalidan tashqarida
+    # ham boshqa % belgilar bor (masalan, "Qarz yuki ko'rsatkichi 50% dan
+    # oshmasligi" talabi va ipoteka mahsulotiga cross-sell banneri "yillik
+    # 17%"). CATEGORY_HEADINGS bo'lmasa butun sahifa matni bitta bo'lim
+    # sifatida olinadi va shu begona foizlar rate_min/rate_max'ni buzadi.
+    # Shuning uchun bu yerda faqat haqiqiy stavka jadvali bilan chegaralanadi.
+    CATEGORY_HEADINGS = {
+        "istemol_krediti": ("Kredit miqdori:", "Imtiyozli davr"),
+    }

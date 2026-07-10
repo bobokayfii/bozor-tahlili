@@ -56,6 +56,30 @@ def test_parse_marks_mikroqarz_as_collateral_free():
     assert mikroqarz.requires_collateral is False
 
 
+def test_force_collateral_overrides_text_detection():
+    """Some products (e.g. auto loans) are always collateralized by the
+    purchased vehicle by convention, even when the page never says "garov"
+    explicitly. FORCE_COLLATERAL lets a scraper assert that fact directly
+    instead of relying on unreliable text detection."""
+
+    class ForcedCollateralScraper(TextSectionScraper):
+        bank_name = "FakeBank"
+        url = "https://fakebank.uz/kredit"
+        CATEGORY_HEADINGS = {
+            "avtokredit": ("Avtokredit", "Mikroqarz"),
+            "mikroqarz": ("Mikroqarz", None),
+        }
+        FORCE_COLLATERAL = {"avtokredit": True}
+
+    products = ForcedCollateralScraper().parse(SAMPLE_HTML)
+    avtokredit = next(p for p in products if p.category == "avtokredit")
+    mikroqarz = next(p for p in products if p.category == "mikroqarz")
+
+    assert avtokredit.requires_collateral is True
+    # mikroqarz has no FORCE_COLLATERAL entry, so text detection still applies.
+    assert mikroqarz.requires_collateral is False
+
+
 def test_run_calls_fetch_html_then_parse():
     scraper = FakeBankScraper()
     with patch("scrapers.base.fetch_html", return_value=SAMPLE_HTML) as mock_fetch:

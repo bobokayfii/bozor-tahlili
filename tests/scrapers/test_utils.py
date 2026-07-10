@@ -50,6 +50,18 @@ def test_extract_term_months_excludes_grace_period_figure_when_range_present():
     assert extract_term_months(text) == [12, 60]
 
 
+def test_extract_term_months_converts_single_year_figure():
+    # Ipoteka Bank's autocredit page states duration in years, not months
+    # ("5 yilgacha"), unlike every other bank which uses "oygacha".
+    text = "Muddati: 5 yilgacha"
+    assert extract_term_months(text) == [60]
+
+
+def test_extract_term_months_converts_year_range():
+    text = "Muddati: 1 yildan 5 yilgacha"
+    assert extract_term_months(text) == [12, 60]
+
+
 def test_extract_amount_som_parses_million():
     text = "Kredit miqdori: 800 mln.so'mgacha"
     assert extract_amount_som(text) == 800_000_000

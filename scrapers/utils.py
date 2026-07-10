@@ -46,12 +46,15 @@ def extract_percentages(text: str) -> list[float]:
 
 _TERM_RANGE_RE = re.compile(r"(\d{1,3})\s*oydan\s*(\d{1,3})\s*oygacha")
 _TERM_SINGLE_RE = re.compile(r"(\d{1,3})\s*oygacha")
+_TERM_YEAR_RANGE_RE = re.compile(r"(\d{1,2})\s*yildan\s*(\d{1,2})\s*yilgacha")
+_TERM_YEAR_SINGLE_RE = re.compile(r"(\d{1,2})\s*yilgacha")
 
 
 def extract_term_months(text: str) -> list[int]:
     """Muddat oralig'ini "N oydan M oygacha" (masalan, "12 oydan 60 oygacha")
     range shaklidan topadi. Agar range topilmasa, yagona "N oygacha"
-    ko'rsatkichiga tushadi.
+    ko'rsatkichiga tushadi. Ba'zi banklar muddatni oy o'rniga yilda beradi
+    ("5 yilgacha" kabi) — bunday qiymatlar oyga aylantiriladi (1 yil = 12 oy).
 
     Range topilganda undan tashqaridagi bitta "N oygacha" iboralari (masalan,
     "Imtiyozli davr: 6 oygacha" kabi imtiyozli davr ko'rsatkichlari) e'tiborga
@@ -59,10 +62,14 @@ def extract_term_months(text: str) -> list[int]:
     term_min/term_max qiymatlarini keltirib chiqaradi.
     """
     range_matches = _TERM_RANGE_RE.findall(text)
-    if range_matches:
+    year_range_matches = _TERM_YEAR_RANGE_RE.findall(text)
+    if range_matches or year_range_matches:
         values = {int(lo) for lo, hi in range_matches} | {int(hi) for lo, hi in range_matches}
+        values |= {int(lo) * 12 for lo, hi in year_range_matches}
+        values |= {int(hi) * 12 for lo, hi in year_range_matches}
     else:
         values = {int(m) for m in _TERM_SINGLE_RE.findall(text)}
+        values |= {int(m) * 12 for m in _TERM_YEAR_SINGLE_RE.findall(text)}
     return sorted(v for v in values if v <= 120)
 
 

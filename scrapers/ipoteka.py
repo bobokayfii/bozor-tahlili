@@ -11,6 +11,25 @@ class IpotekaBankScraper(TextSectionScraper):
     tasdiqlangan mahsulot sahifalari mavjud (WebFetch orqali jonli tekshirilgan
     va real raqamlar bilan mos keldi). Boshqa ikkita kategoriya uchun esa aniq
     moslik topilmadi:
+      - avtokredit -> eski "/uz/private/crediting/auto/" manzili sayt qayta
+        qurilgandan keyin "/ru/crediting/autocredit/" (rus tilidagi) sahifaga
+        301 redirect qiladi — natijada o'zbekcha regex naqshlari ("oygacha",
+        "so'm") mos kelmay, mahsulot butunlay tushib qolardi. To'g'ri, hozirgi
+        manzil "https://www.ipotekabank.uz/crediting/autocredit/" bo'lib,
+        o'zbekcha kontentni to'g'ridan-to'g'ri (redirectsiz) qaytaradi. Bu
+        sahifada bitta umumiy stavka o'rniga har bir avtomobil brendi/dilер
+        uchun alohida shartnoma kartochkasi bor (~12 xil stavka, 0%–29.99%
+        oralig'ida) — bu KONTAMINATSIYA emas, balki turli brendlar uchun
+        haqiqiy turlicha shartlar, shuning uchun rate_min/rate_max butun
+        sahifa bo'ylab hisoblanadi. Muddat esa "oy" emas, "5 yilgacha" (yil)
+        shaklida berilgan — scrapers/utils.py'dagi extract_term_months endi
+        "N yilgacha" naqshini ham oyga aylantirib tushunadi. Garov (kafolat)
+        talabi haqida sahifada aniq "garov" so'zi yo'q — sahifada boshqa bir
+        mahsulot uchun "garovsiz mikrokredit" iborasi bor bo'lib, bu butun
+        sahifa bo'yicha yolg'on-manfiy (false negative) beradi. Avtokredit esa
+        ta'rifiga ko'ra doim sotib olinayotgan avtomobilning o'zi bilan
+        ta'minlanadi (umumbank amaliyoti, alohida yozilmasa ham) — shu sababli
+        FORCE_COLLATERAL orqali aniq True belgilangan.
       - kredit_karta -> Ipoteka Bankda alohida "kredit karta" (credit card)
         krediti yo'q, faqat debet kartalari (UZCARD, VISA Classic, HUMO) bor.
         Shu sababli Overdraft sahifasi eng yaqin funksional analog sifatida
@@ -31,9 +50,12 @@ class IpotekaBankScraper(TextSectionScraper):
     url = "https://ipotekabank.uz/uz/private/crediting/"
     CATEGORY_URLS = {
         # Tasdiqlangan (real, WebFetch orqali jonli tekshirilgan):
-        "avtokredit": "https://ipotekabank.uz/uz/private/crediting/auto/",
+        "avtokredit": "https://www.ipotekabank.uz/crediting/autocredit/",
         "mikroqarz": "https://www.ipotekabank.uz/private/crediting/micro_new/",
         # Taxminiy (best-guess) — quyidagi sinf docstringiga qarang:
         "kredit_karta": "https://ipotekabank.uz/uz/private/crediting/overdraft/",
         "istemol_krediti": "https://ipotekabank.uz/uz/private/crediting/consumer/",
+    }
+    FORCE_COLLATERAL = {
+        "avtokredit": True,
     }

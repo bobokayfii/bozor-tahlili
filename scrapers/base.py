@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from categories import CATEGORIES
 from scrapers.utils import (
     extract_amount_som,
     extract_percentages,
@@ -13,6 +14,8 @@ from scrapers.utils import (
     has_collateral_requirement,
     html_to_text,
 )
+
+_CATEGORY_LABELS: dict[str, str] = {category.key: category.label_uz for category in CATEGORIES}
 
 
 @dataclass
@@ -60,6 +63,13 @@ class TextSectionScraper(BaseScraper):
 
     CATEGORY_HEADINGS: dict[str, tuple[str, str | None]] = {}
     CATEGORY_URLS: dict[str, str] | None = None
+    # Ba'zi mahsulotlar uchun garov talabi mahsulot turi bo'yicha shubhasiz
+    # ma'lum (masalan, avtokredit doim sotib olingan avtomobilning o'zi bilan
+    # ta'minlanadi), lekin sahifa matnida buni aniq "garov" so'zi bilan
+    # yozilmasligi mumkin — chunki bu odatiy amaliyot sifatida qabul qilinadi.
+    # Bunday holatlarda matndan aniqlashga urinish o'rniga shu yerda aniq
+    # qiymat belgilanadi: {category: requires_collateral}.
+    FORCE_COLLATERAL: dict[str, bool] = {}
 
     def _build_product(
         self,
@@ -67,7 +77,7 @@ class TextSectionScraper(BaseScraper):
         section: str,
         source_url: str,
         scraped_at: datetime,
-        heading: str | None = None,
+        full_text: str | None = None,
     ) -> Product | None:
         if not section.strip():
             return None
@@ -78,7 +88,21 @@ class TextSectionScraper(BaseScraper):
         if not rates or not terms or amount is None:
             return None
 
-        label = heading if heading is not None else category
+        # Garov/kafillik talablari ko'pincha stavka jadvalidan ancha pastda,
+        # alohida "Ta'minot talablari" bo'limida joylashadi — ba'zan o'sha
+        # bo'limning o'zida ham foiz belgilari bor (masalan, "ta'minot
+        # miqdori kredit summasining 125%"). Shu sababli garov tekshiruvi
+        # har doim to'liq sahifa matnida (full_text) o'tkaziladi, toraytirilgan
+        # `section`da emas — aks holda foiz kontaminatsiyasidan qochish uchun
+        # bo'limni tor qilib olsak, garov ma'lumoti ham yo'qolib qoladi.
+        collateral_text = full_text if full_text is not None else section
+        requires_collateral = (
+            self.FORCE_COLLATERAL[category]
+            if category in self.FORCE_COLLATERAL
+            else has_collateral_requirement(collateral_text)
+        )
+
+        label = _CATEGORY_LABELS.get(category, category)
         return Product(
             bank=self.bank_name,
             category=category,
@@ -88,7 +112,7 @@ class TextSectionScraper(BaseScraper):
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
-            requires_collateral=has_collateral_requirement(section),
+            requires_collateral=requires_collateral,
             down_payment_pct=None,
             source_url=source_url,
             scraped_at=scraped_at,
@@ -101,7 +125,7 @@ class TextSectionScraper(BaseScraper):
 
         for category, (start_heading, end_heading) in self.CATEGORY_HEADINGS.items():
             section = extract_section(text, start_heading, end_heading)
-            product = self._build_product(category, section, self.url, now, heading=start_heading)
+            product = self._build_product(category, section, self.url, now)
             if product is not None:
                 products.append(product)
         return products
@@ -122,10 +146,9 @@ class TextSectionScraper(BaseScraper):
                 start_heading, end_heading = heading_pair
                 section = extract_section(text, start_heading, end_heading)
             else:
-                start_heading = category
                 section = text
 
-            product = self._build_product(category, section, url, now, heading=start_heading)
+            product = self._build_product(category, section, url, now, full_text=text)
             if product is not None:
                 products.append(product)
         return products

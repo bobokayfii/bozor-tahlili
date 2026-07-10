@@ -43,6 +43,7 @@ def _row_to_dict(row: ProductRow) -> dict:
         "term_max_months": row.term_max_months,
         "amount_max_som": row.amount_max_som,
         "requires_collateral": row.requires_collateral,
+        "down_payment_pct": row.down_payment_pct,
         "grace_period_months": row.grace_period_months,
         "payment_method": row.payment_method,
         "special_terms": row.special_terms,

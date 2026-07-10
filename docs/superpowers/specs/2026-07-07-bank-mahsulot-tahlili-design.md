@@ -1,3 +1,5 @@
+
+
 # Bank mahsulotlari bozor tahlili va AI tavsiya tizimi — Dizayn hujjati
 
 **Sana:** 2026-07-07
@@ -21,6 +23,9 @@ Loyiha 4 mustaqil kichik tizimdan iborat: ma'lumot yig'ish, saqlash/kategoriyala
 **MVP doirasidan tashqarida (keyingi bosqichlar):** yuridik shaxslar mahsulotlari, qolgan ~10 bank, tashqi/ommaviy versiya, cloud deployment, real-time scraping monitoring dashboard.
 
 ## 3. Arxitektura
+
+
+
 
 Bitta Python loyihasi (monolit):
 
