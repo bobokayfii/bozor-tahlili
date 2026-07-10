@@ -124,6 +124,7 @@ def test_products_response_includes_new_optional_fields(client):
     response = client.get("/products", params={"category": "mikroqarz"})
     assert response.status_code == 200
     data = response.json()
+    assert data[0]["down_payment_pct"] is None
     assert data[0]["grace_period_months"] is None
     assert data[0]["payment_method"] is None
     assert data[0]["special_terms"] is None
