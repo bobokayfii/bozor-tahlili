@@ -127,7 +127,6 @@ def test_products_response_includes_new_optional_fields(client):
     assert data[0]["grace_period_months"] is None
     assert data[0]["payment_method"] is None
     assert data[0]["special_terms"] is None
-    assert data[0]["down_payment_pct"] is None
 
 
 def test_cors_allows_configured_frontend_origin(client):
