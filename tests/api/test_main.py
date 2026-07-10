@@ -117,7 +117,7 @@ def test_list_categories_returns_eleven_entries(client):
     keys = {c["key"] for c in data}
     assert "avtokredit" in keys
     assert "ipoteka_davlat" in keys
-    assert data[0]["schema"] == "credit"
+    assert data[0]["schema"] == "credit_down_payment"
 
 
 def test_products_response_includes_new_optional_fields(client):
@@ -127,6 +127,7 @@ def test_products_response_includes_new_optional_fields(client):
     assert data[0]["grace_period_months"] is None
     assert data[0]["payment_method"] is None
     assert data[0]["special_terms"] is None
+    assert data[0]["down_payment_pct"] is None
 
 
 def test_cors_allows_configured_frontend_origin(client):
