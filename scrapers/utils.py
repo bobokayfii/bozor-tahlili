@@ -141,7 +141,10 @@ def extract_section(text: str, start_heading: str, end_heading: str | None) -> s
 
 
 def extract_percentages(text: str) -> list[float]:
-    matches = re.findall(r"(\d{1,2}(?:[.,]\d{1,2})?)\s*%", text)
+    # (?<!\d) stops a 3+-digit figure like a "125%" collateral-coverage
+    # ratio from being mis-read as "25%" — without it, \d{1,2} happily
+    # starts matching mid-number at the "25" tail of "125".
+    matches = re.findall(r"(?<!\d)(\d{1,2}(?:[.,]\d{1,2})?)\s*%", text)
     values = [float(m.replace(",", ".")) for m in matches]
     seen: list[float] = []
     for value in values:
@@ -154,6 +157,8 @@ _TERM_RANGE_RE = re.compile(r"(\d{1,3})\s*oydan\s*(\d{1,3})\s*oygacha")
 _TERM_SINGLE_RE = re.compile(r"(\d{1,3})\s*oygacha")
 _TERM_YEAR_RANGE_RE = re.compile(r"(\d{1,2})\s*yildan\s*(\d{1,2})\s*yilgacha")
 _TERM_YEAR_SINGLE_RE = re.compile(r"(\d{1,2})\s*yilgacha")
+_TERM_YEAR_BARE_RE = re.compile(r"(\d{1,2})\s*yil(?!dan|gacha|lik)")
+_TERM_MONTH_BARE_RE = re.compile(r"(\d{1,3})\s*oy(?!dan|gacha|lik)")
 
 
 def extract_term_months(text: str) -> list[int]:
@@ -166,6 +171,10 @@ def extract_term_months(text: str) -> list[int]:
     "Imtiyozli davr: 6 oygacha" kabi imtiyozli davr ko'rsatkichlari) e'tiborga
     olinmaydi — aks holda ular asosiy muddat oralig'iga aralashib, noto'g'ri
     term_min/term_max qiymatlarini keltirib chiqaradi.
+
+    Agar hech qanday "oygacha"/"yilgacha" ibora topilmasa (masalan, InfinBank
+    "18 oy" yoki "5 yil" kabi "gacha"siz muddat ko'rsatishi mumkin), oxirgi
+    chora sifatida yalang' "N oy"/"N yil" ko'rsatkichi ham qabul qilinadi.
     """
     range_matches = _TERM_RANGE_RE.findall(text)
     year_range_matches = _TERM_YEAR_RANGE_RE.findall(text)
@@ -176,14 +185,28 @@ def extract_term_months(text: str) -> list[int]:
     else:
         values = {int(m) for m in _TERM_SINGLE_RE.findall(text)}
         values |= {int(m) * 12 for m in _TERM_YEAR_SINGLE_RE.findall(text)}
+        if not values:
+            values = {int(m) * 12 for m in _TERM_YEAR_BARE_RE.findall(text)}
+            values |= {int(m) for m in _TERM_MONTH_BARE_RE.findall(text)}
     return sorted(v for v in values if v <= 120)
 
 
+_AMOUNT_GROUPED_RE = re.compile(r"(\d{1,3}(?:[ .]\d{3})+)\s*so", re.IGNORECASE)
+
+
 def extract_amount_som(text: str) -> int | None:
-    mln_matches = re.findall(r"(\d{1,5})\s*mln\.?\s*so", text, flags=re.IGNORECASE)
-    mlrd_matches = re.findall(r"(\d{1,3}(?:[.,]\d{1,2})?)\s*mlrd\.?\s*so", text, flags=re.IGNORECASE)
+    # "so'm"/"som" is the usual currency word, but some sites (e.g.
+    # InfinBank's card tariffs) state amounts against the "UZS" currency
+    # code instead — both refer to the same currency, so both are accepted.
+    mln_matches = re.findall(r"(\d{1,5})\s*mln\.?\s*(?:so|uzs)", text, flags=re.IGNORECASE)
+    mlrd_matches = re.findall(r"(\d{1,3}(?:[.,]\d{1,2})?)\s*mlrd\.?\s*(?:so|uzs)", text, flags=re.IGNORECASE)
     amounts = [int(m) * 1_000_000 for m in mln_matches]
     amounts += [int(float(m.replace(",", "."))) * 1_000_000_000 for m in mlrd_matches]
+    if not amounts:
+        # Some pages spell out the exact sum instead of rounding to
+        # "mln so'm" (e.g. "41 200 000 so'mgacha") — space/dot-grouped
+        # thousands directly followed by "so'm".
+        amounts = [int(m.replace(" ", "").replace(".", "")) for m in _AMOUNT_GROUPED_RE.findall(text)]
     return max(amounts) if amounts else None
 
 
