@@ -85,7 +85,7 @@ def test_run_calls_fetch_html_then_parse():
     with patch("scrapers.base.fetch_html", return_value=SAMPLE_HTML) as mock_fetch:
         products = scraper.run()
 
-    mock_fetch.assert_called_once_with("https://fakebank.uz/kredit")
+    mock_fetch.assert_called_once_with("https://fakebank.uz/kredit", extra_ca_cert=None)
     assert len(products) == 2
 
 
@@ -139,8 +139,8 @@ def test_run_fetches_each_category_url_when_category_urls_set():
         products = MultiPageScraper().run()
 
     assert mock_fetch.call_count == 2
-    mock_fetch.assert_any_call("https://multibank.uz/avtokredit")
-    mock_fetch.assert_any_call("https://multibank.uz/mikroqarz")
+    mock_fetch.assert_any_call("https://multibank.uz/avtokredit", extra_ca_cert=None)
+    mock_fetch.assert_any_call("https://multibank.uz/mikroqarz", extra_ca_cert=None)
 
     assert len(products) == 2
     avtokredit = next(p for p in products if p.category == "avtokredit")

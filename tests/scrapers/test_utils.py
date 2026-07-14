@@ -1,8 +1,16 @@
+import socket
+from unittest.mock import Mock, patch
+
+import pytest
+import requests
+
 from scrapers.utils import (
+    _resolve_hostname_as,
     extract_amount_som,
     extract_percentages,
     extract_section,
     extract_term_months,
+    fetch_html,
     has_collateral_requirement,
     html_to_text,
 )
@@ -82,3 +90,66 @@ def test_has_collateral_requirement_true_when_garov_mentioned():
 
 def test_has_collateral_requirement_false_when_mavjud_emas():
     assert has_collateral_requirement("Kredit kafolati: Mavjud emas") is False
+
+
+def test_fetch_html_returns_response_text_on_success():
+    mock_response = Mock(text="<html>ok</html>")
+    mock_response.raise_for_status = Mock()
+    with patch("scrapers.utils.requests.get", return_value=mock_response) as mock_get:
+        result = fetch_html("https://bank.uz/kredit")
+
+    assert result == "<html>ok</html>"
+    assert mock_get.call_args.kwargs["verify"] is True
+
+
+def test_fetch_html_falls_back_to_doh_resolved_ip_on_connection_error():
+    """Some bank domains fail plain requests.get with a DNS resolution
+    error even though the site is reachable; fetch_html should recover by
+    resolving via DNS-over-HTTPS and retrying against that IP."""
+    ok_response = Mock(text="<html>recovered</html>")
+    ok_response.raise_for_status = Mock()
+    call_count = {"n": 0}
+
+    def fake_get(url, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise requests.exceptions.ConnectionError("DNS lookup failed")
+        return ok_response
+
+    with (
+        patch("scrapers.utils.requests.get", side_effect=fake_get),
+        patch("scrapers.utils._resolve_via_doh", return_value="203.0.113.10"),
+    ):
+        result = fetch_html("https://bank.uz/kredit")
+
+    assert result == "<html>recovered</html>"
+    assert call_count["n"] == 2
+
+
+def test_fetch_html_reraises_original_error_when_no_fallback_ip_available():
+    connection_error = requests.exceptions.ConnectionError("DNS lookup failed")
+
+    with (
+        patch("scrapers.utils.requests.get", side_effect=connection_error),
+        patch("scrapers.utils._resolve_via_doh", return_value=None),
+    ):
+        with pytest.raises(requests.exceptions.ConnectionError):
+            fetch_html("https://unreachable-bank.uz/kredit")
+
+
+def test_resolve_hostname_as_only_patches_the_given_hostname():
+    original = socket.getaddrinfo
+    seen_hosts = []
+
+    def fake_getaddrinfo(host, *args, **kwargs):
+        seen_hosts.append(host)
+        return []
+
+    with patch("socket.getaddrinfo", side_effect=fake_getaddrinfo):
+        with _resolve_hostname_as("bank.uz", "203.0.113.10"):
+            socket.getaddrinfo("bank.uz", 443)
+            socket.getaddrinfo("other.uz", 443)
+
+    assert socket.getaddrinfo is original
+    # fake_getaddrinfo receives whatever _resolve_hostname_as substituted
+    assert seen_hosts == ["203.0.113.10", "other.uz"]

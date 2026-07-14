@@ -40,9 +40,12 @@ class Product:
 class BaseScraper(ABC):
     bank_name: str
     url: str
+    # Set to a filename under scrapers/certs/ when the bank's server sends an
+    # incomplete certificate chain (see fetch_html's extra_ca_cert param).
+    EXTRA_CA_CERT: str | None = None
 
     def run(self) -> list[Product]:
-        html = fetch_html(self.url)
+        html = fetch_html(self.url, extra_ca_cert=self.EXTRA_CA_CERT)
         return self.parse(html)
 
     @abstractmethod
@@ -138,7 +141,7 @@ class TextSectionScraper(BaseScraper):
         products: list[Product] = []
 
         for category, url in self.CATEGORY_URLS.items():
-            html = fetch_html(url)
+            html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
             text = html_to_text(html)
 
             heading_pair = self.CATEGORY_HEADINGS.get(category)
