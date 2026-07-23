@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
@@ -40,7 +41,13 @@ async def lifespan(_: FastAPI):
     # fayliga faqat bitta process yozadi — ikkinchi xizmat/volume kerak emas).
     interval_hours = int(os.environ.get("SCRAPE_INTERVAL_HOURS", "24"))
     scheduler = BackgroundScheduler()
-    scheduler.add_job(_scheduled_scrape_job, "interval", hours=interval_hours)
+    # next_run_time=hozir bo'lmasa, APScheduler'ning "interval" trigger'i
+    # birinchi ishga tushishni to'liq bir interval (standart 24 soat)
+    # kutib turadi — bu esa yangi deploy qilingan (bo'sh SQLite bilan)
+    # xizmatni bir kun davomida ma'lumotsiz qoldiradi. Shuning uchun
+    # birinchi scraping deploy bo'lgan zahoti (fon oqimida, app javob
+    # berishiga xalaqit bermay) ishga tushadi.
+    scheduler.add_job(_scheduled_scrape_job, "interval", hours=interval_hours, next_run_time=datetime.now())
     scheduler.start()
     try:
         yield
