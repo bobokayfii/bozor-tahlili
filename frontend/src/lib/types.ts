@@ -4,6 +4,11 @@ export interface Category {
   schema: string
 }
 
+export interface UnavailableBank {
+  bank: string
+  reason: string
+}
+
 export interface Product {
   bank: string
   category: string
@@ -19,15 +24,4 @@ export interface Product {
   payment_method: string | null
   special_terms: string | null
   scraped_at: string
-}
-
-export interface Recommendation {
-  bank: string
-  product_name: string
-  score: number
-}
-
-export interface RecommendResponse {
-  recommendations: Recommendation[]
-  explanation: string
 }

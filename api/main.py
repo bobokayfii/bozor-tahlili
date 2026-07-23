@@ -10,12 +10,17 @@ from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
 from recommender.explain import explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
+from unavailable_products import get_unavailable_banks
 
 app = FastAPI(title="Bank Mahsulot Tahlili API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    # Vite tanlaydigan port band portlar sababli sessiyadan-sessiyaga
+    # o'zgarishi mumkin (5173, 5174, 5175, ...), shuning uchun aniq bitta
+    # portni qattiq yozish o'rniga har qanday localhost portiga ruxsat
+    # beriladi.
+    allow_origin_regex=r"http://localhost:\d+",
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -90,6 +95,11 @@ def list_products(category: str | None = None, bank: str | None = None):
 @app.get("/categories")
 def list_categories():
     return [{"key": c.key, "label": c.label_uz, "schema": c.schema} for c in CATEGORIES]
+
+
+@app.get("/unavailable-banks")
+def list_unavailable_banks(category: str):
+    return [{"bank": item.bank, "reason": item.reason} for item in get_unavailable_banks(category)]
 
 
 @app.post("/recommend")

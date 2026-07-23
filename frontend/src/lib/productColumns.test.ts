@@ -27,7 +27,6 @@ describe('getProductColumns', () => {
       'Imtiyozli davr',
       'Kredit miqdori',
       "To'lov usuli",
-      'Kredit kafolati',
     ])
   })
 
@@ -38,7 +37,6 @@ describe('getProductColumns', () => {
       'Imtiyozli davr',
       'Maxsus shartlari',
       "To'lov usuli",
-      'Kredit kafolati',
     ])
   })
 
@@ -53,9 +51,10 @@ describe('getProductColumns', () => {
     expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('—')
   })
 
-  it('renders grace period in months or a dash when absent', () => {
+  it('renders grace period as Bor/Yo\'q, or a dash when unknown', () => {
     const [, gracePeriod] = getProductColumns('credit_down_payment')
-    expect(gracePeriod.render(baseProduct)).toBe('3 oy')
+    expect(gracePeriod.render(baseProduct)).toBe('Bor')
+    expect(gracePeriod.render({ ...baseProduct, grace_period_months: 0 })).toBe("Yo'q")
     expect(gracePeriod.render({ ...baseProduct, grace_period_months: null })).toBe('—')
   })
 
@@ -67,7 +66,7 @@ describe('getProductColumns', () => {
   })
 
   it('renders special terms text or a dash when absent', () => {
-    // credit_special_terms order is [amount, gracePeriod, specialTerms, paymentMethod, collateral]
+    // credit_special_terms order is [amount, gracePeriod, specialTerms, paymentMethod]
     const [, , specialTerms] = getProductColumns('credit_special_terms')
     expect(specialTerms.render({ ...baseProduct, special_terms: 'Kredit yuklamasi hisobga olinadi' })).toBe(
       'Kredit yuklamasi hisobga olinadi',
@@ -81,9 +80,17 @@ describe('getProductColumns', () => {
     expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('—')
   })
 
-  it("renders collateral as Bor/Yo'q", () => {
-    const [, , , , collateral] = getProductColumns('credit_down_payment')
-    expect(collateral.render(baseProduct)).toBe('Bor')
-    expect(collateral.render({ ...baseProduct, requires_collateral: false })).toBe("Yo'q")
+  it('omits Imtiyozli davr and Maxsus shartlari for the mikroqarz category, regardless of schema', () => {
+    const mikroqarzColumns = getProductColumns('credit_special_terms', 'mikroqarz')
+    expect(mikroqarzColumns.map((c) => c.label)).toEqual(['Kredit miqdori', "To'lov usuli"])
+
+    const mikroqarzOnlaynColumns = getProductColumns('credit_special_terms', 'mikroqarz_onlayn')
+    expect(mikroqarzOnlaynColumns.map((c) => c.label)).toEqual(['Kredit miqdori', "To'lov usuli"])
+  })
+
+  it('falls back to "Annuitet, Differensial" for mikroqarz payment method when unstated', () => {
+    const [, paymentMethod] = getProductColumns('credit_special_terms', 'mikroqarz')
+    expect(paymentMethod.render(baseProduct)).toBe('Annuitet')
+    expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Annuitet, Differensial')
   })
 })

@@ -17,6 +17,12 @@
   /* rows belonging to SQB (our bank) — also the site's primary brand color */
   --house-soft: #e8eef3;
   --negative: #c0392b;
+  /* Status "good" — a low interest rate is GOOD NEWS for the borrower, so it
+     is marked with a reserved green, never the alarm-red --signal (which
+     elsewhere in the UI marks "cheapest in this table row", a different,
+     narrower meaning). Never reused for anything but "this is the good one". */
+  --good: #0ca30c;
+  --good-soft: #e9f9ea;
 
   /* Brand — SQB navy, drives chrome: nav, buttons, focus */
   --brand: #00355f;
@@ -24,6 +30,9 @@
   --font: 'Inter', system-ui, sans-serif;
 
   --radius: 10px;
+  /* Sidebar sticky-scroll pastki hisoblari shu qiymatga tayanadi — topbar
+     balandligi o'zgarsa, shu yerni yangilang. */
+  --topbar-height: 66px;
 }
 
 * {
@@ -74,6 +83,10 @@ button {
 .app-topbar {
   display: flex;
   flex-shrink: 0;
+  height: var(--topbar-height);
+  position: sticky;
+  top: 0;
+  z-index: 30;
   border-bottom: 1px solid var(--line);
   background: var(--paper);
 }
@@ -96,6 +109,7 @@ button {
 
 .app-body {
   display: flex;
+  align-items: flex-start;
   flex: 1;
   min-height: 0;
 }
@@ -105,6 +119,10 @@ button {
 .sidebar {
   width: 264px;
   flex-shrink: 0;
+  position: sticky;
+  top: var(--topbar-height);
+  height: calc(100vh - var(--topbar-height));
+  overflow-y: auto;
   background: var(--paper-sunk);
   border-right: 1px solid var(--line);
   color: var(--ink);
@@ -290,24 +308,15 @@ button {
 
 .market-pulse {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 16px;
   margin-bottom: 24px;
-  padding: 20px 26px;
+  padding: 22px 26px;
   border-radius: var(--radius);
   background: var(--paper-card);
   border: 1px solid var(--line);
   color: var(--ink);
   animation: content-in 280ms ease backwards;
-}
-
-.market-pulse-headline {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 200px;
 }
 
 .market-pulse-eyebrow {
@@ -318,39 +327,8 @@ button {
   color: var(--ink-faint);
 }
 
-.market-pulse-figure {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.market-pulse-value {
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  color: var(--ink);
-}
-
-.market-pulse-unit {
-  font-size: 19px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.market-pulse-caption {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--signal);
-  background: var(--signal-soft);
-  border-radius: 999px;
-  padding: 3px 9px;
-  white-space: nowrap;
-}
-
 .market-pulse-rank {
-  margin: 0;
+  margin: 14px 0 0;
   font-size: 12.5px;
   color: var(--ink-soft);
 }
@@ -360,47 +338,160 @@ button {
   font-weight: 700;
 }
 
-.market-pulse-spectrum {
-  flex: 1;
-  min-width: 220px;
+/* Eng zo'r taklif — bitta aniq mahsulotni bank logotipi, nomi va asosiy
+   shartlari bilan ko'rsatadigan "hero" karta. Diagramma/reyting o'rniga
+   ataylab shu tanlangan: foydalanuvchi uchun "qaysi bank eng arzon"dan ko'ra
+   "aniq nima olishim mumkin" savoliga to'g'ridan-to'g'ri javob beradi. */
+.pulse-featured-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.pulse-featured-body {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.pulse-featured-bank {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.pulse-featured-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.pulse-featured-names {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 3px;
 }
 
-.spectrum-track {
-  position: relative;
-  height: 2px;
-  background: var(--line-strong);
-  margin: 13px 0;
-}
-
-.spectrum-dot {
-  position: absolute;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--ink-faint);
-  transform: translate(-50%, -50%);
-}
-
-.spectrum-dot-house {
-  border-color: var(--house);
-}
-
-.spectrum-dot-best {
-  background: var(--signal);
-  border-color: var(--signal);
-}
-
-.spectrum-scale {
+.pulse-featured-bank-name {
   display: flex;
-  justify-content: space-between;
-  font-size: 10.5px;
-  color: var(--ink-faint);
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 16.5px;
+  color: var(--ink);
+}
+
+.pulse-featured-product-name {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.pulse-featured-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  flex: 1;
+}
+
+.pulse-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pulse-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pulse-stat-rate .pulse-stat-value {
+  color: var(--good);
+}
+
+.pulse-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* AI tavsiya — hozircha "tez orada" ko'rinishida (real LLM chaqiruvi keyinroq
+   ulanadi). Emoji o'rniga matnli "AI" nishonchasi ishlatiladi. */
+.pulse-ai-teaser {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--paper-sunk);
+  border: 1px dashed var(--line-strong);
+}
+
+.pulse-ai-badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--house);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pulse-ai-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pulse-ai-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pulse-ai-soon {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.pulse-ai-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.market-pulse-insight {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
 }
 
 .market-pulse-meta {
@@ -409,9 +500,16 @@ button {
 }
 
 .meta-chip {
-  text-align: right;
-  padding-left: 20px;
-  border-left: 1px solid var(--line);
+  text-align: left;
+  padding-left: 0;
+  padding-right: 16px;
+  border-left: none;
+  border-right: 1px solid var(--line);
+}
+
+.meta-chip:last-child {
+  border-right: none;
+  padding-right: 0;
 }
 
 .meta-chip-value {
@@ -446,7 +544,11 @@ button {
 
 .rate-board-head {
   display: grid;
-  grid-template-columns: 32px 1.1fr 1.3fr 0.85fr 0.6fr 0.75fr 0.65fr 0.75fr 0.5fr 0.65fr;
+  /* Ustunlar soni kategoriyaga qarab farq qilgani uchun aniq qiymat
+     ProductTable komponenti tomonidan inline style orqali beriladi
+     (frontend/src/components/ProductTable.tsx'dagi gridTemplateColumns()
+     funksiyasiga qarang) — bu yerdagi qiymat faqat zaxira (fallback). */
+  grid-template-columns: 32px 1.1fr 1.3fr 0.85fr 0.6fr 1fr 1fr 1fr 1fr;
   gap: 12px;
   padding: 10px 20px;
   background: var(--paper-sunk);
@@ -459,7 +561,11 @@ button {
 
 .rate-row {
   display: grid;
-  grid-template-columns: 32px 1.1fr 1.3fr 0.85fr 0.6fr 0.75fr 0.65fr 0.75fr 0.5fr 0.65fr;
+  /* Ustunlar soni kategoriyaga qarab farq qilgani uchun aniq qiymat
+     ProductTable komponenti tomonidan inline style orqali beriladi
+     (frontend/src/components/ProductTable.tsx'dagi gridTemplateColumns()
+     funksiyasiga qarang) — bu yerdagi qiymat faqat zaxira (fallback). */
+  grid-template-columns: 32px 1.1fr 1.3fr 0.85fr 0.6fr 1fr 1fr 1fr 1fr;
   gap: 12px;
   align-items: center;
   padding: 14px 20px;
@@ -480,6 +586,20 @@ button {
   background: var(--house-soft);
 }
 
+.rate-row-unavailable {
+  opacity: 0.55;
+}
+
+.rate-row-unavailable:hover {
+  background: none;
+}
+
+.rate-unavailable-reason {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
 .rate-rank {
   font-size: 12px;
   font-weight: 600;
@@ -488,7 +608,7 @@ button {
 }
 
 .rate-row.is-best .rate-rank {
-  color: var(--signal);
+  color: var(--good);
   font-weight: 800;
 }
 
@@ -550,7 +670,7 @@ button {
 }
 
 .rate-row.is-best .rate-figure-value {
-  color: var(--signal);
+  color: var(--good);
 }
 
 .rate-bar-track {
@@ -569,7 +689,7 @@ button {
 }
 
 .rate-row.is-best .rate-bar-fill {
-  background: var(--signal);
+  background: var(--good);
 }
 
 .rate-term {
@@ -665,6 +785,9 @@ button {
 
   .sidebar {
     width: 100%;
+    position: static;
+    height: auto;
+    overflow-y: visible;
     border-right: none;
     border-bottom: 1px solid var(--line);
   }
@@ -680,15 +803,30 @@ button {
 
   .rate-product,
   .rate-term,
-  .rate-extra {
+  .rate-extra,
+  .rate-head-product,
+  .rate-head-term,
+  .rate-head-extra {
     display: none;
   }
 
   .market-pulse {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 20px;
     padding: 22px 20px;
+  }
+
+  .pulse-featured-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .pulse-featured-body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pulse-featured-stats {
+    row-gap: 14px;
   }
 
   .market-pulse-meta {

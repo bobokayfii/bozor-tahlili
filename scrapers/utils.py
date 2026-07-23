@@ -191,22 +191,38 @@ def extract_term_months(text: str) -> list[int]:
     return sorted(v for v in values if v <= 120)
 
 
-_AMOUNT_GROUPED_RE = re.compile(r"(\d{1,3}(?:[ .]\d{3})+)\s*so", re.IGNORECASE)
+_AMOUNT_GROUPED_RE = re.compile(r"(\d{1,3}(?:[ .\xa0]\d{3})+)\s*so", re.IGNORECASE)
 
 
 def extract_amount_som(text: str) -> int | None:
     # "so'm"/"som" is the usual currency word, but some sites (e.g.
     # InfinBank's card tariffs) state amounts against the "UZS" currency
     # code instead — both refer to the same currency, so both are accepted.
-    mln_matches = re.findall(r"(\d{1,5})\s*mln\.?\s*(?:so|uzs)", text, flags=re.IGNORECASE)
-    mlrd_matches = re.findall(r"(\d{1,3}(?:[.,]\d{1,2})?)\s*mlrd\.?\s*(?:so|uzs)", text, flags=re.IGNORECASE)
+    # The unit itself is either abbreviated ("mln"/"mlrd") or spelled out
+    # ("million"/"milliard" — e.g. Aloqabank), sometimes with a
+    # parenthetical number-in-words aside between the digits and the unit
+    # ("100 (bir yuz) million so'm").
+    mln_matches = re.findall(
+        r"(\d{1,5})\s*(?:\([^)]*\)\s*)?mln\.?\s*(?:so|uzs)", text, flags=re.IGNORECASE
+    )
+    mln_matches += re.findall(
+        r"(\d{1,5})\s*(?:\([^)]*\)\s*)?million\s*(?:so|uzs)", text, flags=re.IGNORECASE
+    )
+    mlrd_matches = re.findall(
+        r"(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:\([^)]*\)\s*)?mlrd\.?\s*(?:so|uzs)", text, flags=re.IGNORECASE
+    )
+    mlrd_matches += re.findall(
+        r"(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:\([^)]*\)\s*)?milliard\s*(?:so|uzs)", text, flags=re.IGNORECASE
+    )
     amounts = [int(m) * 1_000_000 for m in mln_matches]
-    amounts += [int(float(m.replace(",", "."))) * 1_000_000_000 for m in mlrd_matches]
+    amounts += [round(float(m.replace(",", ".")) * 1_000_000_000) for m in mlrd_matches]
     if not amounts:
         # Some pages spell out the exact sum instead of rounding to
         # "mln so'm" (e.g. "41 200 000 so'mgacha") — space/dot-grouped
         # thousands directly followed by "so'm".
-        amounts = [int(m.replace(" ", "").replace(".", "")) for m in _AMOUNT_GROUPED_RE.findall(text)]
+        amounts = [
+            int(m.replace(" ", "").replace(".", "").replace("\xa0", "")) for m in _AMOUNT_GROUPED_RE.findall(text)
+        ]
     return max(amounts) if amounts else None
 
 
@@ -215,3 +231,45 @@ def has_collateral_requirement(text: str) -> bool:
     if "mavjud emas" in lowered or "garovsiz" in lowered:
         return False
     return "garov" in lowered
+
+
+def extract_payment_method(text: str) -> str | None:
+    """"Annuitet"/"Differensial" so'zlarining o'zi banklar orasida bir xil
+    (brend nomiga o'xshash atama) yoziladi, shuning uchun oddiy so'z
+    qidiruvi xavfsiz — "garov"/"foiz" kabi umumiy so'zlardan farqli
+    o'laroq, bu ikkalasi boshqa hech qanday kontekstda ishlatilmaydi."""
+    lowered = text.lower()
+    has_annuitet = "annuitet" in lowered
+    # Ipoteka Bank sahifasida "differensial" o'rniga "differentsial" (qo'shimcha
+    # "t" bilan, rus tilidagi imlodan ta'sirlangan) yozilgan — ikkala imlo ham
+    # tanilishi uchun umumiy "differen" prefiksidan foydalaniladi.
+    has_differensial = "differen" in lowered
+    if has_annuitet and has_differensial:
+        return "Annuitet, Differensial"
+    if has_annuitet:
+        return "Annuitet"
+    if has_differensial:
+        return "Differensial"
+    return None
+
+
+_GRACE_PERIOD_NEGATIVE_RE = re.compile(
+    r"yo['ʻ’‘]q|mavjud emas|ko['ʻ’‘]zda tutilmagan|nazarda tutilmagan|berilmaydi|davrsiz",
+    re.IGNORECASE,
+)
+
+
+def extract_grace_period_months(text: str) -> int | None:
+    """Matn "imtiyozli davr" haqida biror aniq ma'lumot bersagina qiymat
+    qaytaradi: rad etuvchi ibora topilsa (masalan "Yo'q", "mavjud emas",
+    "ko'zda tutilmagan") 0 oy qaytaradi, aks holda oy/yil ko'rsatkichi
+    (masalan "6 oygacha") qidiriladi. Matnda "imtiyozli" so'zi umuman
+    yo'q bo'lsa, bu haqda hech narsa aytilmagan deb None qaytariladi —
+    aks holda boshqa har qanday "mavjud emas" iborasi (masalan boshqa
+    band haqida) yolg'on-manfiy "0 oy" natija berib yuboradi."""
+    if "imtiyozli" not in text.lower():
+        return None
+    if _GRACE_PERIOD_NEGATIVE_RE.search(text):
+        return 0
+    months = extract_term_months(text)
+    return months[0] if months else None

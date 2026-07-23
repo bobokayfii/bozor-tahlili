@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fetchCategories, fetchProducts, fetchRecommendation } from './api'
+import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './api'
 
 describe('api client', () => {
   beforeEach(() => {
@@ -33,22 +33,19 @@ describe('api client', () => {
     expect(calledUrl.toString()).toBe('http://localhost:8000/products?category=mikroqarz')
   })
 
-  it('fetchRecommendation posts criteria as a JSON body', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ recommendations: [], explanation: 'test' }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
+  it('fetchUnavailableBanks returns parsed JSON on success', async () => {
+    const mockBanks = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => mockBanks }))
 
-    await fetchRecommendation('avtokredit', 50_000_000, 12, true)
+    const result = await fetchUnavailableBanks('avtokredit')
+    expect(result).toEqual(mockBanks)
+  })
 
-    const [url, options] = fetchMock.mock.calls[0]
-    expect(url).toBe('http://localhost:8000/recommend')
-    expect(JSON.parse(options.body)).toEqual({
-      category: 'avtokredit',
-      amount_som: 50_000_000,
-      term_months: 12,
-      collateral_ok: true,
-    })
+  it('fetchUnavailableBanks throws with the status code when the response is not ok', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+
+    await expect(fetchUnavailableBanks('avtokredit')).rejects.toThrow(
+      "Mavjud bo'lmagan banklar ro'yxatini yuklab bo'lmadi: 500",
+    )
   })
 })

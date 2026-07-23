@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from categories import CATEGORIES
 from scrapers.utils import (
     extract_amount_som,
+    extract_grace_period_months,
+    extract_payment_method,
     extract_percentages,
     extract_section,
     extract_term_months,
@@ -73,6 +75,43 @@ class TextSectionScraper(BaseScraper):
     # Bunday holatlarda matndan aniqlashga urinish o'rniga shu yerda aniq
     # qiymat belgilanadi: {category: requires_collateral}.
     FORCE_COLLATERAL: dict[str, bool] = {}
+    # Mahsulotning saytdagi haqiqiy (asl) nomi — berilmasa, umumiy
+    # "{bank_name} {kategoriya}" shakli ishlatiladi.
+    PRODUCT_NAMES: dict[str, str] = {}
+    # Boshlang'ich badal, imtiyozli davr va to'lov usuli ko'pincha stavka
+    # jadvalidan tashqarida (yoki undan ataylab chetlab o'tilgan, foiz
+    # kontaminatsiyasidan qochish uchun) joylashadi — shuning uchun ular
+    # CATEGORY_HEADINGS bilan bir xil mantiqda, lekin alohida sarlavha
+    # juftliklari orqali, xuddi shu sahifa matnidan qo'shimcha ravishda
+    # qidiriladi. Berilmasa, mos maydon bo'sh (None) qoladi.
+    DOWN_PAYMENT_HEADINGS: dict[str, tuple[str, str | None]] = {}
+    PAYMENT_METHOD_HEADINGS: dict[str, tuple[str, str | None]] = {}
+    GRACE_PERIOD_HEADINGS: dict[str, tuple[str, str | None]] = {}
+
+    def _extract_down_payment_pct(self, category: str, text: str) -> float | None:
+        heading_pair = self.DOWN_PAYMENT_HEADINGS.get(category)
+        if heading_pair is None:
+            return None
+        section = extract_section(text, *heading_pair)
+        rates = extract_percentages(section)
+        return min(rates) if rates else None
+
+    def _extract_payment_method(self, category: str, text: str) -> str | None:
+        heading_pair = self.PAYMENT_METHOD_HEADINGS.get(category)
+        section = extract_section(text, *heading_pair) if heading_pair is not None else text
+        return extract_payment_method(section)
+
+    def _extract_grace_period_months(self, category: str, text: str) -> int | None:
+        heading_pair = self.GRACE_PERIOD_HEADINGS.get(category)
+        if heading_pair is None:
+            return extract_grace_period_months(text)
+        start_heading, end_heading = heading_pair
+        section = extract_section(text, start_heading, end_heading)
+        # extract_section strips the start_heading itself out of the result,
+        # but extract_grace_period_months requires the word "imtiyozli" to be
+        # present (as a guard against false positives on unscoped text) — so
+        # the heading is prefixed back on before handing the section over.
+        return extract_grace_period_months(start_heading + section)
 
     def _build_product(
         self,
@@ -81,6 +120,9 @@ class TextSectionScraper(BaseScraper):
         source_url: str,
         scraped_at: datetime,
         full_text: str | None = None,
+        down_payment_pct: float | None = None,
+        grace_period_months: int | None = None,
+        payment_method: str | None = None,
     ) -> Product | None:
         if not section.strip():
             return None
@@ -106,19 +148,22 @@ class TextSectionScraper(BaseScraper):
         )
 
         label = _CATEGORY_LABELS.get(category, category)
+        product_name = self.PRODUCT_NAMES.get(category) or f"{self.bank_name} {label}"
         return Product(
             bank=self.bank_name,
             category=category,
-            product_name=f"{self.bank_name} {label}",
+            product_name=product_name,
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
             requires_collateral=requires_collateral,
-            down_payment_pct=None,
+            down_payment_pct=down_payment_pct,
             source_url=source_url,
             scraped_at=scraped_at,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
         )
 
     def parse(self, html: str) -> list[Product]:
@@ -127,8 +172,19 @@ class TextSectionScraper(BaseScraper):
         products: list[Product] = []
 
         for category, (start_heading, end_heading) in self.CATEGORY_HEADINGS.items():
-            section = extract_section(text, start_heading, end_heading)
-            product = self._build_product(category, section, self.url, now)
+            try:
+                section = extract_section(text, start_heading, end_heading)
+                product = self._build_product(
+                    category,
+                    section,
+                    self.url,
+                    now,
+                    down_payment_pct=self._extract_down_payment_pct(category, text),
+                    grace_period_months=self._extract_grace_period_months(category, text),
+                    payment_method=self._extract_payment_method(category, text),
+                )
+            except Exception:
+                continue
             if product is not None:
                 products.append(product)
         return products
@@ -141,17 +197,35 @@ class TextSectionScraper(BaseScraper):
         products: list[Product] = []
 
         for category, url in self.CATEGORY_URLS.items():
-            html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
-            text = html_to_text(html)
+            # Har bir kategoriya o'z URL'idan mustaqil olinadi — bittasi
+            # (masalan, o'chirilgan yoki manzili o'zgargan sahifa, 404)
+            # butun bank uchun barcha boshqa kategoriyalarni ham yo'qotib
+            # qo'ymasligi kerak (bu xato avval NBU'da "istemol_krediti"ning
+            # 404 qaytarishi sabab "avtokredit" ham hech qachon
+            # yangilanmasligiga olib kelgan edi).
+            try:
+                html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
+                text = html_to_text(html)
 
-            heading_pair = self.CATEGORY_HEADINGS.get(category)
-            if heading_pair is not None:
-                start_heading, end_heading = heading_pair
-                section = extract_section(text, start_heading, end_heading)
-            else:
-                section = text
+                heading_pair = self.CATEGORY_HEADINGS.get(category)
+                if heading_pair is not None:
+                    start_heading, end_heading = heading_pair
+                    section = extract_section(text, start_heading, end_heading)
+                else:
+                    section = text
 
-            product = self._build_product(category, section, url, now, full_text=text)
+                product = self._build_product(
+                    category,
+                    section,
+                    url,
+                    now,
+                    full_text=text,
+                    down_payment_pct=self._extract_down_payment_pct(category, text),
+                    grace_period_months=self._extract_grace_period_months(category, text),
+                    payment_method=self._extract_payment_method(category, text),
+                )
+            except Exception:
+                continue
             if product is not None:
                 products.append(product)
         return products

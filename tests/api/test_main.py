@@ -130,6 +130,36 @@ def test_products_response_includes_new_optional_fields(client):
     assert data[0]["special_terms"] is None
 
 
+def test_list_unavailable_banks_returns_tbc_for_avtokredit(client):
+    response = client.get("/unavailable-banks", params={"category": "avtokredit"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data == [{"bank": "TBC Bank", "reason": "Mahsulot mavjud emas"}]
+
+
+def test_list_unavailable_banks_returns_sqb_for_avtokredit_ikkilamchi(client):
+    response = client.get("/unavailable-banks", params={"category": "avtokredit_ikkilamchi"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data == [{"bank": "SQB", "reason": "Vaqtincha to'xtatilgan"}]
+
+
+def test_list_unavailable_banks_returns_kapitalbank_for_avtokredit_brend_birlamchi(client):
+    response = client.get("/unavailable-banks", params={"category": "avtokredit_brend_birlamchi"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data == [
+        {"bank": "Kapitalbank", "reason": "Vaqtincha to'xtatilgan"},
+        {"bank": "SQB", "reason": "Vaqtincha to'xtatilgan"},
+    ]
+
+
+def test_list_unavailable_banks_returns_empty_for_unlisted_category(client):
+    response = client.get("/unavailable-banks", params={"category": "mikroqarz"})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_cors_allows_configured_frontend_origin(client):
     response = client.get(
         "/products",

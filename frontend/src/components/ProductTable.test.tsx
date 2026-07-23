@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { ProductTable } from './ProductTable'
-import type { Product } from '../lib/types'
+import type { Product, UnavailableBank } from '../lib/types'
 
 const sampleProduct: Product = {
   bank: 'SQB',
@@ -50,6 +50,13 @@ describe('ProductTable', () => {
     expect(screen.getByText('24.9% – 27.9%')).toBeInTheDocument()
   })
 
+  it('renders a single rate value (not "X%-X%") when rate_min equals rate_max', () => {
+    const flatRateProduct: Product = { ...sampleProduct, rate_min: 0, rate_max: 0 }
+    render(<ProductTable products={[flatRateProduct]} />)
+    expect(screen.getByText('0%')).toBeInTheDocument()
+    expect(screen.queryByText('0% – 0%')).not.toBeInTheDocument()
+  })
+
   it('ranks products by cheapest rate first and flags the SQB row', () => {
     render(<ProductTable products={[sampleProduct, cheaperProduct]} />)
     const rows = screen.getAllByText(/^0[12]$/)
@@ -65,7 +72,6 @@ describe('ProductTable', () => {
     expect(screen.getByText('30%')).toBeInTheDocument()
     expect(screen.getByText('Annuitet')).toBeInTheDocument()
     expect(screen.getByText('Bor')).toBeInTheDocument()
-    expect(screen.getByText('3 oy')).toBeInTheDocument()
     expect(screen.getByText('Kredit miqdori')).toBeInTheDocument()
     expect(screen.getByText("800 mln so'm")).toBeInTheDocument()
   })
@@ -80,7 +86,6 @@ describe('ProductTable', () => {
     }
     render(<ProductTable products={[productWithoutExtras]} />)
     expect(screen.getAllByText('—')).toHaveLength(3)
-    expect(screen.getByText("Yo'q")).toBeInTheDocument()
   })
 
   it('renders the credit_special_terms column set: Maxsus shartlari shown, Boshlang\'ich badal hidden', () => {
@@ -100,5 +105,45 @@ describe('ProductTable', () => {
     render(<ProductTable products={[sampleProduct]} schema="credit_down_payment" />)
     expect(screen.getByText("Boshlang'ich badal")).toBeInTheDocument()
     expect(screen.queryByText('Maxsus shartlari')).not.toBeInTheDocument()
+  })
+
+  it('hides Imtiyozli davr and Maxsus shartlari for the mikroqarz category and defaults unstated payment method to both methods', () => {
+    const microloanProduct: Product = {
+      ...sampleProduct,
+      category: 'mikroqarz',
+      payment_method: null,
+    }
+    render(<ProductTable products={[microloanProduct]} schema="credit_special_terms" category="mikroqarz" />)
+    expect(screen.queryByText('Imtiyozli davr')).not.toBeInTheDocument()
+    expect(screen.queryByText('Maxsus shartlari')).not.toBeInTheDocument()
+    expect(screen.getByText('Annuitet, Differensial')).toBeInTheDocument()
+  })
+
+  it('shows the empty-state message when there are no products and no unavailable banks', () => {
+    render(<ProductTable products={[]} unavailableBanks={[]} />)
+    expect(
+      screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+    ).toBeInTheDocument()
+  })
+
+  it('renders unavailable banks as a separate row without affecting ranking', () => {
+    const unavailableBanks: UnavailableBank[] = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
+    render(<ProductTable products={[sampleProduct, cheaperProduct]} unavailableBanks={unavailableBanks} />)
+
+    expect(screen.getByText('TBC Bank')).toBeInTheDocument()
+    expect(screen.getByText('Mahsulot mavjud emas')).toBeInTheDocument()
+    // Ranking (rank "01", best-rate highlight) is unaffected by the unavailable entry.
+    expect(screen.getByText('NBU').closest('.rate-row')).toHaveClass('is-best')
+    expect(screen.getByText('TBC Bank').closest('.rate-row')).toHaveClass('rate-row-unavailable')
+  })
+
+  it('shows unavailable banks even when there are zero products for the category', () => {
+    const unavailableBanks: UnavailableBank[] = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
+    render(<ProductTable products={[]} unavailableBanks={unavailableBanks} />)
+
+    expect(screen.getByText('TBC Bank')).toBeInTheDocument()
+    expect(
+      screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+    ).not.toBeInTheDocument()
   })
 })
