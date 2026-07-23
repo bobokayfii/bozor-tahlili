@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+from contextlib import asynccontextmanager
+
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -10,24 +14,54 @@ from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
 from recommender.explain import explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
+from scrapers.orchestrator import run_all_scrapers
 from unavailable_products import get_unavailable_banks
 
-app = FastAPI(title="Bank Mahsulot Tahlili API")
+_engine = get_engine()
+init_db(_engine)
+SessionLocal = get_session_factory(_engine)
+
+# Netlify'dagi frontend production domeni ALLOWED_ORIGINS orqali qo'shiladi
+# (vergul bilan ajratilgan, masalan "https://my-site.netlify.app"). Localhost
+# har qanday portda (Vite tasodifiy port tanlashi mumkin) doim ruxsat etiladi.
+_extra_origins = [origin.strip() for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",") if origin.strip()]
+
+
+def _scheduled_scrape_job() -> None:
+    with SessionLocal() as session:
+        run_all_scrapers(session)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # BackgroundScheduler alohida process talab qilmaydi — shu bitta
+    # uvicorn worker ichida fon oqimida ishlaydi, shuning uchun Railway'da
+    # bitta "web" xizmati ham API'ni, ham davriy scraping'ni bajaradi (SQLite
+    # fayliga faqat bitta process yozadi — ikkinchi xizmat/volume kerak emas).
+    interval_hours = int(os.environ.get("SCRAPE_INTERVAL_HOURS", "24"))
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(_scheduled_scrape_job, "interval", hours=interval_hours)
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="Bank Mahsulot Tahlili API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
     # Vite tanlaydigan port band portlar sababli sessiyadan-sessiyaga
     # o'zgarishi mumkin (5173, 5174, 5175, ...), shuning uchun aniq bitta
     # portni qattiq yozish o'rniga har qanday localhost portiga ruxsat
-    # beriladi.
+    # beriladi. Production frontend domeni ALLOWED_ORIGINS env var orqali
+    # qo'shiladi.
     allow_origin_regex=r"http://localhost:\d+",
+    allow_origins=_extra_origins,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
-
-_engine = get_engine()
-init_db(_engine)
-SessionLocal = get_session_factory(_engine)
 
 
 class RecommendRequest(BaseModel):
