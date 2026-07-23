@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
-from recommender.explain import explain_recommendation
+from recommender.explain import FeaturedProduct, explain_featured_product, explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
 from scrapers.orchestrator import run_all_scrapers
 from unavailable_products import get_unavailable_banks
@@ -76,6 +76,19 @@ class RecommendRequest(BaseModel):
     amount_som: int
     term_months: int
     collateral_ok: bool
+
+
+class ExplainProductRequest(BaseModel):
+    category: str
+    bank: str
+    product_name: str
+    rate_min: float
+    rate_max: float
+    term_min_months: int
+    term_max_months: int
+    amount_max_som: int
+    requires_collateral: bool
+    down_payment_pct: float | None = None
 
 
 def _row_to_dict(row: ProductRow) -> dict:
@@ -177,3 +190,30 @@ def recommend(request: RecommendRequest):
         ],
         "explanation": explanation,
     }
+
+
+@app.post("/explain-product")
+def explain_product(request: ExplainProductRequest):
+    """Frontend "Bozor pulsi" kartochkasi jadvaldagi eng past stavkali
+    mahsulotni (mustaqil, oddiy hisob-kitob bilan) tanlaydi — bu endpoint
+    esa /recommend'dagi kabi o'z ballash/saralashini ishlatmasdan, ANIQ
+    shu bank/mahsulot haqida qisqa AI izohi qaytaradi. Shu sabab kartochka
+    va izoh hech qachon boshqa-boshqa bankni ko'rsatib qolmaydi."""
+    with SessionLocal() as session:
+        query = _latest_per_bank_category_query().where(ProductRow.category == request.category)
+        rows = session.execute(query).scalars().all()
+    other_bank_count = len({row.bank for row in rows if row.bank != request.bank})
+
+    product = FeaturedProduct(
+        bank=request.bank,
+        product_name=request.product_name,
+        rate_min=request.rate_min,
+        rate_max=request.rate_max,
+        term_min_months=request.term_min_months,
+        term_max_months=request.term_max_months,
+        amount_max_som=request.amount_max_som,
+        requires_collateral=request.requires_collateral,
+        down_payment_pct=request.down_payment_pct,
+    )
+    explanation = explain_featured_product(request.category, product, other_bank_count)
+    return {"explanation": explanation}

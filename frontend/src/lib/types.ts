@@ -36,6 +36,23 @@ export interface RecommendResponse {
   explanation: string
 }
 
+export interface ExplainProductRequest {
+  category: string
+  bank: string
+  product_name: string
+  rate_min: number
+  rate_max: number
+  term_min_months: number
+  term_max_months: number
+  amount_max_som: number
+  requires_collateral: boolean
+  down_payment_pct: number | null
+}
+
+export interface ExplainProductResponse {
+  explanation: string
+}
+
 export interface Product {
   bank: string
   category: string

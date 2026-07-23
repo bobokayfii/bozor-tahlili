@@ -1,4 +1,12 @@
-import type { Category, Product, RecommendRequest, RecommendResponse, UnavailableBank } from './types'
+import type {
+  Category,
+  ExplainProductRequest,
+  ExplainProductResponse,
+  Product,
+  RecommendRequest,
+  RecommendResponse,
+  UnavailableBank,
+} from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -38,6 +46,18 @@ export async function fetchRecommendation(request: RecommendRequest): Promise<Re
   })
   if (!response.ok) {
     throw new Error(`AI tavsiyasini olib bo'lmadi: ${response.status}`)
+  }
+  return response.json()
+}
+
+export async function fetchProductExplanation(request: ExplainProductRequest): Promise<ExplainProductResponse> {
+  const response = await fetch(`${API_BASE_URL}/explain-product`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  if (!response.ok) {
+    throw new Error(`AI izohini olib bo'lmadi: ${response.status}`)
   }
   return response.json()
 }

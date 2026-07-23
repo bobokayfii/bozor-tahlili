@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { Product, RecommendedItem } from '../lib/types'
+import type { Product } from '../lib/types'
 import { isHouseBank } from '../lib/bank'
 import { getBankLogo } from '../lib/bankLogos'
 import { formatAmount } from '../lib/productColumns'
-import { fetchRecommendation } from '../lib/api'
+import { fetchProductExplanation } from '../lib/api'
 
 interface MarketPulseProps {
   category: string | null
@@ -11,31 +11,12 @@ interface MarketPulseProps {
   updatedLabel: string | null
 }
 
-// Featured kartochka stat qatori uchun kerak bo'lgan maydonlar — Product va
-// RecommendedItem ikkalasida ham xuddi shu nomlar bilan mavjud, shuning uchun
-// stat-formatlash funksiyalari qaysi manbadan kelganidan qat'iy nazar ishlaydi.
-type FeaturedProduct = Pick<
-  Product,
-  | 'bank'
-  | 'product_name'
-  | 'rate_min'
-  | 'rate_max'
-  | 'term_min_months'
-  | 'term_max_months'
-  | 'amount_max_som'
-  | 'requires_collateral'
-  | 'payment_method'
->
-
-// Foydalanuvchidan mezon so'ralmaydi (bu — avtomatik "bozor pulsi" ko'rinishi,
-// forma emas), shuning uchun /recommend uchun mezon joriy kategoriyadagi
-// mahsulotlarning o'zidan chiqariladi: eng qisqa muddat talabi (barcha
-// mahsulotlar mos kelishi uchun mavjud minimal muddatlarning eng kattasi) va
-// eng kichik maksimal summa (hech bir bankning chegarasidan oshmasligi uchun).
-function deriveCriteria(products: Product[]) {
-  const termMonths = Math.max(...products.map((p) => p.term_min_months))
-  const amountSom = Math.min(...products.map((p) => p.amount_max_som))
-  return { amount_som: amountSom, term_months: termMonths, collateral_ok: true }
+// Jadval ham (ProductTable) aynan shu tartibda saralaydi: eng past
+// rate_min birinchi. "Eng zo'r taklif" kartochkasi shu bilan bir xil
+// tanlovni ishlatishi SHART — aks holda kartochka jadvaldagi 1-qatordan
+// boshqa bankni ko'rsatib, chalkashlik keltirib chiqaradi.
+function pickFeatured(products: Product[]): Product {
+  return [...products].sort((a, b) => a.rate_min - b.rate_min)[0]
 }
 
 interface BankRate {
@@ -58,13 +39,13 @@ function formatRate(rate: number): string {
   return `${rate}%`
 }
 
-function formatRateRange(product: FeaturedProduct): string {
+function formatRateRange(product: Product): string {
   return product.rate_min === product.rate_max
     ? formatRate(product.rate_min)
     : `${formatRate(product.rate_min)} – ${formatRate(product.rate_max)}`
 }
 
-function formatTermRange(product: FeaturedProduct): string {
+function formatTermRange(product: Product): string {
   return product.term_min_months === product.term_max_months
     ? `${product.term_min_months} oy`
     : `${product.term_min_months}–${product.term_max_months} oy`
@@ -98,32 +79,44 @@ function buildInsight(bankRates: BankRate[], sqbRank: number): string {
 }
 
 export function MarketPulse({ category, products, updatedLabel }: MarketPulseProps) {
-  const [topPick, setTopPick] = useState<RecommendedItem | null>(null)
   const [aiText, setAiText] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
 
   useEffect(() => {
     if (!category || products.length === 0) {
-      setTopPick(null)
       setAiText(null)
       setAiError(null)
       return
     }
 
+    // Kartochka (pastda) qaysi mahsulotni ko'rsatsa, AI ANIQ shu haqida
+    // yozadi — mustaqil ranking/ballash ishlatilmaydi, shuning uchun
+    // ikkalasi hech qachon boshqa-boshqa bankni ko'rsatib qolmaydi.
+    const featured = pickFeatured(products)
     let ignore = false
     setIsAiLoading(true)
     setAiError(null)
 
-    fetchRecommendation({ category, ...deriveCriteria(products) })
+    fetchProductExplanation({
+      category,
+      bank: featured.bank,
+      product_name: featured.product_name,
+      rate_min: featured.rate_min,
+      rate_max: featured.rate_max,
+      term_min_months: featured.term_min_months,
+      term_max_months: featured.term_max_months,
+      amount_max_som: featured.amount_max_som,
+      requires_collateral: featured.requires_collateral,
+      down_payment_pct: featured.down_payment_pct,
+    })
       .then((data) => {
         if (ignore) return
-        setTopPick(data.recommendations[0] ?? null)
         setAiText(data.explanation)
       })
       .catch((err) => {
         if (ignore) return
-        setAiError(err instanceof Error ? err.message : "AI tavsiyasini olib bo'lmadi")
+        setAiError(err instanceof Error ? err.message : "AI izohini olib bo'lmadi")
       })
       .finally(() => {
         if (!ignore) setIsAiLoading(false)
@@ -140,12 +133,7 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
   const sqbRank = bankRates.findIndex((entry) => isHouseBank(entry.bank)) + 1
   const insight = buildInsight(bankRates, sqbRank)
 
-  // AI tavsiyasi kelmaguncha (yoki xato bo'lsa) eng past stavkali mahsulot
-  // vaqtinchalik ko'rsatiladi; AI javob bergach, xuddi shu kartochka va
-  // pastdagi qisqa AI matni BITTA banka haqida bo'ladi — ikkalasi endi hech
-  // qachon boshqa-boshqa bankni ko'rsatmaydi.
-  const fallbackFeatured = [...products].sort((a, b) => a.rate_min - b.rate_min)[0]
-  const featured: FeaturedProduct = topPick ?? fallbackFeatured
+  const featured = pickFeatured(products)
   const featuredLogo = getBankLogo(featured.bank)
   const featuredIsHouse = isHouseBank(featured.bank)
 

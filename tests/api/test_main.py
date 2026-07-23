@@ -109,6 +109,44 @@ def test_recommend_returns_ranked_list_and_explanation(client, monkeypatch):
     assert data["recommendations"][0]["bank"] == "SQB"
 
 
+def test_explain_product_calls_explain_featured_product_with_the_given_product_only(client, monkeypatch):
+    """/explain-product /recommend'ning ballash/saralashiga umuman
+    tayanmaydi — u faqat so'rovda kelgan (frontend "featured" deb
+    tanlagan) bank/mahsulot haqida yozadi, boshqa hech qanday ranking
+    ishlatilmaydi."""
+    captured = {}
+
+    def fake_explain(category, product, other_bank_count):
+        captured["category"] = category
+        captured["product"] = product
+        captured["other_bank_count"] = other_bank_count
+        return "test tushuntirish"
+
+    monkeypatch.setattr(api_main, "explain_featured_product", fake_explain)
+
+    response = client.post("/explain-product", json={
+        "category": "mikroqarz",
+        "bank": "HamkorBank",
+        "product_name": "Hamkor Mikroqarz",
+        "rate_min": 10.0,
+        "rate_max": 15.0,
+        "term_min_months": 12,
+        "term_max_months": 36,
+        "amount_max_som": 100_000_000,
+        "requires_collateral": False,
+        "down_payment_pct": None,
+    })
+
+    assert response.status_code == 200
+    assert response.json() == {"explanation": "test tushuntirish"}
+    assert captured["category"] == "mikroqarz"
+    assert captured["product"].bank == "HamkorBank"
+    assert captured["product"].product_name == "Hamkor Mikroqarz"
+    # Fixture'da faqat SQB Mikroqarz bor — so'ralgan bank (HamkorBank) undan
+    # farqli, shuning uchun 1 ta "boshqa" bank hisoblanadi.
+    assert captured["other_bank_count"] == 1
+
+
 def test_list_categories_returns_eleven_entries(client):
     response = client.get("/categories")
     assert response.status_code == 200
