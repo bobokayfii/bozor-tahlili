@@ -20,6 +20,15 @@ export interface RecommendedItem {
   bank: string
   product_name: string
   score: number
+  rate_min: number
+  rate_max: number
+  term_min_months: number
+  term_max_months: number
+  amount_max_som: number
+  requires_collateral: boolean
+  down_payment_pct: number | null
+  payment_method: string | null
+  grace_period_months: number | null
 }
 
 export interface RecommendResponse {

@@ -49,6 +49,10 @@ def test_explain_recommendation_returns_fallback_text_when_no_ranked():
 
 
 def test_explain_recommendation_calls_openai_and_returns_content():
+    """"make_ranked()" ikkita mahsulot qaytaradi (SQB + NBU) — explain_recommendation
+    faqat birinchisi (SQB) haqida qisqa matn so'raydi, so'ng qolgan banklar sonini
+    ("Yana 1 ta bank varianti ham mavjud.") o'zi qo'shib qo'yadi, AI'ning o'zidan
+    so'ramaydi (bu qism har doim aniq, hisoblangan raqamga asoslanadi)."""
     fake_response = MagicMock()
     fake_response.choices[0].message.content = "SQB tavsiya etiladi, chunki eng past stavkaga ega."
 
@@ -56,7 +60,7 @@ def test_explain_recommendation_calls_openai_and_returns_content():
         mock_get_client.return_value.chat.completions.create.return_value = fake_response
         result = explain_recommendation(make_criteria(), make_ranked())
 
-    assert result == "SQB tavsiya etiladi, chunki eng past stavkaga ega."
+    assert result == "SQB tavsiya etiladi, chunki eng past stavkaga ega. Yana 1 ta bank varianti ham mavjud."
 
 
 def test_explain_recommendation_falls_back_to_score_list_on_api_error():

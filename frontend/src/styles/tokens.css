@@ -425,23 +425,17 @@ button {
   color: var(--ink-faint);
 }
 
-/* AI tahlili — LLM'dan qaytgan bir necha jumlali xolis tahlil matnini
-   o'qish qulay bo'lishi uchun to'liq eninigacha cho'zilgan karta, emoji
-   o'rniga matnli "AI" nishonchasi bilan. */
-.pulse-ai-analysis {
+/* AI izohi — endi "Bozor pulsi" kartochkasidagi AYNAN o'sha bank haqidagi
+   1-2 jumlali qisqa qayd, alohida katta quticha emas — shu bank bilan
+   vizual va mantiqiy bog'lab turish uchun featured karta ichida, kichik
+   nishoncha + inline matn sifatida chiqadi. */
+.pulse-ai-note {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  padding: 16px 18px;
-  border-radius: 10px;
-  background: var(--paper-sunk);
-  border: 1px solid var(--line);
-}
-
-.pulse-ai-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 .pulse-ai-badge {
@@ -449,26 +443,20 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 6px;
   background: var(--house);
   color: #fff;
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 
-.pulse-ai-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
 .pulse-ai-text {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 12.5px;
+  line-height: 1.55;
   color: var(--ink-soft);
 }
 

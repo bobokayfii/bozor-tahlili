@@ -159,7 +159,20 @@ def recommend(request: RecommendRequest):
     explanation = explain_recommendation(criteria, ranked)
     return {
         "recommendations": [
-            {"bank": item.bank, "product_name": item.product_name, "score": item.score}
+            {
+                "bank": item.bank,
+                "product_name": item.product_name,
+                "score": item.score,
+                "rate_min": item.rate_min,
+                "rate_max": item.rate_max,
+                "term_min_months": item.term_min_months,
+                "term_max_months": item.term_max_months,
+                "amount_max_som": item.amount_max_som,
+                "requires_collateral": item.requires_collateral,
+                "down_payment_pct": item.down_payment_pct,
+                "payment_method": item.payment_method,
+                "grace_period_months": item.grace_period_months,
+            }
             for item in ranked
         ],
         "explanation": explanation,

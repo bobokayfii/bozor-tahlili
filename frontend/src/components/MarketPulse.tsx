@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Product } from '../lib/types'
+import type { Product, RecommendedItem } from '../lib/types'
 import { isHouseBank } from '../lib/bank'
 import { getBankLogo } from '../lib/bankLogos'
 import { formatAmount } from '../lib/productColumns'
@@ -10,6 +10,22 @@ interface MarketPulseProps {
   products: Product[]
   updatedLabel: string | null
 }
+
+// Featured kartochka stat qatori uchun kerak bo'lgan maydonlar — Product va
+// RecommendedItem ikkalasida ham xuddi shu nomlar bilan mavjud, shuning uchun
+// stat-formatlash funksiyalari qaysi manbadan kelganidan qat'iy nazar ishlaydi.
+type FeaturedProduct = Pick<
+  Product,
+  | 'bank'
+  | 'product_name'
+  | 'rate_min'
+  | 'rate_max'
+  | 'term_min_months'
+  | 'term_max_months'
+  | 'amount_max_som'
+  | 'requires_collateral'
+  | 'payment_method'
+>
 
 // Foydalanuvchidan mezon so'ralmaydi (bu — avtomatik "bozor pulsi" ko'rinishi,
 // forma emas), shuning uchun /recommend uchun mezon joriy kategoriyadagi
@@ -42,13 +58,13 @@ function formatRate(rate: number): string {
   return `${rate}%`
 }
 
-function formatRateRange(product: Product): string {
+function formatRateRange(product: FeaturedProduct): string {
   return product.rate_min === product.rate_max
     ? formatRate(product.rate_min)
     : `${formatRate(product.rate_min)} – ${formatRate(product.rate_max)}`
 }
 
-function formatTermRange(product: Product): string {
+function formatTermRange(product: FeaturedProduct): string {
   return product.term_min_months === product.term_max_months
     ? `${product.term_min_months} oy`
     : `${product.term_min_months}–${product.term_max_months} oy`
@@ -82,12 +98,14 @@ function buildInsight(bankRates: BankRate[], sqbRank: number): string {
 }
 
 export function MarketPulse({ category, products, updatedLabel }: MarketPulseProps) {
+  const [topPick, setTopPick] = useState<RecommendedItem | null>(null)
   const [aiText, setAiText] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
 
   useEffect(() => {
     if (!category || products.length === 0) {
+      setTopPick(null)
       setAiText(null)
       setAiError(null)
       return
@@ -100,6 +118,7 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
     fetchRecommendation({ category, ...deriveCriteria(products) })
       .then((data) => {
         if (ignore) return
+        setTopPick(data.recommendations[0] ?? null)
         setAiText(data.explanation)
       })
       .catch((err) => {
@@ -121,9 +140,12 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
   const sqbRank = bankRates.findIndex((entry) => isHouseBank(entry.bank)) + 1
   const insight = buildInsight(bankRates, sqbRank)
 
-  // "Eng zo'r mahsulot" — hozircha faqat eng past stavka bo'yicha tanlanadi
-  // (oddiy, tushunarli mezon). Teng bo'lsa, ro'yxatdagi birinchisi olinadi.
-  const featured = [...products].sort((a, b) => a.rate_min - b.rate_min)[0]
+  // AI tavsiyasi kelmaguncha (yoki xato bo'lsa) eng past stavkali mahsulot
+  // vaqtinchalik ko'rsatiladi; AI javob bergach, xuddi shu kartochka va
+  // pastdagi qisqa AI matni BITTA banka haqida bo'ladi — ikkalasi endi hech
+  // qachon boshqa-boshqa bankni ko'rsatmaydi.
+  const fallbackFeatured = [...products].sort((a, b) => a.rate_min - b.rate_min)[0]
+  const featured: FeaturedProduct = topPick ?? fallbackFeatured
   const featuredLogo = getBankLogo(featured.bank)
   const featuredIsHouse = isHouseBank(featured.bank)
 
@@ -187,16 +209,13 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
             SQB — <strong>{bankRates.length}</strong> bankdan <strong>{sqbRank}</strong>-o'rinda
           </p>
         )}
-      </div>
 
-      <div className="pulse-ai-analysis">
-        <div className="pulse-ai-head">
+        <div className="pulse-ai-note">
           <span className="pulse-ai-badge">AI</span>
-          <span className="pulse-ai-title">AI tahlili</span>
+          {isAiLoading && <span className="pulse-ai-text pulse-ai-text-muted">Tahlil qilinmoqda...</span>}
+          {!isAiLoading && aiError && <span className="pulse-ai-text pulse-ai-text-muted">{aiError}</span>}
+          {!isAiLoading && !aiError && aiText && <span className="pulse-ai-text">{aiText}</span>}
         </div>
-        {isAiLoading && <p className="pulse-ai-text pulse-ai-text-muted">Tahlil qilinmoqda...</p>}
-        {!isAiLoading && aiError && <p className="pulse-ai-text pulse-ai-text-muted">{aiError}</p>}
-        {!isAiLoading && !aiError && aiText && <p className="pulse-ai-text">{aiText}</p>}
       </div>
 
       <p className="market-pulse-insight">{insight}</p>
