@@ -10,8 +10,36 @@ def make_criteria():
 
 def make_ranked():
     return [
-        ScoredProduct(bank="SQB", product_name="SQB Mikroqarz", score=0.82, rate_min=28.0, rate_max=31.0),
-        ScoredProduct(bank="NBU", product_name="NBU Mikroqarz", score=0.71, rate_min=30.0, rate_max=34.0),
+        ScoredProduct(
+            bank="SQB",
+            product_name="SQB Mikroqarz",
+            score=0.82,
+            rate_min=28.0,
+            rate_max=31.0,
+            term_min_months=3,
+            term_max_months=36,
+            amount_max_som=100_000_000,
+            requires_collateral=False,
+            down_payment_pct=None,
+            payment_method="Annuitet, Differensial",
+            grace_period_months=None,
+            special_terms=None,
+        ),
+        ScoredProduct(
+            bank="NBU",
+            product_name="NBU Mikroqarz",
+            score=0.71,
+            rate_min=30.0,
+            rate_max=34.0,
+            term_min_months=6,
+            term_max_months=24,
+            amount_max_som=100_000_000,
+            requires_collateral=True,
+            down_payment_pct=20.0,
+            payment_method="Annuitet, Differensial",
+            grace_period_months=6,
+            special_terms=None,
+        ),
     ]
 
 

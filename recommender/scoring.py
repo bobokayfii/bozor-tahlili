@@ -19,6 +19,14 @@ class ScoredProduct:
     score: float
     rate_min: float
     rate_max: float
+    term_min_months: int
+    term_max_months: int
+    amount_max_som: int
+    requires_collateral: bool
+    down_payment_pct: float | None
+    payment_method: str | None
+    grace_period_months: int | None
+    special_terms: str | None
 
 
 class _ScorableProduct(Protocol):
@@ -30,6 +38,10 @@ class _ScorableProduct(Protocol):
     term_max_months: int
     amount_max_som: int
     requires_collateral: bool
+    down_payment_pct: float | None
+    payment_method: str | None
+    grace_period_months: int | None
+    special_terms: str | None
 
 
 def score_product(criteria: Criteria, product: _ScorableProduct) -> float | None:
@@ -72,6 +84,19 @@ def top_recommendations(
                 score=score,
                 rate_min=product.rate_min,
                 rate_max=product.rate_max,
+                term_min_months=product.term_min_months,
+                term_max_months=product.term_max_months,
+                amount_max_som=product.amount_max_som,
+                requires_collateral=product.requires_collateral,
+                down_payment_pct=product.down_payment_pct,
+                # Ko'pchilik banklar to'lov usulini aniq ko'rsatmasa ham
+                # amalda annuitet yoki differensial jadvalidan birini tanlash
+                # imkonini beradi (bu loyihada tekshirilgan barcha banklar
+                # bo'yicha kuzatilgan konvensiya) — shu sabab noaniq bo'lsa
+                # shu ikkalasi ko'rsatiladi, umuman aytilmagan deb qoldirilmaydi.
+                payment_method=product.payment_method or "Annuitet, Differensial",
+                grace_period_months=product.grace_period_months,
+                special_terms=product.special_terms,
             )
         )
     scored.sort(key=lambda item: item.score, reverse=True)

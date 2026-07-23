@@ -13,6 +13,10 @@ class FakeProduct:
     term_max_months: int
     amount_max_som: int
     requires_collateral: bool
+    down_payment_pct: float | None = None
+    payment_method: str | None = None
+    grace_period_months: int | None = None
+    special_terms: str | None = None
 
 
 def test_score_product_returns_none_for_wrong_category():
