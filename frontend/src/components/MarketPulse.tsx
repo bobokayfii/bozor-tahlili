@@ -1,11 +1,25 @@
+import { useEffect, useState } from 'react'
 import type { Product } from '../lib/types'
 import { isHouseBank } from '../lib/bank'
 import { getBankLogo } from '../lib/bankLogos'
 import { formatAmount } from '../lib/productColumns'
+import { fetchRecommendation } from '../lib/api'
 
 interface MarketPulseProps {
+  category: string | null
   products: Product[]
   updatedLabel: string | null
+}
+
+// Foydalanuvchidan mezon so'ralmaydi (bu — avtomatik "bozor pulsi" ko'rinishi,
+// forma emas), shuning uchun /recommend uchun mezon joriy kategoriyadagi
+// mahsulotlarning o'zidan chiqariladi: eng qisqa muddat talabi (barcha
+// mahsulotlar mos kelishi uchun mavjud minimal muddatlarning eng kattasi) va
+// eng kichik maksimal summa (hech bir bankning chegarasidan oshmasligi uchun).
+function deriveCriteria(products: Product[]) {
+  const termMonths = Math.max(...products.map((p) => p.term_min_months))
+  const amountSom = Math.min(...products.map((p) => p.amount_max_som))
+  return { amount_som: amountSom, term_months: termMonths, collateral_ok: true }
 }
 
 interface BankRate {
@@ -67,7 +81,40 @@ function buildInsight(bankRates: BankRate[], sqbRank: number): string {
   return [leadSentence, restSentence, rankSentence].filter(Boolean).join(' ')
 }
 
-export function MarketPulse({ products, updatedLabel }: MarketPulseProps) {
+export function MarketPulse({ category, products, updatedLabel }: MarketPulseProps) {
+  const [aiText, setAiText] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [isAiLoading, setIsAiLoading] = useState(false)
+
+  useEffect(() => {
+    if (!category || products.length === 0) {
+      setAiText(null)
+      setAiError(null)
+      return
+    }
+
+    let ignore = false
+    setIsAiLoading(true)
+    setAiError(null)
+
+    fetchRecommendation({ category, ...deriveCriteria(products) })
+      .then((data) => {
+        if (ignore) return
+        setAiText(data.explanation)
+      })
+      .catch((err) => {
+        if (ignore) return
+        setAiError(err instanceof Error ? err.message : "AI tavsiyasini olib bo'lmadi")
+      })
+      .finally(() => {
+        if (!ignore) setIsAiLoading(false)
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [category, products])
+
   if (products.length === 0) return null
 
   const bankRates = cheapestPerBank(products)
@@ -145,12 +192,10 @@ export function MarketPulse({ products, updatedLabel }: MarketPulseProps) {
       <div className="pulse-ai-teaser">
         <span className="pulse-ai-badge">AI</span>
         <div className="pulse-ai-copy">
-          <span className="pulse-ai-title">
-            AI tavsiyasi <span className="pulse-ai-soon">Tez orada</span>
-          </span>
-          <p className="pulse-ai-text">
-            Sun'iy intellekt tahlili asosida shaxsiylashtirilgan tavsiyalar tez orada shu yerda paydo bo'ladi.
-          </p>
+          <span className="pulse-ai-title">AI tavsiyasi</span>
+          {isAiLoading && <p className="pulse-ai-text">Tahlil qilinmoqda...</p>}
+          {!isAiLoading && aiError && <p className="pulse-ai-text">{aiError}</p>}
+          {!isAiLoading && !aiError && aiText && <p className="pulse-ai-text">{aiText}</p>}
         </div>
       </div>
 

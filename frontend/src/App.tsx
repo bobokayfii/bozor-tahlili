@@ -90,7 +90,11 @@ export function App() {
           </div>
           {error && <p className="error-state">{error}</p>}
           {!isLoading && (
-            <MarketPulse products={products} updatedLabel={lastUpdated && formatUpdatedAt(lastUpdated)} />
+            <MarketPulse
+              category={activeCategory}
+              products={products}
+              updatedLabel={lastUpdated && formatUpdatedAt(lastUpdated)}
+            />
           )}
           <ProductTable
             products={products}

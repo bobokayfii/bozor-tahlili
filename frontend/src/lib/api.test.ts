@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './api'
+import { fetchCategories, fetchProducts, fetchRecommendation, fetchUnavailableBanks } from './api'
 
 describe('api client', () => {
   beforeEach(() => {
@@ -47,5 +47,28 @@ describe('api client', () => {
     await expect(fetchUnavailableBanks('avtokredit')).rejects.toThrow(
       "Mavjud bo'lmagan banklar ro'yxatini yuklab bo'lmadi: 500",
     )
+  })
+
+  it('fetchRecommendation posts the criteria as JSON and returns parsed JSON on success', async () => {
+    const mockResponse = { recommendations: [{ bank: 'SQB', product_name: 'Mikroqarz', score: 0.9 }], explanation: 'SQB tavsiya etiladi.' }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => mockResponse })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = { category: 'mikroqarz', amount_som: 50_000_000, term_months: 12, collateral_ok: true }
+    const result = await fetchRecommendation(request)
+
+    expect(result).toEqual(mockResponse)
+    const [url, options] = fetchMock.mock.calls[0]
+    expect(url).toBe('http://localhost:8000/recommend')
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toEqual(request)
+  })
+
+  it('fetchRecommendation throws with the status code when the response is not ok', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+
+    await expect(
+      fetchRecommendation({ category: 'mikroqarz', amount_som: 1, term_months: 1, collateral_ok: true }),
+    ).rejects.toThrow("AI tavsiyasini olib bo'lmadi: 500")
   })
 })

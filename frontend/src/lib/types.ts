@@ -9,6 +9,24 @@ export interface UnavailableBank {
   reason: string
 }
 
+export interface RecommendRequest {
+  category: string
+  amount_som: number
+  term_months: number
+  collateral_ok: boolean
+}
+
+export interface RecommendedItem {
+  bank: string
+  product_name: string
+  score: number
+}
+
+export interface RecommendResponse {
+  recommendations: RecommendedItem[]
+  explanation: string
+}
+
 export interface Product {
   bank: string
   category: string
