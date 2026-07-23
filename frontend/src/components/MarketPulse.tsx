@@ -189,14 +189,14 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
         )}
       </div>
 
-      <div className="pulse-ai-teaser">
-        <span className="pulse-ai-badge">AI</span>
-        <div className="pulse-ai-copy">
-          <span className="pulse-ai-title">AI tavsiyasi</span>
-          {isAiLoading && <p className="pulse-ai-text">Tahlil qilinmoqda...</p>}
-          {!isAiLoading && aiError && <p className="pulse-ai-text">{aiError}</p>}
-          {!isAiLoading && !aiError && aiText && <p className="pulse-ai-text">{aiText}</p>}
+      <div className="pulse-ai-analysis">
+        <div className="pulse-ai-head">
+          <span className="pulse-ai-badge">AI</span>
+          <span className="pulse-ai-title">AI tahlili</span>
         </div>
+        {isAiLoading && <p className="pulse-ai-text pulse-ai-text-muted">Tahlil qilinmoqda...</p>}
+        {!isAiLoading && aiError && <p className="pulse-ai-text pulse-ai-text-muted">{aiError}</p>}
+        {!isAiLoading && !aiError && aiText && <p className="pulse-ai-text">{aiText}</p>}
       </div>
 
       <p className="market-pulse-insight">{insight}</p>

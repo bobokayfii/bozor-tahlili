@@ -425,16 +425,23 @@ button {
   color: var(--ink-faint);
 }
 
-/* AI tavsiya — hozircha "tez orada" ko'rinishida (real LLM chaqiruvi keyinroq
-   ulanadi). Emoji o'rniga matnli "AI" nishonchasi ishlatiladi. */
-.pulse-ai-teaser {
+/* AI tahlili — LLM'dan qaytgan bir necha jumlali xolis tahlil matnini
+   o'qish qulay bo'lishi uchun to'liq eninigacha cho'zilgan karta, emoji
+   o'rniga matnli "AI" nishonchasi bilan. */
+.pulse-ai-analysis {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 8px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 10px;
   background: var(--paper-sunk);
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--line);
+}
+
+.pulse-ai-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .pulse-ai-badge {
@@ -452,39 +459,21 @@ button {
   letter-spacing: 0.02em;
 }
 
-.pulse-ai-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
 .pulse-ai-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
 }
 
-.pulse-ai-soon {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  background: var(--paper);
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
 .pulse-ai-text {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.65;
   color: var(--ink-soft);
+}
+
+.pulse-ai-text-muted {
+  color: var(--ink-faint);
 }
 
 .market-pulse-insight {

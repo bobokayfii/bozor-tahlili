@@ -57,10 +57,14 @@ def explain_recommendation(criteria: Criteria, ranked: list[ScoredProduct]) -> s
         f"Quyidagi banklar ballash bo'yicha saralangan (faqat shu ro'yxatdagi "
         "raqamlardan foydalan, hech qanday qo'shimcha raqam yoki shart o'ylab topma):\n\n"
         f"{details}\n\n"
-        "O'zbek tilida javob ber. Har bir bank uchun alohida qator/band sifatida "
-        "stavka, muddat, summa, boshlang'ich badal, garov va to'lov usulini "
-        "aniq ko'rsat, so'ng nima uchun birinchi o'rindagi bank eng yaxshi "
-        "tanlov ekanini 2-3 gapda tushuntir."
+        "O'zbek tilida, bog'lanishli 4-6 gapdan iborat, tabiiy oqimli matn "
+        "sifatida (band-band ro'yxat emas) qisqa tahlil yoz. Bitta bankni "
+        "'eng yaxshisi' yoki 'tavsiya etiladi' deb reklama qilma — buning "
+        "o'rniga har bir bankning qaysi jihati (masalan past stavka, uzunroq "
+        "muddat, garovsizlik) qaysi ehtiyoj uchun mos kelishini xolis "
+        "solishtirib ber, shunda foydalanuvchi o'ziga mosini o'zi tanlay "
+        "oladi. Raqamlarni matn ichida tabiiy tarzda eslatib o't, alohida "
+        "jadval yoki ro'yxat qilib qo'yma."
     )
 
     try:
