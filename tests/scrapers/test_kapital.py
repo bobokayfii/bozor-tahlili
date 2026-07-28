@@ -67,6 +67,25 @@ def test_kapital_avtokredit_ikkilamchi_parses_correctly():
     assert ikkilamchi.down_payment_pct == 20.0
     assert ikkilamchi.grace_period_months == 0
     assert ikkilamchi.payment_method is None
+
+
+def test_kapital_avtokredit_brend_ikkilamchi_parses_correctly():
+    """"Kapitalbankdan Avto Nasiya (ikkilamchi)" o'zi brend cheklovisiz
+    (istalgan avtomobil markasi/modeli qabul qilinadi) — shu sabab bitta
+    haqiqiy sahifa IKKITA toifaga xaritalanadi: "avtokredit_ikkilamchi"
+    (mavjud) va "avtokredit_brend_ikkilamchi" (yangi, xuddi shu
+    URL/qiymatlar bilan), ikkalasi ham bir xil
+    _build_avtokredit_ikkilamchi_product metodidan o'tadi."""
+    with patch("scrapers.kapital.fetch_html", side_effect=_fake_fetch):
+        products = KapitalBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
     assert ikkilamchi.requires_collateral is True
 
 

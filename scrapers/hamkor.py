@@ -69,6 +69,7 @@ class HamkorBankScraper(TextSectionScraper):
         "avtokredit": "https://hamkorbank.uz/uz/physical/credits/auto-damas/",
         "avtokredit_ikkilamchi": "https://hamkorbank.uz/uz/physical/credits/autolight/",
         "avtokredit_brend_birlamchi": "https://hamkorbank.uz/uz/physical/credits/auto-kia-sonet/",
+        "avtokredit_brend_ikkilamchi": "https://hamkorbank.uz/uz/physical/credits/autolight/",
         "ipoteka_tijorat": "https://hamkorbank.uz/uz/physical/mortgage/bank-mortgage/",
         "ipoteka_davlat": "https://hamkorbank.uz/uz/physical/mortgage/mortgage-new-build/",
         "mikroqarz": "https://hamkorbank.uz/uz/physical/credits/microcredit-plus/",
@@ -78,11 +79,13 @@ class HamkorBankScraper(TextSectionScraper):
     }
     FORCE_COLLATERAL = {
         "avtokredit_ikkilamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
     }
     PRODUCT_NAMES = {
         "avtokredit": "Auto DAMAS",
         "avtokredit_ikkilamchi": "Auto light avtokrediti",
         "avtokredit_brend_birlamchi": "Auto KIA Sonet",
+        "avtokredit_brend_ikkilamchi": "Auto light avtokrediti",
         "ipoteka_tijorat": "Bank ipotekasi",
         "ipoteka_davlat": "Yangi qurilgan uy-joy uchun ipoteka",
         "mikroqarz": "Mikrokredit Plus",
@@ -100,8 +103,8 @@ class HamkorBankScraper(TextSectionScraper):
 
                 if category in ("avtokredit", "avtokredit_brend_birlamchi"):
                     product = self._build_avtokredit_product(category, url, now, text)
-                elif category == "avtokredit_ikkilamchi":
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
                 elif category == "mikroqarz_onlayn":
@@ -162,12 +165,19 @@ class HamkorBankScraper(TextSectionScraper):
             payment_method=None,
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"Auto light avtokrediti" — "Kredit maqsadi: Transport
         vositalarini birlamchi va ikkilamchi bozordan sotib olish uchun
         avtokredit" deb aniq yozilgan, ya'ni bitta mahsulot ikkala bozorni
         ham qamrab oladi — shu sabab "avtokredit_ikkilamchi" toifasiga
         xaritalanadi.
+
+        Sahifada brend cheklovi umuman yo'q (istalgan brend/model qabul
+        qilinadi) — shu sabab bu bitta mahsulot "avtokredit_brend_
+        ikkilamchi" toifasiga ham xaritalanadi (bir xil URL, ikkala
+        category kaliti CATEGORY_URLS'da bir xil sahifaga ishora qiladi;
+        shu metod ikkalasi uchun ham chaqiriladi, faqat `category`
+        parametri farq qiladi).
 
         Stavka jadvali ikkita mijoz toifasiga (rasmiy daromadli / rasmiy
         daromadsiz) bo'linib, har birida bir nechta "N yilgacha — X%" qatori
@@ -198,14 +208,14 @@ class HamkorBankScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_ikkilamchi",
-            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
-            requires_collateral=self.FORCE_COLLATERAL["avtokredit_ikkilamchi"],
+            requires_collateral=self.FORCE_COLLATERAL[category],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

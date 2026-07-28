@@ -37,6 +37,7 @@ class MikrokreditBankScraper(TextSectionScraper):
         "avtokredit": "https://mkbank.uz/uz/private/crediting/avtokredit-uzauto-motors1933/",
         "avtokredit_ikkilamchi": "https://mkbank.uz/uz/private/crediting/car-loan-second/",
         "avtokredit_brend_birlamchi": "https://mkbank.uz/uz/private/crediting/avtokrediti-adm-global-/",
+        "avtokredit_brend_ikkilamchi": "https://mkbank.uz/uz/private/crediting/car-loan-second/",
         "mikroqarz": "https://mkbank.uz/uz/private/crediting/microloan/",
         "ipoteka_davlat": "https://mkbank.uz/uz/private/crediting/imkoniyat-ipotekasi-krediti/",
         # Taxminiy (best-guess) — sinf docstringiga qarang.
@@ -50,11 +51,13 @@ class MikrokreditBankScraper(TextSectionScraper):
     FORCE_COLLATERAL = {
         "avtokredit_ikkilamchi": True,
         "avtokredit_brend_birlamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
     }
     PRODUCT_NAMES = {
         "avtokredit": "Avtokredit UzAuto Motors",
         "avtokredit_ikkilamchi": "Foydalanilgan avtomobillar uchun avtokredit",
         "avtokredit_brend_birlamchi": "Avtokredit ADM GLOBAL",
+        "avtokredit_brend_ikkilamchi": "Foydalanilgan avtomobillar uchun avtokredit",
         "mikroqarz": "Mikroqarz",
         "ipoteka_davlat": "Imkoniyat ipotekasi krediti",
     }
@@ -74,8 +77,8 @@ class MikrokreditBankScraper(TextSectionScraper):
 
                 if category == "avtokredit":
                     product = self._build_avtokredit_product(url, now, text)
-                elif category == "avtokredit_ikkilamchi":
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "avtokredit_brend_birlamchi":
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
                 elif category == "mikroqarz":
@@ -198,10 +201,14 @@ class MikrokreditBankScraper(TextSectionScraper):
             payment_method=payment_method,
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"Foydalanilgan avtomobillar uchun avtokredit" — sahifa
         <title>'ida "yo'l bosilgan avtomobillar uchun kredit" deyilgan,
-        ya'ni ishlatilgan (ikkilamchi bozor) avtomobillar uchun.
+        ya'ni ishlatilgan (ikkilamchi bozor) avtomobillar uchun. Brend
+        cheklovi ham yo'q — shu sabab bitta haqiqiy sahifa
+        "avtokredit_brend_ikkilamchi" toifasiga ham xaritalanadi (bir xil
+        URL, shu metod ikkalasi uchun ham chaqiriladi, faqat `category`
+        parametri farq qiladi).
 
         "60 oygacha" muddat qisqacha xulosa kartochkasida BIR marta va
         "Qo'shimcha shartlar" jadvalida yana bir marta (headers keyin
@@ -231,14 +238,14 @@ class MikrokreditBankScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_ikkilamchi",
-            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
-            requires_collateral=self.FORCE_COLLATERAL["avtokredit_ikkilamchi"],
+            requires_collateral=self.FORCE_COLLATERAL[category],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

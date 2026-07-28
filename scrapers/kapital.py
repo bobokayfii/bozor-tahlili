@@ -68,16 +68,19 @@ class KapitalBankScraper(TextSectionScraper):
     CATEGORY_URLS = {
         "avtokredit": "https://www.kapital24.uz/uz/crediting/qulay-nasiya-cobalt/",
         "avtokredit_ikkilamchi": "https://www.kapital24.uz/uz/crediting/kapitalbankdan-avto-nasiya-ikkilamchi/",
+        "avtokredit_brend_ikkilamchi": "https://www.kapital24.uz/uz/crediting/kapitalbankdan-avto-nasiya-ikkilamchi/",
         "ipoteka_tijorat": "https://www.kapital24.uz/uz/crediting/qulay-uy-ipoteka-krediti/",
         "mikroqarz_onlayn": "https://www.kapital24.uz/uz/crediting/onlayn-mikroqarz/",
     }
     FORCE_COLLATERAL = {
         "avtokredit": True,
         "avtokredit_ikkilamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
     }
     PRODUCT_NAMES = {
         "avtokredit": "Qulay Nasiya (Cobalt)",
         "avtokredit_ikkilamchi": "Kapitalbankdan Avto Nasiya (ikkilamchi)",
+        "avtokredit_brend_ikkilamchi": "Kapitalbankdan Avto Nasiya (ikkilamchi)",
         "ipoteka_tijorat": "Qulay uy ipoteka krediti",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
     }
@@ -92,8 +95,8 @@ class KapitalBankScraper(TextSectionScraper):
 
                 if category == "mikroqarz_onlayn":
                     product = self._build_mikroqarz_onlayn_product(url, now, text)
-                elif category == "avtokredit_ikkilamchi":
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "avtokredit":
@@ -122,7 +125,7 @@ class KapitalBankScraper(TextSectionScraper):
             "avtokredit", section, url, now, full_text=text, down_payment_pct=down_payment_pct
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"Kapitalbankdan Avto Nasiya (ikkilamchi)" — xuddi "Qulay Nasiya
         (Cobalt)" kabi, bu ham klassik avtokredit emas, BNPL uslubidagi
         "O'zini o'zi band qilgan shaxslar uchun mikrokredit" (0% foiz +
@@ -134,7 +137,12 @@ class KapitalBankScraper(TextSectionScraper):
         "O'z ishtiroki (boshlang'ich badal)" bo'limida UCHTA mahsulot
         varianti ro'yxatlanadi (bazaviy — 20%, plyus — 30%, Elektro —
         35%) — eng past qiymat (20%) bazaviy "(ikkilamchi)" varianti
-        uchun ishlatiladi, bu bizning PRODUCT_NAMES nomimizga mos keladi."""
+        uchun ishlatiladi, bu bizning PRODUCT_NAMES nomimizga mos keladi.
+
+        Sahifada brend cheklovi yo'q (istalgan brend/model qabul qilinadi)
+        — shu sabab bitta haqiqiy sahifa "avtokredit_brend_ikkilamchi"
+        toifasiga ham xaritalanadi (bir xil URL, shu metod ikkalasi uchun
+        ham chaqiriladi, faqat `category` parametri farq qiladi)."""
         term_rate_section = extract_section(text, "Mikrokredit muddati", "shtiroki").replace("0 (nol) foiz", "0%")
         amount_section = extract_section(text, "Mikrokreditning maksimal miqdori", "minot").replace(",00 so", " so")
         section = f"{term_rate_section}\n{amount_section}"
@@ -152,7 +160,7 @@ class KapitalBankScraper(TextSectionScraper):
         grace_period_months = extract_grace_period_months("imtiyozli" + grace_section)
 
         return self._build_product(
-            "avtokredit_ikkilamchi",
+            category,
             section,
             url,
             now,

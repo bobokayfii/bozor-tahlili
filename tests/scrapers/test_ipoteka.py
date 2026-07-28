@@ -15,6 +15,9 @@ FIXTURE_BY_URL = {
     IpotekaBankScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
         FIXTURES_DIR / "ipoteka_avtokredit_brend_birlamchi.html"
     ).read_text(encoding="utf-8"),
+    IpotekaBankScraper.CATEGORY_URLS["avtokredit_brend_ikkilamchi"]: (
+        FIXTURES_DIR / "ipoteka_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     IpotekaBankScraper.CATEGORY_URLS["avtokredit_elektro"]: (
         FIXTURES_DIR / "ipoteka_avtokredit_elektro.html"
     ).read_text(encoding="utf-8"),
@@ -37,7 +40,7 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_ipoteka_scraper_parses_all_eight_categories():
+def test_ipoteka_scraper_parses_all_nine_categories():
     """"kredit_karta" was removed: its old "overdraft/" URL now redirects
     to an unrelated Russian-language Onlayn Mikrozaym page, and the live
     site has no dedicated credit-card (overdraft) loan product at all —
@@ -45,12 +48,13 @@ def test_ipoteka_scraper_parses_all_eight_categories():
     with patch("scrapers.ipoteka.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = IpotekaBankScraper().run()
 
-    assert mock_fetch.call_count == 8
+    assert mock_fetch.call_count == 9
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
         "avtokredit_ikkilamchi",
         "avtokredit_brend_birlamchi",
+        "avtokredit_brend_ikkilamchi",
         "avtokredit_elektro",
         "ipoteka_tijorat",
         "ipoteka_davlat",
@@ -58,6 +62,25 @@ def test_ipoteka_scraper_parses_all_eight_categories():
         "istemol_krediti",
     }
     assert all(p.bank == "Ipoteka Bank" for p in products)
+
+
+def test_ipoteka_avtokredit_brend_ikkilamchi_parses_correctly():
+    """"Avtokredit R1" o'zi brend cheklovisiz (istalgan avtomobil markasi/
+    modeli, yangi yoki ishlatilgan) — shu sabab bitta haqiqiy sahifa
+    IKKITA toifaga xaritalanadi: "avtokredit_ikkilamchi" (mavjud) va
+    "avtokredit_brend_ikkilamchi" (yangi, xuddi shu URL/qiymatlar bilan)."""
+    with patch("scrapers.ipoteka.fetch_html", side_effect=_fake_fetch):
+        products = IpotekaBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
 
 
 def test_ipoteka_ipoteka_davlat_parses_correctly():
