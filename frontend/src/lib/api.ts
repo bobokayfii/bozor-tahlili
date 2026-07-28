@@ -50,6 +50,13 @@ export async function fetchRecommendation(request: RecommendRequest): Promise<Re
   return response.json()
 }
 
+export function getExportExcelUrl(category: string, language: string): string {
+  const url = new URL(`${API_BASE_URL}/export-excel`)
+  url.searchParams.set('category', category)
+  url.searchParams.set('language', language)
+  return url.toString()
+}
+
 export async function fetchProductExplanation(request: ExplainProductRequest): Promise<ExplainProductResponse> {
   const response = await fetch(`${API_BASE_URL}/explain-product`, {
     method: 'POST',

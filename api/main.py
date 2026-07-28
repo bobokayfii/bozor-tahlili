@@ -5,14 +5,16 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
+from export_excel import build_category_workbook
 from recommender.explain import FeaturedProduct, explain_featured_product, explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
 from scrapers.orchestrator import run_all_scrapers
@@ -218,3 +220,33 @@ def explain_product(request: ExplainProductRequest):
     )
     explanation = explain_featured_product(request.category, product, other_bank_count, request.language)
     return {"explanation": explanation}
+
+
+@app.get("/export-excel")
+def export_excel(category: str, language: str = "uz"):
+    """Joriy ochiq kategoriyani frontenddagi jadval bilan bir xil tartib
+    va ustunlarda (rate_min bo'yicha saralangan) chiroyli formatlangan
+    .xlsx faylga eksport qiladi — faqat shu kategoriya, butun sayt emas."""
+    category_obj = next((c for c in CATEGORIES if c.key == category), None)
+    if category_obj is None:
+        raise HTTPException(status_code=404, detail="Kategoriya topilmadi")
+
+    with SessionLocal() as session:
+        query = _latest_per_bank_category_query().where(ProductRow.category == category)
+        rows = session.execute(query).scalars().all()
+
+    unavailable_banks = get_unavailable_banks(category)
+    content = build_category_workbook(
+        category_key=category,
+        sheet_title=category_obj.label_uz,
+        products=list(rows),
+        unavailable_banks=unavailable_banks,
+        schema=category_obj.schema,
+        lang=language,
+    )
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{category}.xlsx"'},
+    )

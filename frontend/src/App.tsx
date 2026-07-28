@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { ProductTable } from './components/ProductTable'
 import { MarketPulse } from './components/MarketPulse'
-import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
+import { fetchCategories, fetchProducts, fetchUnavailableBanks, getExportExcelUrl } from './lib/api'
 import { getCategoryHeading } from './lib/categoryGroups'
 import { useLanguage } from './lib/LanguageContext'
 import type { Lang } from './lib/i18n'
@@ -39,6 +39,19 @@ function LanguageToggle() {
         RU
       </button>
     </div>
+  )
+}
+
+// Oddiy <a href> yetarli: bu GET so'rov autentifikatsiyasiz, backend
+// Content-Disposition: attachment sarlavhasini qaytaradi, brauzer o'zi
+// yuklab olishni boshlaydi — fetch/blob orqali qo'lda yuklash shart emas.
+function ExportButton({ category }: { category: string | null }) {
+  const { lang, t } = useLanguage()
+  if (!category) return null
+  return (
+    <a className="export-btn" href={getExportExcelUrl(category, lang)}>
+      {t('exportButton')}
+    </a>
   )
 }
 
@@ -107,7 +120,10 @@ export function App() {
         <div className="app-topbar-brand">
           <img src={logo} alt="Bozor Tahlili" className="app-topbar-logo" />
         </div>
-        <LanguageToggle />
+        <div className="app-topbar-actions">
+          <ExportButton category={activeCategory} />
+          <LanguageToggle />
+        </div>
       </header>
       <div className="app-body">
         <Sidebar categories={categories} activeCategory={activeCategory} onSelect={setActiveCategory} />

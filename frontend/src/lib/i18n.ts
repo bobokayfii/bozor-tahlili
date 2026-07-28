@@ -36,6 +36,7 @@ export const UI_TEXT = {
     langToggleLabel: 'Til',
     monthUnit: 'oy',
     loadingLabel: 'Yuklanmoqda',
+    exportButton: "Excel'ga yuklash",
   },
   ru: {
     sidebarTitle: 'Кредитные продукты',
@@ -72,6 +73,7 @@ export const UI_TEXT = {
     langToggleLabel: 'Язык',
     monthUnit: 'мес.',
     loadingLabel: 'Загрузка',
+    exportButton: 'Скачать в Excel',
   },
 } as const satisfies Record<Lang, Record<string, string>>
 

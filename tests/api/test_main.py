@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
+from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 import api.main as api_main
 from db.database import get_engine, get_session_factory, init_db
@@ -236,3 +238,37 @@ def test_cors_allows_configured_frontend_origin(client):
         headers={"Origin": "http://localhost:5173"},
     )
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_export_excel_returns_a_valid_workbook_for_the_seeded_category(client):
+    response = client.get("/export-excel", params={"category": "mikroqarz"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert response.headers["content-disposition"] == 'attachment; filename="mikroqarz.xlsx"'
+
+    workbook = load_workbook(BytesIO(response.content))
+    sheet = workbook.active
+    header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    assert header_row == ("#", "Bank", "Mahsulot", "Stavka", "Muddat", "Kredit miqdori", "To'lov usuli")
+    data_row = next(sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    assert data_row == (1, "SQB", "SQB Mikroqarz", "28.0%–31.0%", "3–36 oy", "100.0 mln so'm", "Annuitet, Differensial")
+
+
+def test_export_excel_translates_headers_and_values_when_language_is_ru(client):
+    response = client.get("/export-excel", params={"category": "mikroqarz", "language": "ru"})
+
+    workbook = load_workbook(BytesIO(response.content))
+    sheet = workbook.active
+    header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    assert header_row == ("#", "Банк", "Продукт", "Ставка", "Срок", "Сумма кредита", "Способ оплаты")
+    data_row = next(sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    assert data_row[-1] == "Аннуитет, Дифференцированный"
+    assert data_row[4] == "3–36 мес."
+
+
+def test_export_excel_returns_404_for_an_unknown_category(client):
+    response = client.get("/export-excel", params={"category": "not_a_real_category"})
+    assert response.status_code == 404

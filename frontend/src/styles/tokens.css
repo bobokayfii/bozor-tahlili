@@ -93,10 +93,36 @@ button {
   background: var(--paper);
 }
 
+.app-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 24px;
+}
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.export-btn:hover {
+  border-color: var(--house);
+  color: var(--house);
+}
+
 .lang-toggle {
   display: flex;
   gap: 2px;
-  margin-right: 24px;
   padding: 3px;
   background: var(--paper-sunk);
   border: 1px solid var(--line);
