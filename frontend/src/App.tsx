@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { ProductTable } from './components/ProductTable'
 import { MarketPulse } from './components/MarketPulse'
 import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
+import { getCategoryHeading } from './lib/categoryGroups'
 import type { Category, Product, UnavailableBank } from './lib/types'
 import logo from './assets/logo.png'
 
@@ -66,7 +67,9 @@ export function App() {
   }, [activeCategory])
 
   const activeCategoryData = categories.find((c) => c.key === activeCategory)
-  const activeLabel = activeCategoryData?.label ?? 'Bozor Tahlili'
+  const activeLabel = activeCategoryData
+    ? getCategoryHeading(activeCategoryData.key, activeCategoryData.label)
+    : 'Bozor Tahlili'
   const lastUpdated =
     products.length > 0
       ? products.reduce((latest, p) => (p.scraped_at > latest ? p.scraped_at : latest), products[0].scraped_at)

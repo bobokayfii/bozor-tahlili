@@ -74,3 +74,16 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     },
   },
 ]
+
+// Sahifa sarlavhasi (h1) uchun: backenddagi to'liq, batafsil category.label
+// o'rniga ("Brendli avtokredit — birlamchi (GM, BYD, KIA, ...)" kabi uzun va
+// eskirgan brend ro'yxatini o'z ichiga olgan matn) sidebar bilan bir xil,
+// qisqa "Guruh nomi — qism nomi" shaklidan foydalaniladi — sidebar allaqachon
+// guruh/qism ierarxiyasini ko'rsatib turgani uchun to'liq label sarlavhada
+// ortiqcha va "hunuk" ko'rinadi.
+export function getCategoryHeading(categoryKey: string, fallbackLabel: string): string {
+  const group = CATEGORY_GROUPS.find((g) => g.keys.includes(categoryKey))
+  if (!group) return fallbackLabel
+  const shortLabel = group.shortLabels?.[categoryKey]
+  return shortLabel ? `${group.label} — ${shortLabel}` : group.label
+}

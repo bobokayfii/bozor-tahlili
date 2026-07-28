@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CATEGORY_GROUPS } from './categoryGroups'
+import { CATEGORY_GROUPS, getCategoryHeading } from './categoryGroups'
 
 describe('CATEGORY_GROUPS', () => {
   it('does not list the same category key in more than one group', () => {
@@ -24,5 +24,22 @@ describe('CATEGORY_GROUPS', () => {
       expect(group.iconColor).toBeTruthy()
     }
     expect(colors.length).toBe(new Set(colors).size)
+  })
+})
+
+describe('getCategoryHeading', () => {
+  it('uses "Group — shortLabel" for a category that belongs to a multi-key group', () => {
+    expect(getCategoryHeading('avtokredit', 'fallback')).toBe('Avtokredit — Birlamchi bozor')
+    expect(getCategoryHeading('avtokredit_brend_ikkilamchi', 'fallback')).toBe(
+      'Brendli avtokredit — Ikkilamchi bozor',
+    )
+  })
+
+  it('uses just the group label for a single-key group', () => {
+    expect(getCategoryHeading('kredit_karta', 'fallback')).toBe('Kredit kartalari')
+  })
+
+  it('falls back to the given label for an unknown category key', () => {
+    expect(getCategoryHeading('unknown_category', 'fallback label')).toBe('fallback label')
   })
 })
