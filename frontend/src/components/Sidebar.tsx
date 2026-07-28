@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Category } from '../lib/types'
-import { CATEGORY_GROUPS, type CategoryGroup } from '../lib/categoryGroups'
+import { CATEGORY_GROUPS, groupLabel, groupShortLabel, type CategoryGroup } from '../lib/categoryGroups'
+import { useLanguage } from '../lib/LanguageContext'
 
 interface SidebarProps {
   categories: Category[]
@@ -44,35 +45,39 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 export function Sidebar({ categories, activeCategory, onSelect }: SidebarProps) {
+  const { lang, t } = useLanguage()
   const byKey = new Map(categories.map((category) => [category.key, category]))
 
-  const activeGroupLabel = CATEGORY_GROUPS.find((group) => group.keys.includes(activeCategory ?? ''))?.label
+  // group.label (Uzbek) is used as a stable internal identity key for the
+  // expanded-set, independent of the currently displayed language.
+  const activeGroupKey = CATEGORY_GROUPS.find((group) => group.keys.includes(activeCategory ?? ''))?.label
 
   const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(activeGroupLabel ? [activeGroupLabel] : []),
+    () => new Set(activeGroupKey ? [activeGroupKey] : []),
   )
 
-  function toggleGroup(label: string) {
+  function toggleGroup(groupKey: string) {
     setExpanded((prev) => {
       const next = new Set(prev)
-      if (next.has(label)) {
-        next.delete(label)
+      if (next.has(groupKey)) {
+        next.delete(groupKey)
       } else {
-        next.add(label)
+        next.add(groupKey)
       }
       return next
     })
   }
 
   return (
-    <nav className="sidebar" aria-label="Mahsulot kategoriyalari">
-      <div className="sidebar-group-label">Kredit mahsulotlari</div>
+    <nav className="sidebar" aria-label={t('sidebarTitle')}>
+      <div className="sidebar-group-label">{t('sidebarTitle')}</div>
       <ul className="sidebar-tree">
         {CATEGORY_GROUPS.map((group) => {
           const availableKeys = group.keys.filter((key) => byKey.has(key))
           if (availableKeys.length === 0) {
             return null
           }
+          const label = groupLabel(group, lang)
 
           if (availableKeys.length === 1) {
             const key = availableKeys[0]
@@ -84,7 +89,7 @@ export function Sidebar({ categories, activeCategory, onSelect }: SidebarProps) 
                   onClick={() => onSelect(key)}
                 >
                   <GroupIcon group={group} />
-                  {group.label}
+                  {label}
                 </button>
               </li>
             )
@@ -103,7 +108,7 @@ export function Sidebar({ categories, activeCategory, onSelect }: SidebarProps) 
               >
                 <span className="sidebar-parent-label">
                   <GroupIcon group={group} />
-                  {group.label}
+                  {label}
                 </span>
                 <Chevron open={isOpen} />
               </button>
@@ -116,7 +121,7 @@ export function Sidebar({ categories, activeCategory, onSelect }: SidebarProps) 
                         className={key === activeCategory ? 'sidebar-subitem active' : 'sidebar-subitem'}
                         onClick={() => onSelect(key)}
                       >
-                        {group.shortLabels?.[key] ?? byKey.get(key)?.label}
+                        {groupShortLabel(group, key, lang) ?? byKey.get(key)?.label}
                       </button>
                     </li>
                   ))}
@@ -126,7 +131,7 @@ export function Sidebar({ categories, activeCategory, onSelect }: SidebarProps) 
           )
         })}
       </ul>
-      <div className="sidebar-foot">SQB · Strategiya bo'limi</div>
+      <div className="sidebar-foot">{t('sidebarFooter')}</div>
     </nav>
   )
 }

@@ -2,6 +2,8 @@ import type { Product, UnavailableBank } from '../lib/types'
 import { isHouseBank } from '../lib/bank'
 import { getBankLogo } from '../lib/bankLogos'
 import { getProductColumns } from '../lib/productColumns'
+import { useLanguage } from '../lib/LanguageContext'
+import { translate, type Lang } from '../lib/i18n'
 
 interface ProductTableProps {
   products: Product[]
@@ -9,6 +11,26 @@ interface ProductTableProps {
   schema?: string
   category?: string
   unavailableBanks?: UnavailableBank[]
+}
+
+// Backend hozircha faqat o'zbekcha sabab matnini qaytaradi
+// (unavailable_products.py) — bu yerda ma'lum ikkita qiymat ruscha
+// interfeys uchun tarjima qilinadi, tanilmagan matn o'zgarishsiz qoladi.
+const UNAVAILABLE_REASON_RU: Record<string, string> = {
+  'Mahsulot mavjud emas': 'Продукт недоступен',
+  "Vaqtincha to'xtatilgan": 'Временно приостановлено',
+}
+
+function translateReason(reason: string, lang: Lang): string {
+  if (lang !== 'ru') return reason
+  return UNAVAILABLE_REASON_RU[reason] ?? reason
+}
+
+function formatTerm(product: Product, lang: Lang): string {
+  const unit = translate(lang, 'monthUnit')
+  return product.term_min_months === product.term_max_months
+    ? `${product.term_min_months} ${unit}`
+    : `${product.term_min_months}–${product.term_max_months} ${unit}`
 }
 
 // Reyting/muddat kabi sobit ustunlar har doim bir xil nisbatda qoladi;
@@ -26,17 +48,18 @@ function gridTemplateColumns(extraColumnCount: number): string {
 }
 
 function SkeletonRows({ schema, category }: { schema?: string; category?: string }) {
-  const columns = getProductColumns(schema, category)
+  const { lang, t } = useLanguage()
+  const columns = getProductColumns(schema, category, lang)
   const gridStyle = { gridTemplateColumns: gridTemplateColumns(columns.length) }
 
   return (
-    <div className="rate-board" aria-busy="true" aria-label="Yuklanmoqda">
+    <div className="rate-board" aria-busy="true" aria-label={t('loadingLabel')}>
       <div className="rate-board-head" style={gridStyle}>
-        <span>#</span>
-        <span>Bank</span>
-        <span className="rate-head-product">Mahsulot</span>
-        <span>Stavka</span>
-        <span className="rate-head-term">Muddat</span>
+        <span>{t('tableRank')}</span>
+        <span>{t('tableBank')}</span>
+        <span className="rate-head-product">{t('tableProduct')}</span>
+        <span>{t('tableRate')}</span>
+        <span className="rate-head-term">{t('tableTerm')}</span>
         {columns.map((column) => (
           <span className="rate-head-extra" key={column.key}>
             {column.label}
@@ -66,7 +89,8 @@ export function ProductTable({
   category,
   unavailableBanks = [],
 }: ProductTableProps) {
-  const columns = getProductColumns(schema, category)
+  const { lang, t } = useLanguage()
+  const columns = getProductColumns(schema, category, lang)
   const gridStyle = { gridTemplateColumns: gridTemplateColumns(columns.length) }
 
   if (isLoading) {
@@ -74,11 +98,7 @@ export function ProductTable({
   }
 
   if (products.length === 0 && unavailableBanks.length === 0) {
-    return (
-      <p className="empty-state">
-        Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda.
-      </p>
-    )
+    return <p className="empty-state">{t('emptyState')}</p>
   }
 
   const ranked = [...products].sort((a, b) => a.rate_min - b.rate_min)
@@ -88,11 +108,11 @@ export function ProductTable({
   return (
     <div className="rate-board">
       <div className="rate-board-head" style={gridStyle}>
-        <span>#</span>
-        <span>Bank</span>
-        <span className="rate-head-product">Mahsulot</span>
-        <span>Stavka</span>
-        <span className="rate-head-term">Muddat</span>
+        <span>{t('tableRank')}</span>
+        <span>{t('tableBank')}</span>
+        <span className="rate-head-product">{t('tableProduct')}</span>
+        <span>{t('tableRate')}</span>
+        <span className="rate-head-term">{t('tableTerm')}</span>
         {columns.map((column) => (
           <span className="rate-head-extra" key={column.key}>
             {column.label}
@@ -116,7 +136,7 @@ export function ProductTable({
                 <img src={getBankLogo(product.bank)} alt="" className="rate-bank-logo" />
               )}
               <span className="rate-bank-name">{product.bank}</span>
-              {house && <span className="house-flag">Biz</span>}
+              {house && <span className="house-flag">{t('houseFlag')}</span>}
             </span>
             <span className="rate-product">{product.product_name}</span>
             <span className="rate-figure">
@@ -129,11 +149,7 @@ export function ProductTable({
                 <span className="rate-bar-fill" style={{ width: `${fillPct}%` }} />
               </span>
             </span>
-            <span className="rate-term">
-              {product.term_min_months === product.term_max_months
-                ? `${product.term_min_months} oy`
-                : `${product.term_min_months}–${product.term_max_months} oy`}
-            </span>
+            <span className="rate-term">{formatTerm(product, lang)}</span>
             {columns.map((column) => {
               const value = column.render(product)
               return (
@@ -155,7 +171,7 @@ export function ProductTable({
             <span className="rate-bank-name">{item.bank}</span>
           </span>
           <span className="rate-unavailable-reason" style={{ gridColumn: '3 / -1' }}>
-            {item.reason}
+            {translateReason(item.reason, lang)}
           </span>
         </div>
       ))}

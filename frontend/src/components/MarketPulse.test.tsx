@@ -1,8 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ReactElement } from 'react'
 import { MarketPulse } from './MarketPulse'
 import { fetchProductExplanation } from '../lib/api'
+import { LanguageProvider } from '../lib/LanguageContext'
 import type { Product } from '../lib/types'
+
+function renderWithLanguage(ui: ReactElement) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>)
+}
 
 vi.mock('../lib/api', () => ({
   fetchProductExplanation: vi.fn(),
@@ -53,7 +59,7 @@ describe('MarketPulse featured card + AI note', () => {
   it('features the same product the table would rank first (lowest rate_min)', () => {
     mockedFetchProductExplanation.mockResolvedValue({ explanation: 'NBU past stavka bilan ajralib turadi.' })
 
-    render(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
 
     // NBU has the lowest rate_min (20.9 vs SQB's 24.9), so it must be featured —
     // matching ProductTable's own `sort((a, b) => a.rate_min - b.rate_min)`.
@@ -65,7 +71,7 @@ describe('MarketPulse featured card + AI note', () => {
   it("requests the AI note for exactly the featured product's own fields, not a separately-ranked pick", async () => {
     mockedFetchProductExplanation.mockResolvedValue({ explanation: 'NBU past stavka bilan ajralib turadi.' })
 
-    render(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
 
     await screen.findByText('NBU past stavka bilan ajralib turadi.')
 
@@ -80,15 +86,31 @@ describe('MarketPulse featured card + AI note', () => {
       amount_max_som: 150_000_000,
       requires_collateral: false,
       down_payment_pct: null,
+      language: 'uz',
     })
   })
 
   it('shows an error message instead of the stale "tez orada" placeholder when the request fails', async () => {
     mockedFetchProductExplanation.mockRejectedValue(new Error("AI izohini olib bo'lmadi: 500"))
 
-    render(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
 
     expect(await screen.findByText("AI izohini olib bo'lmadi: 500")).toBeInTheDocument()
     expect(screen.queryByText(/tez orada/i)).not.toBeInTheDocument()
+  })
+
+  it('translates static labels and sends language: "ru" to the explain-product request when lang is ru', async () => {
+    window.localStorage.setItem('bozor-tahlili-lang', 'ru')
+    mockedFetchProductExplanation.mockResolvedValue({ explanation: 'NBU выделяется низкой ставкой.' })
+
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+
+    await screen.findByText('NBU выделяется низкой ставкой.')
+
+    expect(screen.getByText('Пульс рынка · Лучшее предложение')).toBeInTheDocument()
+    expect(screen.getByText('Ставка')).toBeInTheDocument()
+    expect(screen.getByText('Залог')).toBeInTheDocument()
+    expect(mockedFetchProductExplanation).toHaveBeenCalledWith(expect.objectContaining({ language: 'ru' }))
+    window.localStorage.removeItem('bozor-tahlili-lang')
   })
 })

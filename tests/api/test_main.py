@@ -116,10 +116,11 @@ def test_explain_product_calls_explain_featured_product_with_the_given_product_o
     ishlatilmaydi."""
     captured = {}
 
-    def fake_explain(category, product, other_bank_count):
+    def fake_explain(category, product, other_bank_count, language="uz"):
         captured["category"] = category
         captured["product"] = product
         captured["other_bank_count"] = other_bank_count
+        captured["language"] = language
         return "test tushuntirish"
 
     monkeypatch.setattr(api_main, "explain_featured_product", fake_explain)
@@ -145,6 +146,36 @@ def test_explain_product_calls_explain_featured_product_with_the_given_product_o
     # Fixture'da faqat SQB Mikroqarz bor — so'ralgan bank (HamkorBank) undan
     # farqli, shuning uchun 1 ta "boshqa" bank hisoblanadi.
     assert captured["other_bank_count"] == 1
+    # language yuborilmagan bo'lsa, ExplainProductRequest standart "uz"ni
+    # ishlatadi.
+    assert captured["language"] == "uz"
+
+
+def test_explain_product_passes_through_the_requested_language(client, monkeypatch):
+    captured = {}
+
+    def fake_explain(category, product, other_bank_count, language="uz"):
+        captured["language"] = language
+        return "test explanation"
+
+    monkeypatch.setattr(api_main, "explain_featured_product", fake_explain)
+
+    response = client.post("/explain-product", json={
+        "category": "mikroqarz",
+        "bank": "HamkorBank",
+        "product_name": "Hamkor Mikroqarz",
+        "rate_min": 10.0,
+        "rate_max": 15.0,
+        "term_min_months": 12,
+        "term_max_months": 36,
+        "amount_max_som": 100_000_000,
+        "requires_collateral": False,
+        "down_payment_pct": None,
+        "language": "ru",
+    })
+
+    assert response.status_code == 200
+    assert captured["language"] == "ru"
 
 
 def test_list_categories_returns_eleven_entries(client):

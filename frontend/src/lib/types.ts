@@ -47,6 +47,7 @@ export interface ExplainProductRequest {
   amount_max_som: number
   requires_collateral: boolean
   down_payment_pct: number | null
+  language?: 'uz' | 'ru'
 }
 
 export interface ExplainProductResponse {

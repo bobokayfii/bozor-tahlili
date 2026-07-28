@@ -89,6 +89,7 @@ class ExplainProductRequest(BaseModel):
     amount_max_som: int
     requires_collateral: bool
     down_payment_pct: float | None = None
+    language: str = "uz"
 
 
 def _row_to_dict(row: ProductRow) -> dict:
@@ -215,5 +216,5 @@ def explain_product(request: ExplainProductRequest):
         requires_collateral=request.requires_collateral,
         down_payment_pct=request.down_payment_pct,
     )
-    explanation = explain_featured_product(request.category, product, other_bank_count)
+    explanation = explain_featured_product(request.category, product, other_bank_count, request.language)
     return {"explanation": explanation}

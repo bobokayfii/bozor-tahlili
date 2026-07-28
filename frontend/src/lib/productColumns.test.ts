@@ -93,4 +93,22 @@ describe('getProductColumns', () => {
     expect(paymentMethod.render(baseProduct)).toBe('Annuitet')
     expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Annuitet, Differensial')
   })
+
+  it('translates column labels and rendered values into Russian when lang is ru', () => {
+    const [downPayment, gracePeriod, amount, paymentMethod] = getProductColumns('credit_down_payment', undefined, 'ru')
+    expect(downPayment.label).toBe('Первоначальный взнос')
+    expect(gracePeriod.label).toBe('Льготный период')
+    expect(amount.label).toBe('Сумма кредита')
+    expect(paymentMethod.label).toBe('Способ оплаты')
+
+    expect(gracePeriod.render(baseProduct)).toBe('Есть')
+    expect(gracePeriod.render({ ...baseProduct, grace_period_months: null })).toBe('Нет')
+    expect(amount.render(baseProduct)).toBe('800 млн сум')
+    expect(paymentMethod.render(baseProduct)).toBe('Аннуитет')
+    expect(paymentMethod.render({ ...baseProduct, payment_method: 'Annuitet, Differensial' })).toBe(
+      'Аннуитет, Дифференцированный',
+    )
+    expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Аннуитет, Дифференцированный')
+    expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('—')
+  })
 })
