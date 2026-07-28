@@ -51,11 +51,11 @@ describe('getProductColumns', () => {
     expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('—')
   })
 
-  it('renders grace period as Bor/Yo\'q, or a dash when unknown', () => {
+  it('renders grace period as Bor/Yo\'q, falling back to Yo\'q when unknown', () => {
     const [, gracePeriod] = getProductColumns('credit_down_payment')
     expect(gracePeriod.render(baseProduct)).toBe('Bor')
     expect(gracePeriod.render({ ...baseProduct, grace_period_months: 0 })).toBe("Yo'q")
-    expect(gracePeriod.render({ ...baseProduct, grace_period_months: null })).toBe('—')
+    expect(gracePeriod.render({ ...baseProduct, grace_period_months: null })).toBe("Yo'q")
   })
 
   it('formats the credit amount in millions of soum', () => {
@@ -74,10 +74,10 @@ describe('getProductColumns', () => {
     expect(specialTerms.render({ ...baseProduct, special_terms: null })).toBe('—')
   })
 
-  it('renders payment method or a dash when absent', () => {
+  it('renders payment method, falling back to "Annuitet, Differensial" when absent', () => {
     const [, , , paymentMethod] = getProductColumns('credit_down_payment')
     expect(paymentMethod.render(baseProduct)).toBe('Annuitet')
-    expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('—')
+    expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Annuitet, Differensial')
   })
 
   it('omits Imtiyozli davr and Maxsus shartlari for the mikroqarz category, regardless of schema', () => {

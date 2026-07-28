@@ -57,6 +57,13 @@ describe('ProductTable', () => {
     expect(screen.queryByText('0% – 0%')).not.toBeInTheDocument()
   })
 
+  it('renders a single term value (not "N–N oy") when term_min_months equals term_max_months', () => {
+    const flatTermProduct: Product = { ...sampleProduct, term_min_months: 48, term_max_months: 48 }
+    render(<ProductTable products={[flatTermProduct]} />)
+    expect(screen.getByText('48 oy')).toBeInTheDocument()
+    expect(screen.queryByText('48–48 oy')).not.toBeInTheDocument()
+  })
+
   it('ranks products by cheapest rate first and flags the SQB row', () => {
     render(<ProductTable products={[sampleProduct, cheaperProduct]} />)
     const rows = screen.getAllByText(/^0[12]$/)
@@ -76,7 +83,7 @@ describe('ProductTable', () => {
     expect(screen.getByText("800 mln so'm")).toBeInTheDocument()
   })
 
-  it('falls back to a dash for missing optional fields', () => {
+  it('falls back to a dash only for down payment; grace period and payment method get friendlier defaults', () => {
     const productWithoutExtras: Product = {
       ...sampleProduct,
       requires_collateral: false,
@@ -85,7 +92,9 @@ describe('ProductTable', () => {
       grace_period_months: null,
     }
     render(<ProductTable products={[productWithoutExtras]} />)
-    expect(screen.getAllByText('—')).toHaveLength(3)
+    expect(screen.getAllByText('—')).toHaveLength(1)
+    expect(screen.getByText("Yo'q")).toBeInTheDocument()
+    expect(screen.getByText('Annuitet, Differensial')).toBeInTheDocument()
   })
 
   it('renders the credit_special_terms column set: Maxsus shartlari shown, Boshlang\'ich badal hidden', () => {

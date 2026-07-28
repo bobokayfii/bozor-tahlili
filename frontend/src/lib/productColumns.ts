@@ -21,7 +21,7 @@ const gracePeriodColumn: ProductColumn = {
   key: 'grace_period',
   label: 'Imtiyozli davr',
   render: (product) => {
-    if (product.grace_period_months === null) return '—'
+    if (product.grace_period_months === null) return "Yo'q"
     return product.grace_period_months > 0 ? 'Bor' : "Yo'q"
   },
 }
@@ -38,16 +38,10 @@ const specialTermsColumn: ProductColumn = {
   render: (product) => product.special_terms ?? '—',
 }
 
+// Sahifada to'lov usuli aniq ko'rsatilmagan bank mahsulotlari uchun
+// ikkala usul ("Annuitet, Differensial") ham taklif qilinadi deb
+// hisoblanadi — noma'lum ("—") o'rniga shu ikkalasi ko'rsatiladi.
 const paymentMethodColumn: ProductColumn = {
-  key: 'payment_method',
-  label: "To'lov usuli",
-  render: (product) => product.payment_method ?? '—',
-}
-
-// Mikroqarz bo'limida to'lov usuli saytda aniq ko'rsatilmagan bank
-// mahsulotlari uchun ikkala usul ("Annuitet, Differensial") ham taklif
-// qilinadi deb hisoblanadi — noma'lum ("—") o'rniga shu ikkalasi ko'rsatiladi.
-const mikroqarzPaymentMethodColumn: ProductColumn = {
   key: 'payment_method',
   label: "To'lov usuli",
   render: (product) => product.payment_method ?? 'Annuitet, Differensial',
@@ -69,7 +63,7 @@ const CREDIT_SPECIAL_TERMS_COLUMNS: ProductColumn[] = [
 
 // Mikroqarz (oflayn/onlayn) bo'limida "Maxsus shartlari" va "Imtiyozli
 // davr" kolonkalari olib tashlangan.
-const MIKROQARZ_COLUMNS: ProductColumn[] = [amountColumn, mikroqarzPaymentMethodColumn]
+const MIKROQARZ_COLUMNS: ProductColumn[] = [amountColumn, paymentMethodColumn]
 
 export function getProductColumns(schema: string | undefined, category?: string): ProductColumn[] {
   if (category === 'mikroqarz' || category === 'mikroqarz_onlayn') return MIKROQARZ_COLUMNS

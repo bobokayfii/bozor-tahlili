@@ -130,7 +130,9 @@ export function ProductTable({
               </span>
             </span>
             <span className="rate-term">
-              {product.term_min_months}–{product.term_max_months} oy
+              {product.term_min_months === product.term_max_months
+                ? `${product.term_min_months} oy`
+                : `${product.term_min_months}–${product.term_max_months} oy`}
             </span>
             {columns.map((column) => {
               const value = column.render(product)
