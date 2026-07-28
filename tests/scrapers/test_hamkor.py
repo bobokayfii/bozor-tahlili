@@ -175,7 +175,7 @@ def test_hamkor_avtokredit_brend_birlamchi_parses_correctly():
     assert brend.product_name == "Auto KIA Sonet"
     assert brend.rate_min == 0.0
     assert brend.rate_max == 18.5
-    assert brend.term_min_months == 60
+    assert brend.term_min_months == 12
     assert brend.term_max_months == 60
     assert brend.amount_max_som == 600_000_000
     assert brend.down_payment_pct == 25.0
@@ -213,9 +213,12 @@ def test_hamkor_avtokredit_ignores_down_payment_tier_percentages():
     official income) grouped by down-payment tier (25%-70%) x term
     (13-60 months). Those tier labels ("Kamida 30%" etc.) are themselves
     percentages and must not leak into rate_min/rate_max — only the actual
-    "N oy -> X%" rate pairs should. A cross-sell "Imtiyozli shartlar
-    asosida" mention for an unrelated home-repair loan must also not cause
-    a false grace-period reading."""
+    "N oy -> X%" rate pairs should. term_min/term_max are read from the
+    same rate-matrix pairs (13-60 months), not the summary card's single
+    "5 yilgacha" (60 oy) ceiling, which would otherwise hide the real 13
+    month floor. A cross-sell "Imtiyozli shartlar asosida" mention for an
+    unrelated home-repair loan must also not cause a false grace-period
+    reading."""
     with patch("scrapers.hamkor.fetch_html", side_effect=_fake_fetch):
         products = HamkorBankScraper().run()
 
@@ -223,7 +226,7 @@ def test_hamkor_avtokredit_ignores_down_payment_tier_percentages():
     assert avtokredit.product_name == "Auto DAMAS"
     assert avtokredit.rate_min == 0.0
     assert avtokredit.rate_max == 19.0
-    assert avtokredit.term_min_months == 60
+    assert avtokredit.term_min_months == 13
     assert avtokredit.term_max_months == 60
     assert avtokredit.amount_max_som == 600_000_000
     assert avtokredit.down_payment_pct == 25.0

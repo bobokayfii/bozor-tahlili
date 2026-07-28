@@ -127,13 +127,17 @@ class HamkorBankScraper(TextSectionScraper):
     def _build_avtokredit_product(self, category, url, now, text):
         """"Auto DAMAS" (birlamchi) va "Auto KIA Sonet" (brend-maxsus
         birlamchi) bir xil sahifa shabloniga ega — ikkalasi ham shu bitta
-        metod orqali ishlanadi (category parametri bilan)."""
+        metod orqali ishlanadi (category parametri bilan).
+
+        Muddat rate_pairs'ning o'zidan (13-60 oy oralig'idagi haqiqiy
+        jadval qatorlaridan) olinadi — yuqoridagi qisqa xulosa kartochkasi
+        faqat yakuniy chegarani ("5 yilgacha" -> 60 oy) ko'rsatadi va real
+        minimal muddatni (jadvalda ko'rinib turgan 13 oy) yashirib
+        qo'yadi."""
         rate_matrix_section = extract_section(text, "boshlang", "Garov ta")
         rate_pairs = _RATE_TERM_PAIR_RE.findall(rate_matrix_section)
         rates = [float(rate.replace(",", ".")) for _, rate in rate_pairs]
-
-        term_section = extract_section(text, "Kredit miqdori", "Foydali taklif")
-        terms = extract_term_months(term_section)
+        terms = [int(term) for term, _rate in rate_pairs]
 
         amount_section = extract_section(text, "Ariza qoldirish", "Kredit miqdori")
         amount = extract_amount_som(amount_section)
