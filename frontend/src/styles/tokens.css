@@ -336,15 +336,28 @@ button {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 18px 28px 18px 12px;
   border-right: 1px solid var(--line);
 }
 
-.app-topbar-logo {
-  width: 100%;
-  height: auto;
-  max-width: 190px;
+.app-topbar-logo-icon {
+  height: 32px;
+  width: auto;
+  flex-shrink: 0;
   object-fit: contain;
+}
+
+/* Logotipdagi rasmga "yozib qo'yilgan" so'z o'rniga (tarjima qilib
+   bo'lmaydi) — belgi (icon) rasm sifatida, nom esa oddiy matn sifatida
+   alohida chiqariladi, shunda til almashtirgichda ("BOZOR TAHLILI" /
+   "АНАЛИЗ РЫНКА") to'g'ri tarjima qilinadi. */
+.app-topbar-wordmark {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--house);
+  white-space: nowrap;
 }
 
 .app-body {

@@ -2,6 +2,7 @@ export type Lang = 'uz' | 'ru'
 
 export const UI_TEXT = {
   uz: {
+    brandName: 'BOZOR TAHLILI',
     sidebarTitle: 'Kredit mahsulotlari',
     sidebarFooter: "SQB · Strategiya bo'limi",
     pageSubtitle: 'Raqobatchi banklar shartlarining joriy holati',
@@ -52,6 +53,7 @@ export const UI_TEXT = {
     closeLabel: 'Yopish',
   },
   ru: {
+    brandName: 'АНАЛИЗ РЫНКА',
     sidebarTitle: 'Кредитные продукты',
     sidebarFooter: 'SQB · Отдел стратегии',
     pageSubtitle: 'Текущее состояние условий банков-конкурентов',

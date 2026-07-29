@@ -9,7 +9,7 @@ import { getCategoryHeading } from './lib/categoryGroups'
 import { useLanguage } from './lib/LanguageContext'
 import type { Lang } from './lib/i18n'
 import type { Category, Product, UnavailableBank } from './lib/types'
-import logo from './assets/logo.png'
+import logoIcon from './assets/logo-icon.png'
 
 function formatUpdatedAt(iso: string, lang: Lang): string {
   const date = new Date(iso)
@@ -97,7 +97,7 @@ export function App() {
   const activeCategoryData = categories.find((c) => c.key === activeCategory)
   const activeLabel = activeCategoryData
     ? getCategoryHeading(activeCategoryData.key, activeCategoryData.label, lang)
-    : 'Bozor Tahlili'
+    : t('brandName')
   const lastUpdated =
     products.length > 0
       ? products.reduce((latest, p) => (p.scraped_at > latest ? p.scraped_at : latest), products[0].scraped_at)
@@ -107,7 +107,8 @@ export function App() {
     <div className="app-shell">
       <header className="app-topbar">
         <div className="app-topbar-brand">
-          <img src={logo} alt="Bozor Tahlili" className="app-topbar-logo" />
+          <img src={logoIcon} alt="" className="app-topbar-logo-icon" />
+          <span className="app-topbar-wordmark">{t('brandName')}</span>
         </div>
         <div className="app-topbar-actions">
           <RefreshDataButton />
