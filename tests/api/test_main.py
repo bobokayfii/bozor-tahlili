@@ -272,3 +272,37 @@ def test_export_excel_translates_headers_and_values_when_language_is_ru(client):
 def test_export_excel_returns_404_for_an_unknown_category(client):
     response = client.get("/export-excel", params={"category": "not_a_real_category"})
     assert response.status_code == 404
+
+
+def test_export_excel_all_returns_one_sheet_per_category(client):
+    from categories import CATEGORIES
+
+    response = client.get("/export-excel-all")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="bozor-tahlili-barcha-kategoriyalar.xlsx"'
+    )
+
+    workbook = load_workbook(BytesIO(response.content))
+    assert len(workbook.sheetnames) == len(CATEGORIES)
+
+    # Fixture'da faqat "mikroqarz" uchun SQB qatori bor — o'sha varaqda
+    # haqiqiy ma'lumot, qolganlari faqat sarlavha qatori bilan bo'sh.
+    mikroqarz_sheet = workbook[CATEGORIES[[c.key for c in CATEGORIES].index("mikroqarz")].label_uz[:31]]
+    data_row = next(mikroqarz_sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    assert data_row[1] == "SQB"
+
+
+def test_export_excel_all_translates_headers_when_language_is_ru(client):
+    from categories import CATEGORIES
+
+    response = client.get("/export-excel-all", params={"language": "ru"})
+
+    workbook = load_workbook(BytesIO(response.content))
+    mikroqarz_sheet = workbook[CATEGORIES[[c.key for c in CATEGORIES].index("mikroqarz")].label_uz[:31]]
+    header_row = next(mikroqarz_sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    assert header_row == ("#", "Банк", "Продукт", "Ставка", "Срок", "Сумма кредита", "Способ оплаты")

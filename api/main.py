@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
-from export_excel import build_category_workbook
+from export_excel import build_all_categories_workbook, build_category_workbook
 from recommender.explain import FeaturedProduct, explain_featured_product, explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
 from scrapers.orchestrator import run_all_scrapers
@@ -249,4 +249,32 @@ def export_excel(category: str, language: str = "uz"):
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{category}.xlsx"'},
+    )
+
+
+@app.get("/export-excel-all")
+def export_excel_all(language: str = "uz"):
+    """Barcha kategoriyalarni BITTA .xlsx faylida, har biri o'z nomi bilan
+    alohida varaqda (sheet) eksport qiladi — hisobot uchun to'liq
+    ma'lumotlar to'plami."""
+    with SessionLocal() as session:
+        products_by_category: dict[str, list[ProductRow]] = {}
+        for category in CATEGORIES:
+            query = _latest_per_bank_category_query().where(ProductRow.category == category.key)
+            rows = session.execute(query).scalars().all()
+            products_by_category[category.key] = list(rows)
+
+    unavailable_by_category = {category.key: get_unavailable_banks(category.key) for category in CATEGORIES}
+
+    content = build_all_categories_workbook(
+        categories=[(c.key, c.label_uz, c.schema) for c in CATEGORIES],
+        products_by_category=products_by_category,
+        unavailable_by_category=unavailable_by_category,
+        lang=language,
+    )
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="bozor-tahlili-barcha-kategoriyalar.xlsx"'},
     )

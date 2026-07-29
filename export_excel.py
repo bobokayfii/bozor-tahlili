@@ -1,8 +1,10 @@
-"""Joriy ochiq kategoriyani chiroyli formatlangan Excel (.xlsx) fayliga
-eksport qilish. Ustunlar frontend'dagi getProductColumns bilan bir xil
-mantiqqa amal qiladi (mikroqarz — qisqartirilgan, credit_special_terms —
-Maxsus shartlari bilan, aks holda Boshlang'ich badal bilan), shuning
-uchun yuklab olingan fayl ekrandagi jadvalga mos keladi."""
+"""Kategoriyalarni chiroyli formatlangan Excel (.xlsx) fayliga eksport
+qilish — bitta joriy kategoriya (bitta varaq) yoki barcha kategoriyalar
+(har biri o'z varag'ida, bitta faylda) sifatida. Ustunlar frontend'dagi
+getProductColumns bilan bir xil mantiqqa amal qiladi (mikroqarz —
+qisqartirilgan, credit_special_terms — Maxsus shartlari bilan, aks holda
+Boshlang'ich badal bilan), shuning uchun yuklab olingan fayl ekrandagi
+jadvalga mos keladi."""
 
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 from db.models import ProductRow
 from unavailable_products import UnavailableBank
@@ -97,14 +100,14 @@ def _payment_method_text(payment_method: str | None, lang: str, text: dict[str, 
     return _PAYMENT_METHOD_RU.get(payment_method, payment_method)
 
 
-def build_category_workbook(
+def _write_category_sheet(
+    sheet: Worksheet,
     category_key: str,
-    sheet_title: str,
     products: list[ProductRow],
     unavailable_banks: list[UnavailableBank],
     schema: str,
-    lang: str = "uz",
-) -> bytes:
+    lang: str,
+) -> None:
     text = _TEXT.get(lang, _TEXT["uz"])
     is_mikroqarz = category_key in ("mikroqarz", "mikroqarz_onlayn")
     is_special_terms = schema == "credit_special_terms" and not is_mikroqarz
@@ -116,14 +119,6 @@ def build_category_workbook(
         headers += [text["amount"], text["grace_period"], text["special_terms"], text["payment_method"]]
     else:
         headers += [text["down_payment"], text["grace_period"], text["amount"], text["payment_method"]]
-
-    workbook = Workbook()
-    sheet = workbook.active
-    assert sheet is not None
-    # Excel varaq nomi 31 belgidan oshmasligi kerak va \/:*?[] belgilarini
-    # qabul qilmaydi — kategoriya nomlari bunday belgilarni ishlatmaydi,
-    # shuning uchun faqat uzunlik cheklanadi.
-    sheet.title = sheet_title[:31]
 
     sheet.append(headers)
     for cell in sheet[1]:
@@ -160,6 +155,73 @@ def build_category_workbook(
     for column_index, width in enumerate(widths[: len(headers)], start=1):
         sheet.column_dimensions[get_column_letter(column_index)].width = width
     sheet.freeze_panes = "A2"
+
+
+def _unique_sheet_title(label: str, used_titles: set[str]) -> str:
+    # Excel varaq nomi 31 belgidan oshmasligi kerak va \/:*?[] belgilarini
+    # qabul qilmaydi — kategoriya nomlari bunday belgilarni ishlatmaydi,
+    # shuning uchun faqat uzunlik cheklanadi. Kelajakda qo'shiladigan
+    # kategoriya nomi 31 belgigacha qirqilganda boshqasi bilan tasodifan
+    # bir xil chiqib qolsa (hozircha bunday holat yo'q), Excel bir xil
+    # nomli ikkita varaqni rad etadi — shu sabab raqamli qo'shimcha bilan
+    # ajratiladi.
+    base = label[:31]
+    if base not in used_titles:
+        return base
+    counter = 2
+    while True:
+        suffix = f" ({counter})"
+        candidate = label[: 31 - len(suffix)] + suffix
+        if candidate not in used_titles:
+            return candidate
+        counter += 1
+
+
+def build_category_workbook(
+    category_key: str,
+    sheet_title: str,
+    products: list[ProductRow],
+    unavailable_banks: list[UnavailableBank],
+    schema: str,
+    lang: str = "uz",
+) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet.title = sheet_title[:31]
+    _write_category_sheet(sheet, category_key, products, unavailable_banks, schema, lang)
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def build_all_categories_workbook(
+    categories: list[tuple[str, str, str]],
+    products_by_category: dict[str, list[ProductRow]],
+    unavailable_by_category: dict[str, list[UnavailableBank]],
+    lang: str = "uz",
+) -> bytes:
+    """`categories` — [(key, label, schema), ...] categories.py'dagi tartibda.
+    Har bir kategoriya bitta varaqda, kategoriya nomi bilan nomlangan."""
+    workbook = Workbook()
+    default_sheet = workbook.active
+    assert default_sheet is not None
+    workbook.remove(default_sheet)
+
+    used_titles: set[str] = set()
+    for key, label, schema in categories:
+        title = _unique_sheet_title(label, used_titles)
+        used_titles.add(title)
+        sheet = workbook.create_sheet(title=title)
+        _write_category_sheet(
+            sheet,
+            key,
+            products_by_category.get(key, []),
+            unavailable_by_category.get(key, []),
+            schema,
+            lang,
+        )
 
     buffer = BytesIO()
     workbook.save(buffer)

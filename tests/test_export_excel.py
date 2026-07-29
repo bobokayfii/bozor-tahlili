@@ -4,7 +4,7 @@ from io import BytesIO
 from openpyxl import load_workbook
 
 from db.models import ProductRow
-from export_excel import build_category_workbook
+from export_excel import build_all_categories_workbook, build_category_workbook
 from unavailable_products import UnavailableBank
 
 
@@ -124,3 +124,60 @@ def test_build_category_workbook_sheet_title_is_truncated_to_excels_31_char_limi
 
     sheet = load_workbook(BytesIO(content)).active
     assert len(sheet.title) <= 31
+
+
+def test_build_all_categories_workbook_creates_one_named_sheet_per_category():
+    categories = [
+        ("avtokredit", "Avtokredit (birlamchi bozor)", "credit_down_payment"),
+        ("mikroqarz", "Mikroqarz (oflayn)", "credit_special_terms"),
+    ]
+    products_by_category = {
+        "avtokredit": [make_product(bank="HamkorBank")],
+        "mikroqarz": [make_product(category="mikroqarz", product_name="Mikrokredit Plus")],
+    }
+
+    content = build_all_categories_workbook(
+        categories=categories,
+        products_by_category=products_by_category,
+        unavailable_by_category={},
+    )
+
+    workbook = load_workbook(BytesIO(content))
+    assert workbook.sheetnames == ["Avtokredit (birlamchi bozor)", "Mikroqarz (oflayn)"]
+
+    avto_row = next(workbook["Avtokredit (birlamchi bozor)"].iter_rows(min_row=2, max_row=2, values_only=True))
+    assert avto_row[1] == "HamkorBank"
+
+    mikro_header = next(workbook["Mikroqarz (oflayn)"].iter_rows(min_row=1, max_row=1, values_only=True))
+    assert mikro_header == ("#", "Bank", "Mahsulot", "Stavka", "Muddat", "Kredit miqdori", "To'lov usuli")
+
+
+def test_build_all_categories_workbook_handles_a_category_with_no_products():
+    categories = [("avtokredit", "Avtokredit (birlamchi bozor)", "credit_down_payment")]
+
+    content = build_all_categories_workbook(
+        categories=categories,
+        products_by_category={},
+        unavailable_by_category={"avtokredit": [UnavailableBank(bank="TBC Bank", reason="Mahsulot mavjud emas")]},
+    )
+
+    sheet = load_workbook(BytesIO(content)).active
+    row = next(sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    assert row[1] == "TBC Bank"
+
+
+def test_build_all_categories_workbook_deduplicates_sheet_titles_that_collide_after_truncation():
+    long_prefix = "A" * 40
+    categories = [
+        ("cat_one", f"{long_prefix} one", "credit_down_payment"),
+        ("cat_two", f"{long_prefix} two", "credit_down_payment"),
+    ]
+
+    content = build_all_categories_workbook(
+        categories=categories,
+        products_by_category={"cat_one": [make_product()], "cat_two": [make_product()]},
+        unavailable_by_category={},
+    )
+
+    sheet_names = load_workbook(BytesIO(content)).sheetnames
+    assert len(sheet_names) == len(set(sheet_names)) == 2

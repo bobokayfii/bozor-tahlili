@@ -100,6 +100,10 @@ button {
   margin-right: 24px;
 }
 
+.export-menu {
+  position: relative;
+}
+
 .export-btn {
   display: inline-flex;
   align-items: center;
@@ -118,6 +122,43 @@ button {
 .export-btn:hover {
   border-color: var(--house);
   color: var(--house);
+}
+
+.export-btn-caret {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.export-btn-caret-open {
+  transform: rotate(180deg);
+}
+
+.export-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(20, 22, 31, 0.12);
+  padding: 6px;
+  z-index: 40;
+}
+
+.export-menu-item {
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.export-menu-item:hover {
+  background: var(--paper-sunk);
 }
 
 .lang-toggle {

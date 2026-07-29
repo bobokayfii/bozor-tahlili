@@ -57,6 +57,12 @@ export function getExportExcelUrl(category: string, language: string): string {
   return url.toString()
 }
 
+export function getExportAllExcelUrl(language: string): string {
+  const url = new URL(`${API_BASE_URL}/export-excel-all`)
+  url.searchParams.set('language', language)
+  return url.toString()
+}
+
 export async function fetchProductExplanation(request: ExplainProductRequest): Promise<ExplainProductResponse> {
   const response = await fetch(`${API_BASE_URL}/explain-product`, {
     method: 'POST',
