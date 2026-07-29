@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { ProductTable } from './components/ProductTable'
 import { MarketPulse } from './components/MarketPulse'
 import { ExportMenu } from './components/ExportMenu'
+import { RefreshDataButton } from './components/RefreshDataButton'
 import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
 import { getCategoryHeading } from './lib/categoryGroups'
 import { useLanguage } from './lib/LanguageContext'
@@ -109,6 +110,7 @@ export function App() {
           <img src={logo} alt="Bozor Tahlili" className="app-topbar-logo" />
         </div>
         <div className="app-topbar-actions">
+          <RefreshDataButton />
           <ExportMenu category={activeCategory} />
           <LanguageToggle />
         </div>

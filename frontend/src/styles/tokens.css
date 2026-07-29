@@ -23,6 +23,11 @@
      narrower meaning). Never reused for anything but "this is the good one". */
   --good: #0ca30c;
   --good-soft: #e9f9ea;
+  /* Status "warning" — a non-error, non-success transient state (e.g. "a
+     refresh is already running") — distinct from --negative (real error)
+     and --good (positive outcome). */
+  --warning: #b7791f;
+  --warning-soft: #fbf1de;
 
   /* Brand — SQB navy, drives chrome: nav, buttons, focus */
   --brand: #00355f;
@@ -159,6 +164,144 @@ button {
 
 .export-menu-item:hover {
   background: var(--paper-sunk);
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  border-color: var(--house);
+  color: var(--house);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 22, 31, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--paper);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: 0 20px 48px rgba(20, 22, 31, 0.24);
+}
+
+.modal-title {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.modal-body {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-btn {
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.modal-btn-secondary {
+  background: var(--paper);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.modal-btn-secondary:hover {
+  background: var(--paper-sunk);
+}
+
+.modal-btn-primary {
+  background: var(--house);
+  color: #ffffff;
+}
+
+.modal-btn-primary:hover {
+  background: #012544;
+}
+
+.refresh-status {
+  position: fixed;
+  top: calc(var(--topbar-height) + 12px);
+  right: 24px;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 360px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(20, 22, 31, 0.14);
+}
+
+.refresh-status-success {
+  background: var(--good-soft);
+  color: #0a5c0a;
+}
+
+.refresh-status-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.refresh-status-error {
+  background: var(--signal-soft);
+  color: var(--negative);
+}
+
+.refresh-status-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+}
+
+.refresh-status-close:hover {
+  opacity: 1;
 }
 
 .lang-toggle {

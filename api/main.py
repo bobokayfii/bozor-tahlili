@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -30,9 +31,44 @@ SessionLocal = get_session_factory(_engine)
 _extra_origins = [origin.strip() for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",") if origin.strip()]
 
 
+# Bitta uvicorn worker ichida (davriy jadval ham, qo'lda "Yangilash"
+# tugmasi ham) run_all_scrapers() bir vaqtning o'zida IKKI marta ishga
+# tushmasligi uchun sodda in-memory bayroq bilan himoyalangan — ikkalasi
+# bir xil SQLite faylga yozgani uchun bir-birining ustidan yozib
+# yubormasligi kerak. Bitta process ichida ishlagani uchun (Railway'da ham
+# shunday) bu yetarli, ko'p processli/ko'p worker holatida esa (masalan,
+# gunicorn bir nechta worker bilan) tashqi lock (Redis va h.k.) kerak bo'lardi.
+_scrape_state_lock = threading.Lock()
+_scrape_in_progress = False
+
+
+def _mark_scrape_finished() -> None:
+    global _scrape_in_progress
+    with _scrape_state_lock:
+        _scrape_in_progress = False
+
+
 def _scheduled_scrape_job() -> None:
-    with SessionLocal() as session:
-        run_all_scrapers(session)
+    global _scrape_in_progress
+    with _scrape_state_lock:
+        if _scrape_in_progress:
+            # Qo'lda ishga tushirilgan yangilash hali tugallanmagan —
+            # davriy sikl bu safar chetlab o'tiladi, keyingi sikli kutadi.
+            return
+        _scrape_in_progress = True
+    try:
+        with SessionLocal() as session:
+            run_all_scrapers(session)
+    finally:
+        _mark_scrape_finished()
+
+
+def _run_manual_scrape() -> None:
+    try:
+        with SessionLocal() as session:
+            run_all_scrapers(session)
+    finally:
+        _mark_scrape_finished()
 
 
 @asynccontextmanager
@@ -278,3 +314,23 @@ def export_excel_all(language: str = "uz"):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="bozor-tahlili-barcha-kategoriyalar.xlsx"'},
     )
+
+
+@app.post("/trigger-scrape")
+def trigger_scrape():
+    """Buyurtmachi so'ragan "qo'lda yangilash" tugmasi uchun: barcha
+    banklarni HOZIR qayta scrape qilishni boshlaydi. HTTP so'rovni
+    bloklamaslik uchun run_all_scrapers alohida oqimda (thread) ishga
+    tushiriladi — javob darhol qaytadi, scrape esa fonda davom etadi.
+    Davriy sikl bilan bir vaqtda ikkalasi ham ishlab, bir xil SQLite
+    faylga bir-birining ustidan yozib yubormasligi uchun
+    _scrape_in_progress bayrog'i orqali himoyalangan: agar allaqachon
+    biror scrape ketayotgan bo'lsa, 409 qaytariladi."""
+    global _scrape_in_progress
+    with _scrape_state_lock:
+        if _scrape_in_progress:
+            raise HTTPException(status_code=409, detail="Yangilash allaqachon ishlamoqda")
+        _scrape_in_progress = True
+
+    threading.Thread(target=_run_manual_scrape, daemon=True).start()
+    return {"status": "started"}

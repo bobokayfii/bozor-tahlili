@@ -39,6 +39,17 @@ export const UI_TEXT = {
     exportButton: "Excel'ga yuklash",
     exportCurrentPage: 'Joriy sahifani yuklash',
     exportAllCategories: 'Barcha kategoriyalarni yuklash',
+    refreshButton: 'Ma\'lumotlarni yangilash',
+    refreshConfirmTitle: 'Ma\'lumotlarni qayta yig\'ish',
+    refreshConfirmBody:
+      "Barcha banklarning ma'lumotlari qaytadan yig'iladi. Bu jarayon bir necha daqiqa vaqt oladi — yangi ma'lumotlar tayyor bo'lguncha jadvallar hozirgi holatida qoladi. Davom etasizmi?",
+    refreshConfirmYes: 'Ha, boshlash',
+    refreshConfirmCancel: 'Bekor qilish',
+    refreshStarted:
+      "Yangilash boshlandi. Barcha banklar qayta tekshirilmoqda — iltimos, taxminan 5 daqiqadan so'ng sahifani qayta yuklang.",
+    refreshAlreadyRunning: 'Yangilash allaqachon ishlamoqda — iltimos, biroz kuting.',
+    refreshFailed: "Yangilashni boshlab bo'lmadi. Birozdan so'ng qayta urinib ko'ring.",
+    closeLabel: 'Yopish',
   },
   ru: {
     sidebarTitle: 'Кредитные продукты',
@@ -78,6 +89,17 @@ export const UI_TEXT = {
     exportButton: 'Скачать в Excel',
     exportCurrentPage: 'Скачать текущую страницу',
     exportAllCategories: 'Скачать все категории',
+    refreshButton: 'Обновить данные',
+    refreshConfirmTitle: 'Повторный сбор данных',
+    refreshConfirmBody:
+      'Данные всех банков будут собраны заново. Этот процесс займёт несколько минут — таблицы останутся в текущем виде, пока новые данные не будут готовы. Продолжить?',
+    refreshConfirmYes: 'Да, начать',
+    refreshConfirmCancel: 'Отмена',
+    refreshStarted:
+      'Обновление началось. Все банки проверяются заново — пожалуйста, обновите страницу примерно через 5 минут.',
+    refreshAlreadyRunning: 'Обновление уже выполняется — пожалуйста, подождите немного.',
+    refreshFailed: 'Не удалось запустить обновление. Попробуйте ещё раз чуть позже.',
+    closeLabel: 'Закрыть',
   },
 } as const satisfies Record<Lang, Record<string, string>>
 

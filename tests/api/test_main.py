@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -306,3 +307,40 @@ def test_export_excel_all_translates_headers_when_language_is_ru(client):
     mikroqarz_sheet = workbook[CATEGORIES[[c.key for c in CATEGORIES].index("mikroqarz")].label_uz[:31]]
     header_row = next(mikroqarz_sheet.iter_rows(min_row=1, max_row=1, values_only=True))
     assert header_row == ("#", "Банк", "Продукт", "Ставка", "Срок", "Сумма кредита", "Способ оплаты")
+
+
+def test_trigger_scrape_starts_a_background_run_and_returns_immediately(client, monkeypatch):
+    monkeypatch.setattr(api_main, "_scrape_in_progress", False)
+    called = threading.Event()
+
+    def fake_run_all_scrapers(session):
+        called.set()
+
+    monkeypatch.setattr(api_main, "run_all_scrapers", fake_run_all_scrapers)
+
+    response = client.post("/trigger-scrape")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "started"}
+    assert called.wait(timeout=2), "run_all_scrapers should have been called in the background thread"
+
+
+def test_trigger_scrape_returns_409_when_a_scrape_is_already_running(client, monkeypatch):
+    monkeypatch.setattr(api_main, "_scrape_in_progress", False)
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_run_all_scrapers(session):
+        started.set()
+        release.wait(timeout=2)
+
+    monkeypatch.setattr(api_main, "run_all_scrapers", blocking_run_all_scrapers)
+
+    first_response = client.post("/trigger-scrape")
+    assert first_response.status_code == 200
+    assert started.wait(timeout=2), "background scrape should have started"
+
+    second_response = client.post("/trigger-scrape")
+    assert second_response.status_code == 409
+
+    release.set()
