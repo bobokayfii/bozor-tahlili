@@ -18,6 +18,9 @@ FIXTURE_BY_URL = {
     AloqabankScraper.CATEGORY_URLS["ipoteka_davlat"]: (
         FIXTURES_DIR / "aloqa_ipoteka_davlat.html"
     ).read_text(encoding="utf-8"),
+    AloqabankScraper.CATEGORY_URLS["avtokredit_elektro"]: (
+        FIXTURES_DIR / "aloqa_avtokredit_elektro.html"
+    ).read_text(encoding="utf-8"),
 }
 
 
@@ -92,6 +95,33 @@ def test_aloqa_ipoteka_davlat_parses_correctly():
     assert davlat.grace_period_months == 6
     assert davlat.payment_method == "Annuitet, Differensial"
     assert davlat.requires_collateral is True
+
+
+def test_aloqa_avtokredit_elektro_parses_correctly():
+    """"Avtokredit BYD Avto" — "Kredit maqsadi" aniq "Song Plus Champion
+    Hybrid, Song Plus Champion EV, Song Pro, Chazor" modellarini
+    ko'rsatadi (elektromobil/gibrid) — avtokredit_elektro toifasiga to'g'ri
+    keladi. Stavka (vergul-kasr, "21,9%" kabi) va boshlang'ich badal
+    (butun son, "20%" kabi) formatidagi farq orqali ajratiladi. Muddat
+    "36 yoki 60 oy" — ikkita aniq qiymat, oraliq emas. Aniq son
+    ko'rinishidagi "Kreditning eng ko'p miqdori" yo'q (faqat garov
+    nisbati) — kalkulyatorning o'z chegarasi ("1 milliard so'mgacha")
+    ishlatiladi."""
+    with patch("scrapers.aloqa.fetch_html", side_effect=_fake_fetch):
+        products = AloqabankScraper().run()
+
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    assert elektro.bank == "Aloqabank"
+    assert elektro.product_name == "Avtokredit BYD Avto"
+    assert elektro.rate_min == 18.9
+    assert elektro.rate_max == 21.9
+    assert elektro.term_min_months == 36
+    assert elektro.term_max_months == 60
+    assert elektro.amount_max_som == 1_000_000_000
+    assert elektro.down_payment_pct == 20.0
+    assert elektro.grace_period_months == 0
+    assert elektro.payment_method == "Annuitet, Differensial"
+    assert elektro.requires_collateral is True
 
 
 def test_aloqa_ipoteka_tijorat_parses_correctly():

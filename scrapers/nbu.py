@@ -58,6 +58,7 @@ class NBUScraper(TextSectionScraper):
         "avtokredit": "https://nbu.uz/jismoniy-shaxslarga-kreditlar/yangi-avtomobillar-uchun-avtokredit",
         "avtokredit_ikkilamchi": "https://nbu.uz/jismoniy-shaxslarga-kreditlar/ikkilamchi-bozor-uchun-avtokredit",
         "avtokredit_brend_birlamchi": "https://nbu.uz/jismoniy-shaxslarga-kreditlar/avtokredit-kia-haval-chery",
+        "avtokredit_brend_ikkilamchi": "https://nbu.uz/jismoniy-shaxslarga-kreditlar/ikkilamchi-bozor-uchun-avtokredit",
         "avtokredit_elektro": (
             "https://nbu.uz/jismoniy-shaxslarga-kreditlar/elektromobillar-va-gibridlar-uchun-avtokredit"
         ),
@@ -73,6 +74,7 @@ class NBUScraper(TextSectionScraper):
         "avtokredit": "Yangi avtomobillar uchun avtokredit",
         "avtokredit_ikkilamchi": "Ikkilamchi bozor uchun avtokredit",
         "avtokredit_brend_birlamchi": "Avtokredit KIA, Chery",
+        "avtokredit_brend_ikkilamchi": "Ikkilamchi bozor uchun avtokredit",
         "avtokredit_elektro": "Elektromobillar va gibridlar uchun avtokredit",
         "mikroqarz": "Mikroqarz",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
@@ -89,8 +91,8 @@ class NBUScraper(TextSectionScraper):
 
                 if category in ("avtokredit", "avtokredit_elektro"):
                     product = self._build_avtokredit_product(category, url, now, text)
-                elif category == "avtokredit_ikkilamchi":
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "avtokredit_brend_birlamchi":
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
                 elif category == "ipoteka_davlat":
@@ -157,13 +159,19 @@ class NBUScraper(TextSectionScraper):
             payment_method=payment_method,
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"Ikkilamchi bozor uchun avtokredit" — nomining o'zi ikkilamchi
         bozor uchun ekanini tasdiqlaydi. Xuddi birlamchi bozor avtokrediti
         kabi, "Foiz stavkasi" bo'limi boshlang'ich badal ulushiga qarab
         guruhlangan jadval ("20% – 22% yillik" / "30% – 21% yillik" /
         "30% - 23% yilik") — shu sabab bir xil _RATE_TIER_RE ishlatiladi
         (birinchi raqam badal, ikkinchisi haqiqiy stavka).
+
+        Brend cheklovi yo'q (istalgan avtomobil markasi/modeli qabul
+        qilinadi) — shu sabab bitta haqiqiy sahifa "avtokredit_brend_
+        ikkilamchi" toifasiga ham xaritalanadi (bir xil URL, shu metod
+        ikkalasi uchun ham chaqiriladi, faqat `category` parametri farq
+        qiladi).
 
         "Kreditni ta'minlash: Kredit mablag'lari hisobiga sotib olinadigan
         transport vositasi" — "garov" so'zi ishlatilmagan, shu sabab
@@ -196,8 +204,8 @@ class NBUScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_ikkilamchi",
-            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),

@@ -74,6 +74,7 @@ class IpotekaBankScraper(TextSectionScraper):
         "avtokredit": "https://www.ipotekabank.uz/crediting/autocredit/cobalt-special/",
         "avtokredit_ikkilamchi": "https://www.ipotekabank.uz/crediting/autocredit/avtokredit-r1/",
         "avtokredit_brend_birlamchi": "https://www.ipotekabank.uz/crediting/autocredit/avtokredit-hyundai/",
+        "avtokredit_brend_ikkilamchi": "https://www.ipotekabank.uz/crediting/autocredit/avtokredit-r1/",
         "avtokredit_elektro": "https://www.ipotekabank.uz/crediting/autocredit/avtokredit-super-byd/",
         "ipoteka_tijorat": "https://www.ipotekabank.uz/crediting/mortgage/tijorat/",
         "ipoteka_davlat": "https://www.ipotekabank.uz/crediting/mortgage/oson/",
@@ -84,6 +85,7 @@ class IpotekaBankScraper(TextSectionScraper):
         "avtokredit": True,
         "avtokredit_ikkilamchi": True,
         "avtokredit_brend_birlamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
         "avtokredit_elektro": True,
         # Ipoteka (uy-joy garovi) ta'rifiga ko'ra doim sotib olinayotgan
         # ko'chmas mulk bilan ta'minlanadi; sahifada aloqasiz "garovsiz
@@ -99,6 +101,7 @@ class IpotekaBankScraper(TextSectionScraper):
         "avtokredit": "Avtokredit Cobalt Special",
         "avtokredit_ikkilamchi": "Avtokredit R1",
         "avtokredit_brend_birlamchi": "Avtokredit Hyundai",
+        "avtokredit_brend_ikkilamchi": "Avtokredit R1",
         "avtokredit_elektro": "Avtokredit Super BYD",
         "ipoteka_tijorat": "Tijorat ipotekasi",
         "ipoteka_davlat": '"Oson" ipotekasi',
@@ -115,8 +118,8 @@ class IpotekaBankScraper(TextSectionScraper):
 
                 if category == "avtokredit":
                     product = self._build_avtokredit_product(url, now, text)
-                elif category == "avtokredit_ikkilamchi":
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "avtokredit_brend_birlamchi":
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
                 elif category == "avtokredit_elektro":
@@ -213,10 +216,14 @@ class IpotekaBankScraper(TextSectionScraper):
             payment_method=payment_method,
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"Avtokredit R1" — sahifa sarlavhasi "Avtokredit R1 yangi yoki
         ishlatilgan avtomobil uchun" deb aniq yozilgan, ya'ni yangi VA
         ishlatilgan (ikkilamchi bozor) avtomobillarni ham qamrab oladi.
+        Brend cheklovi ham yo'q (istalgan marka/model) — shu sabab bitta
+        haqiqiy sahifa "avtokredit_brend_ikkilamchi" toifasiga ham
+        xaritalanadi (bir xil URL, shu metod ikkalasi uchun ham
+        chaqiriladi, faqat `category` parametri farq qiladi).
 
         "Foiz stavkasi" sarlavhasi sahifada 2 marta uchraydi: birinchisi
         yuqoridagi bo'sh kalkulyator vidjeti ("Foiz stavkasi: %"), ikkinchisi
@@ -251,14 +258,14 @@ class IpotekaBankScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_ikkilamchi",
-            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
-            requires_collateral=self.FORCE_COLLATERAL["avtokredit_ikkilamchi"],
+            requires_collateral=self.FORCE_COLLATERAL[category],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

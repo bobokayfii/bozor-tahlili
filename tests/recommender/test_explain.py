@@ -131,3 +131,22 @@ def test_explain_featured_product_falls_back_to_bank_and_product_name_on_api_err
         result = explain_featured_product("avtokredit", make_featured_product(), other_bank_count=3)
 
     assert result == "HamkorBank — Auto DAMAS."
+
+
+def test_explain_featured_product_builds_a_russian_prompt_and_others_note_when_language_is_ru():
+    """language="ru" berilganda promptning o'zi ruscha yozilishi (modeldan
+    ruscha javob so'ralishi) va "others_note" qo'shimcha jumlasi ham ruscha
+    bo'lishi kerak — interfeys tili bilan AI matni tili mos kelishi uchun."""
+    fake_response = MagicMock()
+    fake_response.choices[0].message.content = "HamkorBank Auto DAMAS выделяется низкой ставкой."
+
+    with patch("recommender.explain.get_client") as mock_get_client:
+        mock_get_client.return_value.chat.completions.create.return_value = fake_response
+        result = explain_featured_product(
+            "avtokredit", make_featured_product(), other_bank_count=8, language="ru"
+        )
+
+        sent_prompt = mock_get_client.return_value.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+
+    assert "на русском языке" in sent_prompt
+    assert result == "HamkorBank Auto DAMAS выделяется низкой ставкой. Также доступно ещё 8 банковских вариантов."

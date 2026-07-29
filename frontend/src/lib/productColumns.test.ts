@@ -51,11 +51,11 @@ describe('getProductColumns', () => {
     expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('—')
   })
 
-  it('renders grace period as Bor/Yo\'q, or a dash when unknown', () => {
+  it('renders grace period as Bor/Yo\'q, falling back to Yo\'q when unknown', () => {
     const [, gracePeriod] = getProductColumns('credit_down_payment')
     expect(gracePeriod.render(baseProduct)).toBe('Bor')
     expect(gracePeriod.render({ ...baseProduct, grace_period_months: 0 })).toBe("Yo'q")
-    expect(gracePeriod.render({ ...baseProduct, grace_period_months: null })).toBe('—')
+    expect(gracePeriod.render({ ...baseProduct, grace_period_months: null })).toBe("Yo'q")
   })
 
   it('formats the credit amount in millions of soum', () => {
@@ -74,10 +74,10 @@ describe('getProductColumns', () => {
     expect(specialTerms.render({ ...baseProduct, special_terms: null })).toBe('—')
   })
 
-  it('renders payment method or a dash when absent', () => {
+  it('renders payment method, falling back to "Annuitet, Differensial" when absent', () => {
     const [, , , paymentMethod] = getProductColumns('credit_down_payment')
     expect(paymentMethod.render(baseProduct)).toBe('Annuitet')
-    expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('—')
+    expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Annuitet, Differensial')
   })
 
   it('omits Imtiyozli davr and Maxsus shartlari for the mikroqarz category, regardless of schema', () => {
@@ -92,5 +92,23 @@ describe('getProductColumns', () => {
     const [, paymentMethod] = getProductColumns('credit_special_terms', 'mikroqarz')
     expect(paymentMethod.render(baseProduct)).toBe('Annuitet')
     expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Annuitet, Differensial')
+  })
+
+  it('translates column labels and rendered values into Russian when lang is ru', () => {
+    const [downPayment, gracePeriod, amount, paymentMethod] = getProductColumns('credit_down_payment', undefined, 'ru')
+    expect(downPayment.label).toBe('Первоначальный взнос')
+    expect(gracePeriod.label).toBe('Льготный период')
+    expect(amount.label).toBe('Сумма кредита')
+    expect(paymentMethod.label).toBe('Способ оплаты')
+
+    expect(gracePeriod.render(baseProduct)).toBe('Есть')
+    expect(gracePeriod.render({ ...baseProduct, grace_period_months: null })).toBe('Нет')
+    expect(amount.render(baseProduct)).toBe('800 млн сум')
+    expect(paymentMethod.render(baseProduct)).toBe('Аннуитет')
+    expect(paymentMethod.render({ ...baseProduct, payment_method: 'Annuitet, Differensial' })).toBe(
+      'Аннуитет, Дифференцированный',
+    )
+    expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Аннуитет, Дифференцированный')
+    expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('—')
   })
 })

@@ -50,6 +50,31 @@ export async function fetchRecommendation(request: RecommendRequest): Promise<Re
   return response.json()
 }
 
+export function getExportExcelUrl(category: string, language: string): string {
+  const url = new URL(`${API_BASE_URL}/export-excel`)
+  url.searchParams.set('category', category)
+  url.searchParams.set('language', language)
+  return url.toString()
+}
+
+export function getExportAllExcelUrl(language: string): string {
+  const url = new URL(`${API_BASE_URL}/export-excel-all`)
+  url.searchParams.set('language', language)
+  return url.toString()
+}
+
+export type TriggerScrapeStatus = 'started' | 'already_running' | 'error'
+
+// 409 ("allaqachon ishlamoqda") kutilgan, oddiy holat — istisno (throw)
+// emas, natija sifatida qaytariladi, shunda chaqiruvchi UI'da alohida
+// (xatolik emas, oddiy ogohlantirish) matn ko'rsata oladi.
+export async function triggerScrapeRefresh(): Promise<TriggerScrapeStatus> {
+  const response = await fetch(`${API_BASE_URL}/trigger-scrape`, { method: 'POST' })
+  if (response.status === 409) return 'already_running'
+  if (!response.ok) return 'error'
+  return 'started'
+}
+
 export async function fetchProductExplanation(request: ExplainProductRequest): Promise<ExplainProductResponse> {
   const response = await fetch(`${API_BASE_URL}/explain-product`, {
     method: 'POST',

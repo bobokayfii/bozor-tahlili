@@ -13,6 +13,9 @@ FIXTURE_BY_URL = {
     NBUScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
         FIXTURES_DIR / "nbu_avtokredit_brend_birlamchi.html"
     ).read_text(encoding="utf-8"),
+    NBUScraper.CATEGORY_URLS["avtokredit_brend_ikkilamchi"]: (
+        FIXTURES_DIR / "nbu_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     NBUScraper.CATEGORY_URLS["avtokredit_elektro"]: (FIXTURES_DIR / "nbu_avtokredit_elektro.html").read_text(
         encoding="utf-8"
     ),
@@ -43,12 +46,13 @@ def test_nbu_scraper_parses_all_eight_categories():
     with patch("scrapers.nbu.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = NBUScraper().run()
 
-    assert mock_fetch.call_count == 8
+    assert mock_fetch.call_count == 9
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
         "avtokredit_ikkilamchi",
         "avtokredit_brend_birlamchi",
+        "avtokredit_brend_ikkilamchi",
         "avtokredit_elektro",
         "mikroqarz",
         "mikroqarz_onlayn",
@@ -56,6 +60,26 @@ def test_nbu_scraper_parses_all_eight_categories():
         "ipoteka_davlat",
     }
     assert all(p.bank == "NBU" for p in products)
+
+
+def test_nbu_avtokredit_brend_ikkilamchi_parses_correctly():
+    """"Ikkilamchi bozor uchun avtokredit" o'zi brend cheklovisiz (istalgan
+    avtomobil markasi/modeli qabul qilinadi) — shu sabab bitta haqiqiy
+    sahifa IKKITA toifaga xaritalanadi: "avtokredit_ikkilamchi" (mavjud)
+    va "avtokredit_brend_ikkilamchi" (yangi, xuddi shu URL/qiymatlar
+    bilan)."""
+    with patch("scrapers.nbu.fetch_html", side_effect=_fake_fetch):
+        products = NBUScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
 
 
 def test_nbu_ipoteka_davlat_parses_correctly():

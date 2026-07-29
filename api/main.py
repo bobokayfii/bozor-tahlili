@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import os
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
+from export_excel import build_all_categories_workbook, build_category_workbook
 from recommender.explain import FeaturedProduct, explain_featured_product, explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
 from scrapers.orchestrator import run_all_scrapers
@@ -28,9 +31,44 @@ SessionLocal = get_session_factory(_engine)
 _extra_origins = [origin.strip() for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",") if origin.strip()]
 
 
+# Bitta uvicorn worker ichida (davriy jadval ham, qo'lda "Yangilash"
+# tugmasi ham) run_all_scrapers() bir vaqtning o'zida IKKI marta ishga
+# tushmasligi uchun sodda in-memory bayroq bilan himoyalangan — ikkalasi
+# bir xil SQLite faylga yozgani uchun bir-birining ustidan yozib
+# yubormasligi kerak. Bitta process ichida ishlagani uchun (Railway'da ham
+# shunday) bu yetarli, ko'p processli/ko'p worker holatida esa (masalan,
+# gunicorn bir nechta worker bilan) tashqi lock (Redis va h.k.) kerak bo'lardi.
+_scrape_state_lock = threading.Lock()
+_scrape_in_progress = False
+
+
+def _mark_scrape_finished() -> None:
+    global _scrape_in_progress
+    with _scrape_state_lock:
+        _scrape_in_progress = False
+
+
 def _scheduled_scrape_job() -> None:
-    with SessionLocal() as session:
-        run_all_scrapers(session)
+    global _scrape_in_progress
+    with _scrape_state_lock:
+        if _scrape_in_progress:
+            # Qo'lda ishga tushirilgan yangilash hali tugallanmagan —
+            # davriy sikl bu safar chetlab o'tiladi, keyingi sikli kutadi.
+            return
+        _scrape_in_progress = True
+    try:
+        with SessionLocal() as session:
+            run_all_scrapers(session)
+    finally:
+        _mark_scrape_finished()
+
+
+def _run_manual_scrape() -> None:
+    try:
+        with SessionLocal() as session:
+            run_all_scrapers(session)
+    finally:
+        _mark_scrape_finished()
 
 
 @asynccontextmanager
@@ -89,6 +127,7 @@ class ExplainProductRequest(BaseModel):
     amount_max_som: int
     requires_collateral: bool
     down_payment_pct: float | None = None
+    language: str = "uz"
 
 
 def _row_to_dict(row: ProductRow) -> dict:
@@ -215,5 +254,83 @@ def explain_product(request: ExplainProductRequest):
         requires_collateral=request.requires_collateral,
         down_payment_pct=request.down_payment_pct,
     )
-    explanation = explain_featured_product(request.category, product, other_bank_count)
+    explanation = explain_featured_product(request.category, product, other_bank_count, request.language)
     return {"explanation": explanation}
+
+
+@app.get("/export-excel")
+def export_excel(category: str, language: str = "uz"):
+    """Joriy ochiq kategoriyani frontenddagi jadval bilan bir xil tartib
+    va ustunlarda (rate_min bo'yicha saralangan) chiroyli formatlangan
+    .xlsx faylga eksport qiladi — faqat shu kategoriya, butun sayt emas."""
+    category_obj = next((c for c in CATEGORIES if c.key == category), None)
+    if category_obj is None:
+        raise HTTPException(status_code=404, detail="Kategoriya topilmadi")
+
+    with SessionLocal() as session:
+        query = _latest_per_bank_category_query().where(ProductRow.category == category)
+        rows = session.execute(query).scalars().all()
+
+    unavailable_banks = get_unavailable_banks(category)
+    content = build_category_workbook(
+        category_key=category,
+        sheet_title=category_obj.label_uz,
+        products=list(rows),
+        unavailable_banks=unavailable_banks,
+        schema=category_obj.schema,
+        lang=language,
+    )
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{category}.xlsx"'},
+    )
+
+
+@app.get("/export-excel-all")
+def export_excel_all(language: str = "uz"):
+    """Barcha kategoriyalarni BITTA .xlsx faylida, har biri o'z nomi bilan
+    alohida varaqda (sheet) eksport qiladi — hisobot uchun to'liq
+    ma'lumotlar to'plami."""
+    with SessionLocal() as session:
+        products_by_category: dict[str, list[ProductRow]] = {}
+        for category in CATEGORIES:
+            query = _latest_per_bank_category_query().where(ProductRow.category == category.key)
+            rows = session.execute(query).scalars().all()
+            products_by_category[category.key] = list(rows)
+
+    unavailable_by_category = {category.key: get_unavailable_banks(category.key) for category in CATEGORIES}
+
+    content = build_all_categories_workbook(
+        categories=[(c.key, c.label_uz, c.schema) for c in CATEGORIES],
+        products_by_category=products_by_category,
+        unavailable_by_category=unavailable_by_category,
+        lang=language,
+    )
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="bozor-tahlili-barcha-kategoriyalar.xlsx"'},
+    )
+
+
+@app.post("/trigger-scrape")
+def trigger_scrape():
+    """Buyurtmachi so'ragan "qo'lda yangilash" tugmasi uchun: barcha
+    banklarni HOZIR qayta scrape qilishni boshlaydi. HTTP so'rovni
+    bloklamaslik uchun run_all_scrapers alohida oqimda (thread) ishga
+    tushiriladi — javob darhol qaytadi, scrape esa fonda davom etadi.
+    Davriy sikl bilan bir vaqtda ikkalasi ham ishlab, bir xil SQLite
+    faylga bir-birining ustidan yozib yubormasligi uchun
+    _scrape_in_progress bayrog'i orqali himoyalangan: agar allaqachon
+    biror scrape ketayotgan bo'lsa, 409 qaytariladi."""
+    global _scrape_in_progress
+    with _scrape_state_lock:
+        if _scrape_in_progress:
+            raise HTTPException(status_code=409, detail="Yangilash allaqachon ishlamoqda")
+        _scrape_in_progress = True
+
+    threading.Thread(target=_run_manual_scrape, daemon=True).start()
+    return {"status": "started"}

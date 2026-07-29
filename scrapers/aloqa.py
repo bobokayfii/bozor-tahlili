@@ -22,6 +22,10 @@ _DAVLAT_DOWN_RE = re.compile(r"(\d{1,2})\s*foiz")
 _DAVLAT_AMOUNT_RE = re.compile(r"(\d{1,3}(?:,\d{1,2})?)\s*mln\.?\s*so")
 _DAVLAT_TERM_RE = re.compile(r"(\d{1,2})\s*yild")
 _DAVLAT_GRACE_RE = re.compile(r"(\d{1,2})\s*oygacha imtiyozli")
+_ELEKTRO_RATE_RE = re.compile(r"(\d{1,2},\d)%")
+_ELEKTRO_DOWN_RE = re.compile(r"(\d{1,2})%\**\s*dan boshlab")
+_ELEKTRO_TERM_RE = re.compile(r"(\d{1,2})\s*\n\s*yoki\n\s*(\d{1,2})\s*\n\s*oy")
+_ELEKTRO_AMOUNT_RE = re.compile(r"(\d+(?:,\d+)?)\s*milliard\s*so.mgacha")
 
 
 class AloqabankScraper(TextSectionScraper):
@@ -52,6 +56,7 @@ class AloqabankScraper(TextSectionScraper):
         "avtokredit_brend_birlamchi": "https://aloqabank.uz/uz/private/crediting/avtokredit-import-/",
         "ipoteka_tijorat": "https://aloqabank.uz/uz/private/crediting/ipoteka-secondary/",
         "ipoteka_davlat": "https://aloqabank.uz/uz/private/crediting/primary-mortgage/",
+        "avtokredit_elektro": "https://aloqabank.uz/uz/private/crediting/avtokredit-byd-avto-/",
     }
     CATEGORY_HEADINGS = {
         "avtokredit": ("Yillik foiz stavkasi", "Kredit maqsadi"),
@@ -61,6 +66,7 @@ class AloqabankScraper(TextSectionScraper):
         "avtokredit_brend_birlamchi": "Avtokredit import",
         "ipoteka_tijorat": "Ipoteka (ikkilamchi bozor)",
         "ipoteka_davlat": "Ipoteka krediti - Iqtisodiyot va moliya vazirligi mablag'lari hisobidan",
+        "avtokredit_elektro": "Avtokredit BYD Avto",
     }
 
     def run(self):
@@ -77,6 +83,8 @@ class AloqabankScraper(TextSectionScraper):
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "ipoteka_davlat":
                     product = self._build_ipoteka_davlat_product(url, now, text)
+                elif category == "avtokredit_elektro":
+                    product = self._build_avtokredit_elektro_product(url, now, text)
                 else:
                     heading_pair = self.CATEGORY_HEADINGS.get(category)
                     section = extract_section(text, *heading_pair) if heading_pair else text
@@ -201,6 +209,71 @@ class AloqabankScraper(TextSectionScraper):
             rate_max=max(rates),
             term_min_months=term,
             term_max_months=term,
+            amount_max_som=amount,
+            requires_collateral=has_collateral_requirement(text),
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
+
+    def _build_avtokredit_elektro_product(self, url, now, text):
+        """"Avtokredit BYD Avto" — "Kredit maqsadi" bo'limida aniq
+        yozilgan: "Song Plus Champion Hybrid, Song Plus Champion EV, Song
+        Pro, Chazor markadagi avtomobillar uchun amal qiladi" — bu
+        modellar elektromobil/gibrid, shuning uchun avtokredit_elektro
+        toifasiga to'g'ri keladi (boshqa Aloqabank avtokredit sahifalari
+        istalgan brend/model uchun, faqat shu sahifa BYD elektro/gibrid
+        modellariga xos).
+
+        Stavka jadvalida ("21,9%"/"20,9%"/"19,9%"/"18,9%") barcha qiymatlar
+        vergul-kasr bilan yozilgan, boshlang'ich badal ulushlari esa
+        ("20%"/"30%"/"40%"/"50%") butun son — shu farq orqali ikkalasi
+        ajratiladi (vergul-kasrli regex faqat stavkalarni oladi).
+
+        Muddat "36 yoki 60 oy" — ikkita aniq qiymat (oraliq emas),
+        term_min=36, term_max=60.
+
+        "Kreditning eng ko'p miqdori" bo'limida faqat garov qiymatiga
+        nisbat (75-90%) ko'rsatilgan, aniq so'm yo'q — shu sabab sahifa
+        pastidagi interaktiv kalkulyatorning o'z chegarasi ("1 milliard
+        so'mgacha") ishlatiladi (Turonbank/boshqa banklardagi BHM/nisbat-
+        asosli chegara konvensiyasi bilan bir xil).
+
+        Boshlang'ich badalning "**" izohida shart bajarilmasa 25% dan kam
+        bo'lmasligi kerakligi aytiladi, lekin shu izohning o'zida hozirgi
+        Nizom bo'yicha garov nisbati 90%gacha ruxsat etilishi ham
+        ta'kidlangan (ya'ni 75% shart amalda kamdan-kam ishlaydi) — shu
+        sabab jadvalda aniq ko'rsatilgan boshlang'ich (20%) qiymat
+        ishlatiladi, shartli 25% emas."""
+        block = extract_section(text, "Kredit maqsadi", "Ajratish shakli")
+        rates = [float(m.replace(",", ".")) for m in _ELEKTRO_RATE_RE.findall(block)]
+        down_payment_rates = [float(m) for m in _ELEKTRO_DOWN_RE.findall(block)]
+        down_payment_pct = min(down_payment_rates) if down_payment_rates else None
+
+        term_match = _ELEKTRO_TERM_RE.search(block)
+        terms = [int(term_match.group(1)), int(term_match.group(2))] if term_match else []
+
+        amount_match = _ELEKTRO_AMOUNT_RE.search(text)
+        amount = round(float(amount_match.group(1).replace(",", ".")) * 1_000_000_000) if amount_match else None
+
+        grace_period_months = extract_grace_period_months("imtiyozli " + block)
+
+        payment_method_section = extract_section(text, "Qaytarish usuli", "Kredit ta")
+        payment_method = extract_payment_method(payment_method_section)
+
+        if not rates or not terms or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="avtokredit_elektro",
+            product_name=self.PRODUCT_NAMES["avtokredit_elektro"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
             amount_max_som=amount,
             requires_collateral=has_collateral_requirement(text),
             down_payment_pct=down_payment_pct,

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fetchCategories, fetchProductExplanation, fetchProducts, fetchRecommendation, fetchUnavailableBanks } from './api'
+import {
+  fetchCategories,
+  fetchProductExplanation,
+  fetchProducts,
+  fetchRecommendation,
+  fetchUnavailableBanks,
+  getExportExcelUrl,
+} from './api'
 
 describe('api client', () => {
   beforeEach(() => {
@@ -133,5 +140,10 @@ describe('api client', () => {
         down_payment_pct: 25.0,
       }),
     ).rejects.toThrow("AI izohini olib bo'lmadi: 500")
+  })
+
+  it('getExportExcelUrl builds a URL with category and language as query params', () => {
+    const url = getExportExcelUrl('avtokredit', 'ru')
+    expect(url).toBe('http://localhost:8000/export-excel?category=avtokredit&language=ru')
   })
 })

@@ -55,7 +55,24 @@ class FeaturedProduct:
         )
 
 
-def _build_single_product_prompt(category: str, product: FeaturedProduct) -> str:
+def _build_single_product_prompt(category: str, product: FeaturedProduct, language: str = "uz") -> str:
+    if language == "ru":
+        down_payment_note = (
+            f", первоначальный взнос от {product.down_payment_pct}%" if product.down_payment_pct is not None else ""
+        )
+        collateral_note = ", требуется залог" if product.requires_collateral else ", без залога"
+        return (
+            f"Банк: {product.bank} — {product.product_name} (категория {category}), "
+            f"годовая ставка {product.rate_min}%–{product.rate_max}%, срок "
+            f"{product.term_min_months}–{product.term_max_months} мес., "
+            f"максимальная сумма {product.amount_max_som:,} сум{down_payment_note}{collateral_note}.\n\n"
+            "На основе этой информации, на русском языке, всего в 1-2 КОРОТКИХ "
+            "предложениях (не более 30-35 слов), напиши, чем этот вариант "
+            "примечателен — не придумывай никаких других цифр или условий, "
+            "кроме указанных для этого банка. Без заголовка, списка или "
+            "дополнительных комментариев, только обычный текст."
+        )
+
     down_payment_note = (
         f", boshlang'ich badal {product.down_payment_pct}% dan" if product.down_payment_pct is not None else ""
     )
@@ -102,16 +119,25 @@ def explain_recommendation(criteria: Criteria, ranked: list[ScoredProduct]) -> s
     return result + others_note if result != fallback else result
 
 
-def explain_featured_product(category: str, product: FeaturedProduct, other_bank_count: int) -> str:
+def explain_featured_product(
+    category: str, product: FeaturedProduct, other_bank_count: int, language: str = "uz"
+) -> str:
     """Frontend "Bozor pulsi" kartochkasi jadvaldagi eng past stavkali
     mahsulotni ko'rsatadi (oddiy, mustaqil hisob-kitob) — bu funksiya esa
     ANIQ shu bank/mahsulot haqida qisqa AI izohi yozadi, hech qanday o'z
     ballash/saralashisiz. Shu sabab kartochka va izoh hech qachon boshqa-
     boshqa bankni ko'rsatib qolmaydi (avval /recommend'ning og'irlikli
     ballash formulasi ba'zan boshqa bankni "eng yaxshi" deb tanlab, jadval
-    va kartochka mos kelmasligiga sabab bo'lardi)."""
-    others_note = f" Yana {other_bank_count} ta bank varianti ham mavjud." if other_bank_count > 0 else ""
-    prompt = _build_single_product_prompt(category, product)
+    va kartochka mos kelmasligiga sabab bo'lardi).
+
+    `language` frontenddagi til almashtirgichdan keladi ("uz" yoki "ru") —
+    modelga mos tildagi prompt beriladi, shunda AI matni interfeys tili
+    bilan bir xil tilda chiqadi."""
+    if language == "ru":
+        others_note = f" Также доступно ещё {other_bank_count} банковских вариантов." if other_bank_count > 0 else ""
+    else:
+        others_note = f" Yana {other_bank_count} ta bank varianti ham mavjud." if other_bank_count > 0 else ""
+    prompt = _build_single_product_prompt(category, product, language)
     fallback = f"{product.bank} — {product.product_name}."
 
     result = _call_model(prompt, fallback)

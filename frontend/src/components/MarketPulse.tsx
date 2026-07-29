@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import type { Product } from '../lib/types'
 import { isHouseBank } from '../lib/bank'
 import { getBankLogo } from '../lib/bankLogos'
-import { formatAmount } from '../lib/productColumns'
+import { formatAmount, formatPaymentMethod } from '../lib/productColumns'
 import { fetchProductExplanation } from '../lib/api'
+import { useLanguage } from '../lib/LanguageContext'
+import { translate, type Lang } from '../lib/i18n'
 
 interface MarketPulseProps {
   category: string | null
@@ -45,10 +47,11 @@ function formatRateRange(product: Product): string {
     : `${formatRate(product.rate_min)} – ${formatRate(product.rate_max)}`
 }
 
-function formatTermRange(product: Product): string {
+function formatTermRange(product: Product, lang: Lang): string {
+  const unit = translate(lang, 'monthUnit')
   return product.term_min_months === product.term_max_months
-    ? `${product.term_min_months} oy`
-    : `${product.term_min_months}–${product.term_max_months} oy`
+    ? `${product.term_min_months} ${unit}`
+    : `${product.term_min_months}–${product.term_max_months} ${unit}`
 }
 
 // Bozorni ikki qismga bo'lib tushuntiruvchi jumla quradi: eng past stavkada
@@ -56,10 +59,28 @@ function formatTermRange(product: Product): string {
 // raqobatlashmoqda. Sabab (masalan "dilerlik aksiyasi") taxmin qilinmaydi —
 // faqat ma'lumotning o'zidan kelib chiqadigan haqiqatlar aytiladi, chunki bu
 // matn har qanday kategoriya (avtokredit, mikroqarz va h.k.) uchun ishlaydi.
-function buildInsight(bankRates: BankRate[], sqbRank: number): string {
+function buildInsight(lang: Lang, bankRates: BankRate[], sqbRank: number): string {
   const minRate = bankRates[0].rate
   const tiedBest = bankRates.filter((entry) => entry.rate === minRate)
   const rest = bankRates.filter((entry) => entry.rate > minRate)
+
+  if (lang === 'ru') {
+    const leadSentence =
+      tiedBest.length > 1
+        ? `${tiedBest.length} из ${bankRates.length} банков предлагают самую низкую ставку ${formatRate(minRate)}.`
+        : `Самую низкую ставку предлагает ${tiedBest[0].bank} — ${formatRate(minRate)}.`
+
+    const restSentence =
+      rest.length > 0
+        ? rest.length === 1
+          ? `Остался один банк со ставкой ${formatRate(rest[0].rate)}.`
+          : `Остальные ${rest.length} банков конкурируют в диапазоне ${formatRate(rest[0].rate)}–${formatRate(rest[rest.length - 1].rate)}.`
+        : ''
+
+    const rankSentence = sqbRank > 0 ? `SQB — ${sqbRank}-е место из ${bankRates.length} банков.` : ''
+
+    return [leadSentence, restSentence, rankSentence].filter(Boolean).join(' ')
+  }
 
   const leadSentence =
     tiedBest.length > 1
@@ -79,6 +100,7 @@ function buildInsight(bankRates: BankRate[], sqbRank: number): string {
 }
 
 export function MarketPulse({ category, products, updatedLabel }: MarketPulseProps) {
+  const { lang, t } = useLanguage()
   const [aiText, setAiText] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
@@ -109,6 +131,7 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
       amount_max_som: featured.amount_max_som,
       requires_collateral: featured.requires_collateral,
       down_payment_pct: featured.down_payment_pct,
+      language: lang,
     })
       .then((data) => {
         if (ignore) return
@@ -125,32 +148,32 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
     return () => {
       ignore = true
     }
-  }, [category, products])
+  }, [category, products, lang])
 
   if (products.length === 0) return null
 
   const bankRates = cheapestPerBank(products)
   const sqbRank = bankRates.findIndex((entry) => isHouseBank(entry.bank)) + 1
-  const insight = buildInsight(bankRates, sqbRank)
+  const insight = buildInsight(lang, bankRates, sqbRank)
 
   const featured = pickFeatured(products)
   const featuredLogo = getBankLogo(featured.bank)
   const featuredIsHouse = isHouseBank(featured.bank)
 
   return (
-    <section className="market-pulse" aria-label="Bozor pulsi">
+    <section className="market-pulse" aria-label={t('pulseEyebrow')}>
       <div className="pulse-featured">
         <div className="pulse-featured-head">
-          <span className="market-pulse-eyebrow">Bozor pulsi · Eng zo'r taklif</span>
+          <span className="market-pulse-eyebrow">{t('pulseEyebrow')}</span>
           <div className="market-pulse-meta">
             <div className="meta-chip">
               <span className="meta-chip-value">{bankRates.length}</span>
-              <span className="meta-chip-label">Bank</span>
+              <span className="meta-chip-label">{t('pulseBankCount')}</span>
             </div>
             {updatedLabel && (
               <div className="meta-chip">
                 <span className="meta-chip-value meta-chip-time">{updatedLabel}</span>
-                <span className="meta-chip-label">Yangilangan</span>
+                <span className="meta-chip-label">{t('pulseUpdated')}</span>
               </div>
             )}
           </div>
@@ -162,7 +185,7 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
             <div className="pulse-featured-names">
               <span className="pulse-featured-bank-name">
                 {featured.bank}
-                {featuredIsHouse && <span className="house-flag">Biz</span>}
+                {featuredIsHouse && <span className="house-flag">{t('houseFlag')}</span>}
               </span>
               <span className="pulse-featured-product-name">{featured.product_name}</span>
             </div>
@@ -171,36 +194,44 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
           <div className="pulse-featured-stats">
             <div className="pulse-stat pulse-stat-rate">
               <span className="pulse-stat-value">{formatRateRange(featured)}</span>
-              <span className="pulse-stat-label">Stavka</span>
+              <span className="pulse-stat-label">{t('pulseRate')}</span>
             </div>
             <div className="pulse-stat">
-              <span className="pulse-stat-value">{formatTermRange(featured)}</span>
-              <span className="pulse-stat-label">Muddat</span>
+              <span className="pulse-stat-value">{formatTermRange(featured, lang)}</span>
+              <span className="pulse-stat-label">{t('pulseTerm')}</span>
             </div>
             <div className="pulse-stat">
-              <span className="pulse-stat-value">{formatAmount(featured.amount_max_som)}</span>
-              <span className="pulse-stat-label">Kredit miqdori</span>
+              <span className="pulse-stat-value">{formatAmount(featured.amount_max_som, lang)}</span>
+              <span className="pulse-stat-label">{t('pulseAmount')}</span>
             </div>
             <div className="pulse-stat">
-              <span className="pulse-stat-value">{featured.requires_collateral ? 'Bor' : "Yo'q"}</span>
-              <span className="pulse-stat-label">Garov</span>
+              <span className="pulse-stat-value">{featured.requires_collateral ? t('yes') : t('no')}</span>
+              <span className="pulse-stat-label">{t('pulseCollateral')}</span>
             </div>
             <div className="pulse-stat">
-              <span className="pulse-stat-value">{featured.payment_method ?? '—'}</span>
-              <span className="pulse-stat-label">To'lov usuli</span>
+              <span className="pulse-stat-value">{formatPaymentMethod(featured.payment_method, lang)}</span>
+              <span className="pulse-stat-label">{t('pulsePaymentMethod')}</span>
             </div>
           </div>
         </div>
 
         {sqbRank > 0 && (
           <p className="market-pulse-rank">
-            SQB — <strong>{bankRates.length}</strong> bankdan <strong>{sqbRank}</strong>-o'rinda
+            {lang === 'ru' ? (
+              <>
+                SQB — <strong>{sqbRank}</strong>-е место из <strong>{bankRates.length}</strong> банков
+              </>
+            ) : (
+              <>
+                SQB — <strong>{bankRates.length}</strong> bankdan <strong>{sqbRank}</strong>-o'rinda
+              </>
+            )}
           </p>
         )}
 
         <div className="pulse-ai-note">
-          <span className="pulse-ai-badge">AI</span>
-          {isAiLoading && <span className="pulse-ai-text pulse-ai-text-muted">Tahlil qilinmoqda...</span>}
+          <span className="pulse-ai-badge">{t('pulseAiBadge')}</span>
+          {isAiLoading && <span className="pulse-ai-text pulse-ai-text-muted">{t('pulseAiLoading')}</span>}
           {!isAiLoading && aiError && <span className="pulse-ai-text pulse-ai-text-muted">{aiError}</span>}
           {!isAiLoading && !aiError && aiText && <span className="pulse-ai-text">{aiText}</span>}
         </div>

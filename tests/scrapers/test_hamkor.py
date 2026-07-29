@@ -15,6 +15,9 @@ FIXTURE_BY_URL = {
     HamkorBankScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
         FIXTURES_DIR / "hamkor_avtokredit_brend_birlamchi.html"
     ).read_text(encoding="utf-8"),
+    HamkorBankScraper.CATEGORY_URLS["avtokredit_brend_ikkilamchi"]: (
+        FIXTURES_DIR / "hamkor_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     HamkorBankScraper.CATEGORY_URLS["ipoteka_tijorat"]: (FIXTURES_DIR / "hamkor_ipoteka_tijorat.html").read_text(
         encoding="utf-8"
     ),
@@ -40,16 +43,17 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_hamkor_scraper_parses_all_nine_categories():
+def test_hamkor_scraper_parses_all_ten_categories():
     with patch("scrapers.hamkor.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = HamkorBankScraper().run()
 
-    assert mock_fetch.call_count == 9
+    assert mock_fetch.call_count == 10
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
         "avtokredit_ikkilamchi",
         "avtokredit_brend_birlamchi",
+        "avtokredit_brend_ikkilamchi",
         "ipoteka_tijorat",
         "ipoteka_davlat",
         "mikroqarz",
@@ -58,6 +62,28 @@ def test_hamkor_scraper_parses_all_nine_categories():
         "istemol_krediti",
     }
     assert all(p.bank == "HamkorBank" for p in products)
+
+
+def test_hamkor_avtokredit_brend_ikkilamchi_parses_correctly():
+    """"Auto light avtokrediti" o'zi brend cheklovisiz (istalgan avtomobil
+    markasi/modeli qabul qilinadi) "birlamchi va ikkilamchi bozordan sotib
+    olish uchun" mo'ljallangan mahsulot — shu sabab bitta haqiqiy sahifa
+    IKKITA toifaga xaritalanadi: "avtokredit_ikkilamchi" (mavjud) va
+    "avtokredit_brend_ikkilamchi" (yangi, xuddi shu URL/qiymatlar bilan).
+    Ikkalasi ham bir xil _build_avtokredit_ikkilamchi_product metodidan
+    o'tadi, faqat `category` parametri farq qiladi."""
+    with patch("scrapers.hamkor.fetch_html", side_effect=_fake_fetch):
+        products = HamkorBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
 
 
 def test_hamkor_istemol_krediti_parses_correctly():
@@ -149,7 +175,7 @@ def test_hamkor_avtokredit_brend_birlamchi_parses_correctly():
     assert brend.product_name == "Auto KIA Sonet"
     assert brend.rate_min == 0.0
     assert brend.rate_max == 18.5
-    assert brend.term_min_months == 60
+    assert brend.term_min_months == 12
     assert brend.term_max_months == 60
     assert brend.amount_max_som == 600_000_000
     assert brend.down_payment_pct == 25.0
@@ -187,9 +213,12 @@ def test_hamkor_avtokredit_ignores_down_payment_tier_percentages():
     official income) grouped by down-payment tier (25%-70%) x term
     (13-60 months). Those tier labels ("Kamida 30%" etc.) are themselves
     percentages and must not leak into rate_min/rate_max — only the actual
-    "N oy -> X%" rate pairs should. A cross-sell "Imtiyozli shartlar
-    asosida" mention for an unrelated home-repair loan must also not cause
-    a false grace-period reading."""
+    "N oy -> X%" rate pairs should. term_min/term_max are read from the
+    same rate-matrix pairs (13-60 months), not the summary card's single
+    "5 yilgacha" (60 oy) ceiling, which would otherwise hide the real 13
+    month floor. A cross-sell "Imtiyozli shartlar asosida" mention for an
+    unrelated home-repair loan must also not cause a false grace-period
+    reading."""
     with patch("scrapers.hamkor.fetch_html", side_effect=_fake_fetch):
         products = HamkorBankScraper().run()
 
@@ -197,7 +226,7 @@ def test_hamkor_avtokredit_ignores_down_payment_tier_percentages():
     assert avtokredit.product_name == "Auto DAMAS"
     assert avtokredit.rate_min == 0.0
     assert avtokredit.rate_max == 19.0
-    assert avtokredit.term_min_months == 60
+    assert avtokredit.term_min_months == 13
     assert avtokredit.term_max_months == 60
     assert avtokredit.amount_max_som == 600_000_000
     assert avtokredit.down_payment_pct == 25.0

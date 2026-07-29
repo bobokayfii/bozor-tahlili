@@ -2,21 +2,50 @@ import { useEffect, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { ProductTable } from './components/ProductTable'
 import { MarketPulse } from './components/MarketPulse'
+import { ExportMenu } from './components/ExportMenu'
+import { RefreshDataButton } from './components/RefreshDataButton'
 import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
+import { getCategoryHeading } from './lib/categoryGroups'
+import { useLanguage } from './lib/LanguageContext'
+import type { Lang } from './lib/i18n'
 import type { Category, Product, UnavailableBank } from './lib/types'
 import logo from './assets/logo.png'
 
-function formatUpdatedAt(iso: string): string {
+function formatUpdatedAt(iso: string, lang: Lang): string {
   const date = new Date(iso)
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
-  const time = date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
-  if (isToday) return `bugun, ${time}`
-  const day = date.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' })
+  const locale = lang === 'ru' ? 'ru-RU' : 'uz-UZ'
+  const time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return `${lang === 'ru' ? 'сегодня' : 'bugun'}, ${time}`
+  const day = date.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })
   return `${day}, ${time}`
 }
 
+function LanguageToggle() {
+  const { lang, setLang } = useLanguage()
+  return (
+    <div className="lang-toggle" role="group" aria-label="Til / Язык">
+      <button
+        type="button"
+        className={lang === 'uz' ? 'lang-toggle-btn active' : 'lang-toggle-btn'}
+        onClick={() => setLang('uz')}
+      >
+        UZ
+      </button>
+      <button
+        type="button"
+        className={lang === 'ru' ? 'lang-toggle-btn active' : 'lang-toggle-btn'}
+        onClick={() => setLang('ru')}
+      >
+        RU
+      </button>
+    </div>
+  )
+}
+
 export function App() {
+  const { lang, t } = useLanguage()
   const [categories, setCategories] = useState<Category[]>([])
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [products, setProducts] = useState<Product[]>([])
@@ -66,7 +95,9 @@ export function App() {
   }, [activeCategory])
 
   const activeCategoryData = categories.find((c) => c.key === activeCategory)
-  const activeLabel = activeCategoryData?.label ?? 'Bozor Tahlili'
+  const activeLabel = activeCategoryData
+    ? getCategoryHeading(activeCategoryData.key, activeCategoryData.label, lang)
+    : 'Bozor Tahlili'
   const lastUpdated =
     products.length > 0
       ? products.reduce((latest, p) => (p.scraped_at > latest ? p.scraped_at : latest), products[0].scraped_at)
@@ -78,6 +109,11 @@ export function App() {
         <div className="app-topbar-brand">
           <img src={logo} alt="Bozor Tahlili" className="app-topbar-logo" />
         </div>
+        <div className="app-topbar-actions">
+          <RefreshDataButton />
+          <ExportMenu category={activeCategory} />
+          <LanguageToggle />
+        </div>
       </header>
       <div className="app-body">
         <Sidebar categories={categories} activeCategory={activeCategory} onSelect={setActiveCategory} />
@@ -85,7 +121,7 @@ export function App() {
           <div className="page-head">
             <div>
               <h1>{activeLabel}</h1>
-              <p className="page-subtitle">Raqobatchi banklar shartlarining joriy holati</p>
+              <p className="page-subtitle">{t('pageSubtitle')}</p>
             </div>
           </div>
           {error && <p className="error-state">{error}</p>}
@@ -93,7 +129,7 @@ export function App() {
             <MarketPulse
               category={activeCategory}
               products={products}
-              updatedLabel={lastUpdated && formatUpdatedAt(lastUpdated)}
+              updatedLabel={lastUpdated && formatUpdatedAt(lastUpdated, lang)}
             />
           )}
           <ProductTable

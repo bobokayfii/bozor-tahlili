@@ -1,7 +1,10 @@
+import threading
 from datetime import datetime, timezone
+from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 import api.main as api_main
 from db.database import get_engine, get_session_factory, init_db
@@ -116,10 +119,11 @@ def test_explain_product_calls_explain_featured_product_with_the_given_product_o
     ishlatilmaydi."""
     captured = {}
 
-    def fake_explain(category, product, other_bank_count):
+    def fake_explain(category, product, other_bank_count, language="uz"):
         captured["category"] = category
         captured["product"] = product
         captured["other_bank_count"] = other_bank_count
+        captured["language"] = language
         return "test tushuntirish"
 
     monkeypatch.setattr(api_main, "explain_featured_product", fake_explain)
@@ -145,6 +149,36 @@ def test_explain_product_calls_explain_featured_product_with_the_given_product_o
     # Fixture'da faqat SQB Mikroqarz bor — so'ralgan bank (HamkorBank) undan
     # farqli, shuning uchun 1 ta "boshqa" bank hisoblanadi.
     assert captured["other_bank_count"] == 1
+    # language yuborilmagan bo'lsa, ExplainProductRequest standart "uz"ni
+    # ishlatadi.
+    assert captured["language"] == "uz"
+
+
+def test_explain_product_passes_through_the_requested_language(client, monkeypatch):
+    captured = {}
+
+    def fake_explain(category, product, other_bank_count, language="uz"):
+        captured["language"] = language
+        return "test explanation"
+
+    monkeypatch.setattr(api_main, "explain_featured_product", fake_explain)
+
+    response = client.post("/explain-product", json={
+        "category": "mikroqarz",
+        "bank": "HamkorBank",
+        "product_name": "Hamkor Mikroqarz",
+        "rate_min": 10.0,
+        "rate_max": 15.0,
+        "term_min_months": 12,
+        "term_max_months": 36,
+        "amount_max_som": 100_000_000,
+        "requires_collateral": False,
+        "down_payment_pct": None,
+        "language": "ru",
+    })
+
+    assert response.status_code == 200
+    assert captured["language"] == "ru"
 
 
 def test_list_categories_returns_eleven_entries(client):
@@ -205,3 +239,108 @@ def test_cors_allows_configured_frontend_origin(client):
         headers={"Origin": "http://localhost:5173"},
     )
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_export_excel_returns_a_valid_workbook_for_the_seeded_category(client):
+    response = client.get("/export-excel", params={"category": "mikroqarz"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert response.headers["content-disposition"] == 'attachment; filename="mikroqarz.xlsx"'
+
+    workbook = load_workbook(BytesIO(response.content))
+    sheet = workbook.active
+    header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    assert header_row == ("#", "Bank", "Mahsulot", "Stavka", "Muddat", "Kredit miqdori", "To'lov usuli")
+    data_row = next(sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    assert data_row == (1, "SQB", "SQB Mikroqarz", "28.0%–31.0%", "3–36 oy", "100.0 mln so'm", "Annuitet, Differensial")
+
+
+def test_export_excel_translates_headers_and_values_when_language_is_ru(client):
+    response = client.get("/export-excel", params={"category": "mikroqarz", "language": "ru"})
+
+    workbook = load_workbook(BytesIO(response.content))
+    sheet = workbook.active
+    header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    assert header_row == ("#", "Банк", "Продукт", "Ставка", "Срок", "Сумма кредита", "Способ оплаты")
+    data_row = next(sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    assert data_row[-1] == "Аннуитет, Дифференцированный"
+    assert data_row[4] == "3–36 мес."
+
+
+def test_export_excel_returns_404_for_an_unknown_category(client):
+    response = client.get("/export-excel", params={"category": "not_a_real_category"})
+    assert response.status_code == 404
+
+
+def test_export_excel_all_returns_one_sheet_per_category(client):
+    from categories import CATEGORIES
+
+    response = client.get("/export-excel-all")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="bozor-tahlili-barcha-kategoriyalar.xlsx"'
+    )
+
+    workbook = load_workbook(BytesIO(response.content))
+    assert len(workbook.sheetnames) == len(CATEGORIES)
+
+    # Fixture'da faqat "mikroqarz" uchun SQB qatori bor — o'sha varaqda
+    # haqiqiy ma'lumot, qolganlari faqat sarlavha qatori bilan bo'sh.
+    mikroqarz_sheet = workbook[CATEGORIES[[c.key for c in CATEGORIES].index("mikroqarz")].label_uz[:31]]
+    data_row = next(mikroqarz_sheet.iter_rows(min_row=2, max_row=2, values_only=True))
+    assert data_row[1] == "SQB"
+
+
+def test_export_excel_all_translates_headers_when_language_is_ru(client):
+    from categories import CATEGORIES
+
+    response = client.get("/export-excel-all", params={"language": "ru"})
+
+    workbook = load_workbook(BytesIO(response.content))
+    mikroqarz_sheet = workbook[CATEGORIES[[c.key for c in CATEGORIES].index("mikroqarz")].label_uz[:31]]
+    header_row = next(mikroqarz_sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+    assert header_row == ("#", "Банк", "Продукт", "Ставка", "Срок", "Сумма кредита", "Способ оплаты")
+
+
+def test_trigger_scrape_starts_a_background_run_and_returns_immediately(client, monkeypatch):
+    monkeypatch.setattr(api_main, "_scrape_in_progress", False)
+    called = threading.Event()
+
+    def fake_run_all_scrapers(session):
+        called.set()
+
+    monkeypatch.setattr(api_main, "run_all_scrapers", fake_run_all_scrapers)
+
+    response = client.post("/trigger-scrape")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "started"}
+    assert called.wait(timeout=2), "run_all_scrapers should have been called in the background thread"
+
+
+def test_trigger_scrape_returns_409_when_a_scrape_is_already_running(client, monkeypatch):
+    monkeypatch.setattr(api_main, "_scrape_in_progress", False)
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_run_all_scrapers(session):
+        started.set()
+        release.wait(timeout=2)
+
+    monkeypatch.setattr(api_main, "run_all_scrapers", blocking_run_all_scrapers)
+
+    first_response = client.post("/trigger-scrape")
+    assert first_response.status_code == 200
+    assert started.wait(timeout=2), "background scrape should have started"
+
+    second_response = client.post("/trigger-scrape")
+    assert second_response.status_code == 409
+
+    release.set()

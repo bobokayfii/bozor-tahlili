@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
+import type { ReactElement } from 'react'
 import { ProductTable } from './ProductTable'
+import { LanguageProvider } from '../lib/LanguageContext'
 import type { Product, UnavailableBank } from '../lib/types'
+
+function renderWithLanguage(ui: ReactElement) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>)
+}
 
 const sampleProduct: Product = {
   bank: 'SQB',
@@ -30,7 +36,7 @@ const cheaperProduct: Product = {
 
 describe('ProductTable', () => {
   it('shows a loading skeleton instead of the empty-state message while loading', () => {
-    render(<ProductTable products={[]} isLoading />)
+    renderWithLanguage(<ProductTable products={[]} isLoading />)
     expect(screen.getByLabelText('Yuklanmoqda')).toBeInTheDocument()
     expect(
       screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
@@ -38,27 +44,34 @@ describe('ProductTable', () => {
   })
 
   it('shows the empty-state message when there are no products', () => {
-    render(<ProductTable products={[]} />)
+    renderWithLanguage(<ProductTable products={[]} />)
     expect(
       screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
     ).toBeInTheDocument()
   })
 
   it('renders one row per product with bank and rate range', () => {
-    render(<ProductTable products={[sampleProduct]} />)
+    renderWithLanguage(<ProductTable products={[sampleProduct]} />)
     expect(screen.getByText('SQB')).toBeInTheDocument()
     expect(screen.getByText('24.9% – 27.9%')).toBeInTheDocument()
   })
 
   it('renders a single rate value (not "X%-X%") when rate_min equals rate_max', () => {
     const flatRateProduct: Product = { ...sampleProduct, rate_min: 0, rate_max: 0 }
-    render(<ProductTable products={[flatRateProduct]} />)
+    renderWithLanguage(<ProductTable products={[flatRateProduct]} />)
     expect(screen.getByText('0%')).toBeInTheDocument()
     expect(screen.queryByText('0% – 0%')).not.toBeInTheDocument()
   })
 
+  it('renders a single term value (not "N–N oy") when term_min_months equals term_max_months', () => {
+    const flatTermProduct: Product = { ...sampleProduct, term_min_months: 48, term_max_months: 48 }
+    renderWithLanguage(<ProductTable products={[flatTermProduct]} />)
+    expect(screen.getByText('48 oy')).toBeInTheDocument()
+    expect(screen.queryByText('48–48 oy')).not.toBeInTheDocument()
+  })
+
   it('ranks products by cheapest rate first and flags the SQB row', () => {
-    render(<ProductTable products={[sampleProduct, cheaperProduct]} />)
+    renderWithLanguage(<ProductTable products={[sampleProduct, cheaperProduct]} />)
     const rows = screen.getAllByText(/^0[12]$/)
     expect(rows[0]).toHaveTextContent('01')
     expect(screen.getByText('NBU').closest('.rate-row')).toHaveClass('is-best')
@@ -67,7 +80,7 @@ describe('ProductTable', () => {
   })
 
   it('defaults to the credit_down_payment column set when no schema prop is given', () => {
-    render(<ProductTable products={[sampleProduct]} />)
+    renderWithLanguage(<ProductTable products={[sampleProduct]} />)
     expect(screen.getByText("Boshlang'ich badal")).toBeInTheDocument()
     expect(screen.getByText('30%')).toBeInTheDocument()
     expect(screen.getByText('Annuitet')).toBeInTheDocument()
@@ -76,7 +89,7 @@ describe('ProductTable', () => {
     expect(screen.getByText("800 mln so'm")).toBeInTheDocument()
   })
 
-  it('falls back to a dash for missing optional fields', () => {
+  it('falls back to a dash only for down payment; grace period and payment method get friendlier defaults', () => {
     const productWithoutExtras: Product = {
       ...sampleProduct,
       requires_collateral: false,
@@ -84,8 +97,10 @@ describe('ProductTable', () => {
       payment_method: null,
       grace_period_months: null,
     }
-    render(<ProductTable products={[productWithoutExtras]} />)
-    expect(screen.getAllByText('—')).toHaveLength(3)
+    renderWithLanguage(<ProductTable products={[productWithoutExtras]} />)
+    expect(screen.getAllByText('—')).toHaveLength(1)
+    expect(screen.getByText("Yo'q")).toBeInTheDocument()
+    expect(screen.getByText('Annuitet, Differensial')).toBeInTheDocument()
   })
 
   it('renders the credit_special_terms column set: Maxsus shartlari shown, Boshlang\'ich badal hidden', () => {
@@ -95,14 +110,14 @@ describe('ProductTable', () => {
       down_payment_pct: null,
       special_terms: 'Kredit yuklamasi hisobga olinadi',
     }
-    render(<ProductTable products={[microloanProduct]} schema="credit_special_terms" />)
+    renderWithLanguage(<ProductTable products={[microloanProduct]} schema="credit_special_terms" />)
     expect(screen.getByText('Maxsus shartlari')).toBeInTheDocument()
     expect(screen.getByText('Kredit yuklamasi hisobga olinadi')).toBeInTheDocument()
     expect(screen.queryByText("Boshlang'ich badal")).not.toBeInTheDocument()
   })
 
   it('renders the credit_down_payment column set: Boshlang\'ich badal shown, Maxsus shartlari hidden', () => {
-    render(<ProductTable products={[sampleProduct]} schema="credit_down_payment" />)
+    renderWithLanguage(<ProductTable products={[sampleProduct]} schema="credit_down_payment" />)
     expect(screen.getByText("Boshlang'ich badal")).toBeInTheDocument()
     expect(screen.queryByText('Maxsus shartlari')).not.toBeInTheDocument()
   })
@@ -113,14 +128,14 @@ describe('ProductTable', () => {
       category: 'mikroqarz',
       payment_method: null,
     }
-    render(<ProductTable products={[microloanProduct]} schema="credit_special_terms" category="mikroqarz" />)
+    renderWithLanguage(<ProductTable products={[microloanProduct]} schema="credit_special_terms" category="mikroqarz" />)
     expect(screen.queryByText('Imtiyozli davr')).not.toBeInTheDocument()
     expect(screen.queryByText('Maxsus shartlari')).not.toBeInTheDocument()
     expect(screen.getByText('Annuitet, Differensial')).toBeInTheDocument()
   })
 
   it('shows the empty-state message when there are no products and no unavailable banks', () => {
-    render(<ProductTable products={[]} unavailableBanks={[]} />)
+    renderWithLanguage(<ProductTable products={[]} unavailableBanks={[]} />)
     expect(
       screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
     ).toBeInTheDocument()
@@ -128,7 +143,7 @@ describe('ProductTable', () => {
 
   it('renders unavailable banks as a separate row without affecting ranking', () => {
     const unavailableBanks: UnavailableBank[] = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
-    render(<ProductTable products={[sampleProduct, cheaperProduct]} unavailableBanks={unavailableBanks} />)
+    renderWithLanguage(<ProductTable products={[sampleProduct, cheaperProduct]} unavailableBanks={unavailableBanks} />)
 
     expect(screen.getByText('TBC Bank')).toBeInTheDocument()
     expect(screen.getByText('Mahsulot mavjud emas')).toBeInTheDocument()
@@ -139,11 +154,28 @@ describe('ProductTable', () => {
 
   it('shows unavailable banks even when there are zero products for the category', () => {
     const unavailableBanks: UnavailableBank[] = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
-    render(<ProductTable products={[]} unavailableBanks={unavailableBanks} />)
+    renderWithLanguage(<ProductTable products={[]} unavailableBanks={unavailableBanks} />)
 
     expect(screen.getByText('TBC Bank')).toBeInTheDocument()
     expect(
       screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
     ).not.toBeInTheDocument()
+  })
+
+  it('translates table headers, values, and the unavailable reason into Russian when lang is ru', () => {
+    window.localStorage.setItem('bozor-tahlili-lang', 'ru')
+    const unavailableBanks: UnavailableBank[] = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
+    renderWithLanguage(<ProductTable products={[sampleProduct]} unavailableBanks={unavailableBanks} />)
+
+    expect(screen.getByText('Банк')).toBeInTheDocument()
+    expect(screen.getByText('Продукт')).toBeInTheDocument()
+    expect(screen.getByText('Ставка')).toBeInTheDocument()
+    expect(screen.getByText('Срок')).toBeInTheDocument()
+    expect(screen.getByText('Первоначальный взнос')).toBeInTheDocument()
+    expect(screen.getByText('Есть')).toBeInTheDocument()
+    expect(screen.getByText('Аннуитет')).toBeInTheDocument()
+    expect(screen.getByText('12–60 мес.')).toBeInTheDocument()
+    expect(screen.getByText('Продукт недоступен')).toBeInTheDocument()
+    window.localStorage.removeItem('bozor-tahlili-lang')
   })
 })
