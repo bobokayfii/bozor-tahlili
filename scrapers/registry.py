@@ -1,5 +1,6 @@
 from scrapers.agro import AgroBankScraper
 from scrapers.aloqa import AloqabankScraper
+from scrapers.anorbank import AnorbankScraper
 from scrapers.asaka import AsakabankScraper
 from scrapers.hamkor import HamkorBankScraper
 from scrapers.infinbank import InfinBankScraper
@@ -30,4 +31,5 @@ ALL_SCRAPERS = [
     TuronBankScraper,
     TengeBankScraper,
     TBCBankScraper,
+    AnorbankScraper,
 ]

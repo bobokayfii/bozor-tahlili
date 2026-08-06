@@ -1,0 +1,118 @@
+import re
+from datetime import datetime, timezone
+
+from scrapers.base import Product, TextSectionScraper
+from scrapers.utils import extract_payment_method, extract_section, fetch_html, html_to_text
+
+_DOWN_PAYMENT_RE = re.compile(r"Первоначальный взнос не менее (\d{1,2})%")
+_AMOUNT_RE = re.compile(r"Сумма кредита до (\d{1,4})\s*млн\s*сум")
+_RATE_RE = re.compile(r"Процентная ставка (\d{1,2}(?:,\d)?)%\s*годовых")
+_TERM_RE = re.compile(r"Срок до (\d{1,3})\s*месяцев")
+_MIKROZAYM_AMOUNT_RE = re.compile(r"До (\d{1,4})\s*млн\s*сум")
+_MIKROZAYM_RATE_RE = re.compile(r"от (\d{1,2})% до (\d{1,2})%")
+_MIKROZAYM_TERM_RE = re.compile(r"Срок (\d{1,3}) месяцев")
+
+
+class AnorbankScraper(TextSectionScraper):
+    """Anorbank (anorbank.uz) mahsulot sahifalari /uz/ manzil ostida ham
+    (masalan https://anorbank.uz/uz/credits/avtokredit/) navigatsiyasi
+    o'zbekcha, lekin CMS'dan olinadigan asosiy mahsulot matni (stavka/
+    muddat/summa) baribir ruscha (kirill) qoladi — o'zbekcha-lotin
+    muqobili umuman yo'q, to'g'ridan-to'g'ri tekshirilgan. scrapers/
+    utils.py'dagi extract_term_months/extract_amount_som o'zbekcha
+    so'zlarga ("oygacha", "mln so'm") tayanadi va ruscha matnda umuman
+    ishlamaydi, shu sabab bu ikkalasi uchun bankka xos regexlar
+    ishlatiladi. extract_percentages (raqam+% shakli til-neytral) va
+    extract_payment_method ("annuitet"/"differen" so'zlari kalkulyator
+    vidjetining o'zida ham ishlatilgani uchun) ishlaydi, lekin aniqlik
+    uchun bu yerda ham to'g'ridan-to'g'ri regex ishlatildi.
+
+    Har bir /credits/* sahifa oxirida BARCHA mahsulotlarga umumiy, bir xil
+    matnli "SEO" blok bor ("с первоначальным взносом от 40% и сроком до 5
+    лет", "с льготным периодом в 4 месяца" kabi) — bu boshqa
+    mahsulotlarning raqamlarini o'z ichiga oladi. Shu sabab ma'lumot
+    doimo "Условия автокредита" -> "Kalkulyator" tor oralig'idan olinadi,
+    hech qachon butun sahifa matnidan emas."""
+
+    bank_name = "Anorbank"
+    url = "https://anorbank.uz/uz/credits/avtokredit/"
+    CATEGORY_URLS = {
+        "avtokredit": "https://anorbank.uz/uz/credits/avtokredit/",
+        "avtokredit_brend_birlamchi": "https://anorbank.uz/uz/credits/avtokredit4-0/",
+        "mikroqarz_onlayn": "https://anorbank.uz/uz/credits/udobnyy-mikrozaym/",
+    }
+    PRODUCT_NAMES = {
+        "avtokredit": "Автокредит 3.0",
+        "avtokredit_brend_birlamchi": "Автокредит 4.0",
+        "mikroqarz_onlayn": "Удобный микрозайм",
+    }
+
+    def run(self) -> list[Product]:
+        now = datetime.now(timezone.utc)
+        products: list[Product] = []
+        for category, url in self.CATEGORY_URLS.items():
+            try:
+                html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
+                text = html_to_text(html)
+                if category == "mikroqarz_onlayn":
+                    product = self._build_mikrozaym_product(url, now, text)
+                else:
+                    product = self._build_avtokredit_product(category, url, now, text)
+            except Exception:
+                continue
+            if product is not None:
+                products.append(product)
+        return products
+
+    def _build_avtokredit_product(self, category: str, url: str, now: datetime, text: str) -> Product | None:
+        section = extract_section(text, "Условия автокредита", "Kalkulyator")
+        down_match = _DOWN_PAYMENT_RE.search(section)
+        amount_match = _AMOUNT_RE.search(section)
+        rate_match = _RATE_RE.search(section)
+        term_match = _TERM_RE.search(section)
+        if not (amount_match and rate_match and term_match):
+            return None
+
+        rate = float(rate_match.group(1).replace(",", "."))
+        term = int(term_match.group(1))
+        return Product(
+            bank=self.bank_name,
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
+            rate_min=rate,
+            rate_max=rate,
+            term_min_months=term,
+            term_max_months=term,
+            amount_max_som=int(amount_match.group(1)) * 1_000_000,
+            requires_collateral=True,
+            down_payment_pct=float(down_match.group(1)) if down_match else None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method=extract_payment_method(section),
+        )
+
+    def _build_mikrozaym_product(self, url: str, now: datetime, text: str) -> Product | None:
+        section = extract_section(text, "Кешбэк по микрозайму", "Увеличенный лимит")
+        amount_match = _MIKROZAYM_AMOUNT_RE.search(text)
+        rate_match = _MIKROZAYM_RATE_RE.search(section)
+        term_match = _MIKROZAYM_TERM_RE.search(section)
+        if not (amount_match and rate_match and term_match):
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="mikroqarz_onlayn",
+            product_name=self.PRODUCT_NAMES["mikroqarz_onlayn"],
+            rate_min=float(rate_match.group(1)),
+            rate_max=float(rate_match.group(2)),
+            term_min_months=int(term_match.group(1)),
+            term_max_months=int(term_match.group(1)),
+            amount_max_som=int(amount_match.group(1)) * 1_000_000,
+            requires_collateral=False,
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method=None,
+        )
