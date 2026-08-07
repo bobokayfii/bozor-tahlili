@@ -23,6 +23,9 @@ def _fake_fetch(url, *args, **kwargs):
 
 
 def test_anorbank_avtokredit_parses_correctly():
+    """Автокредит 3.0 — the base auto-loan product, with a stated down
+    payment (40%) and a single flat rate (33%), unlike the 4.0 promo
+    variant which is 0%."""
     with patch("scrapers.anorbank.fetch_html", side_effect=_fake_fetch):
         products = AnorbankScraper().run()
 

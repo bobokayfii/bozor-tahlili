@@ -27,12 +27,19 @@ class AnorbankScraper(TextSectionScraper):
     vidjetining o'zida ham ishlatilgani uchun) ishlaydi, lekin aniqlik
     uchun bu yerda ham to'g'ridan-to'g'ri regex ishlatildi.
 
-    Har bir /credits/* sahifa oxirida BARCHA mahsulotlarga umumiy, bir xil
-    matnli "SEO" blok bor ("с первоначальным взносом от 40% и сроком до 5
-    лет", "с льготным периодом в 4 месяца" kabi) — bu boshqa
-    mahsulotlarning raqamlarini o'z ichiga oladi. Shu sabab ma'lumot
-    doimo "Условия автокредита" -> "Kalkulyator" tor oralig'idan olinadi,
-    hech qachon butun sahifa matnidan emas."""
+    "Условия автокредита" -> "Kalkulyator" sarlavhalari har bir avtokredit
+    sahifasida aynan bir marta uchraydi va atigi ~500 belgilik tor blokni
+    belgilaydi. Shu sabab ma'lumot doimo shu tor oraliqdan olinadi, butun
+    sahifa matnidan emas — bu aniq bir kontaminatsiya holati kuzatilgani
+    uchun emas, balki tor oraliqqa tayanish butun sahifani skanerlashga
+    qaraganda umumiy ehtiyot chorasi sifatida afzalroq bo'lgani uchun.
+
+    requires_collateral avtokredit ikkala toifasi uchun ham True qattiq
+    kodlangan — avtomobilning o'zi garov bo'lishi kredit turi orqali
+    nazarda tutiladi, biroq sahifa matnida bu alohida so'z bilan
+    aytilmaydi. grace_period_months esa None qattiq kodlangan, chunki
+    ikkala avtokredit sahifasida ham imtiyozli davr haqida hech qanday
+    ma'lumot yo'q."""
 
     bank_name = "Anorbank"
     url = "https://anorbank.uz/uz/credits/avtokredit/"
@@ -94,7 +101,8 @@ class AnorbankScraper(TextSectionScraper):
 
     def _build_mikrozaym_product(self, url: str, now: datetime, text: str) -> Product | None:
         section = extract_section(text, "Кешбэк по микрозайму", "Увеличенный лимит")
-        amount_match = _MIKROZAYM_AMOUNT_RE.search(text)
+        amount_section = extract_section(text, "5 причины", "Кешбэк по микрозайму")
+        amount_match = _MIKROZAYM_AMOUNT_RE.search(amount_section)
         rate_match = _MIKROZAYM_RATE_RE.search(section)
         term_match = _MIKROZAYM_TERM_RE.search(section)
         if not (amount_match and rate_match and term_match):

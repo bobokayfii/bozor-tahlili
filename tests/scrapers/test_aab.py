@@ -26,6 +26,9 @@ def _fake_fetch(url, *args, **kwargs):
 
 
 def test_aab_avtokredit_ikkilamchi_parses_correctly():
+    """Avtokredit «Ikkilamchi» — secondary-market auto loan, requiring a
+    down payment and collateral, with both a rate range and a stated
+    payment-method choice (annuitet/differensial)."""
     with patch("scrapers.aab.fetch_html", side_effect=_fake_fetch):
         products = AsiaAllianceBankScraper().run()
 

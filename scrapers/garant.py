@@ -34,10 +34,10 @@ class GarantBankScraper(TextSectionScraper):
     Har bir sahifada bir xil yorliq ("Kredit miqdori"/"Foiz stavkasi"/
     "Kredit muddati") IKKI marta uchraydi: avval kichik harfli hero
     kartochka sifatida ("kredit miqdori"), keyin katta harfli batafsil
-    jadvalda ("Kredit miqdori"). Bu holat naqadar qulay - katta/kichik
-    harf farqi extract_section'ning birinchi (text.find) uchrashuvini
-    to'g'ridan-to'g'ri kerakli (batafsil jadval) joyga yo'naltiradi,
-    qo'shimcha toraytirish shart emas.
+    jadvalda ("Kredit miqdori"). Katta/kichik harf farqi extract_section'ning
+    birinchi (text.find) uchrashuvini to'g'ridan-to'g'ri kerakli
+    (batafsil jadval) joyga yo'naltiradi, qo'shimcha toraytirish shart
+    emas.
 
     mikrozajm-onlajn'ning batafsil jadvalidagi muddat "48 (qirq sakkiz)
     oygacha" — sonning o'zi bilan "oygacha" orasida so'zdagi izoh
@@ -96,26 +96,17 @@ class GarantBankScraper(TextSectionScraper):
         amount_section = extract_section(text, "Kredit miqdori", "Kredit muddati")
         amount_match = _YENGIL_AMOUNT_RE.search(amount_section)
 
+        if not rates or not terms or amount_match is None:
+            return None
+
         grace_section = extract_section(text, "Imtiyozli muddat", "Kredit valyutasi")
         grace_period_months = extract_grace_period_months("Imtiyozli muddat" + grace_section)
 
         payment_section = extract_section(text, "Foiz hisoblash", "Asosiy qarz")
         payment_method = extract_payment_method(payment_section)
 
-        # "Imtiyozli muddat: Mavjud emas" earlier on this page trips
-        # has_collateral_requirement's negative-phrase guard when scanning
-        # full-page text (the guard doesn't know "mavjud emas" here refers to
-        # the grace period, not collateral) — the actual collateral
-        # statement ("...avtotransport vositasi garov ta'minoti...") lives
-        # further down, under the "Mahsulot bo'yicha ta'minot" heading, so
-        # scoping to everything from there onward (past the earlier "mavjud
-        # emas") avoids the false negative. Unlike mikroqarz_onlayn, this
-        # page cannot safely use unscoped full-page text.
         collateral_section = extract_section(text, "Mahsulot bo", None)
         requires_collateral = has_collateral_requirement(collateral_section)
-
-        if not rates or not terms or amount_match is None:
-            return None
 
         return Product(
             bank=self.bank_name,
@@ -145,14 +136,14 @@ class GarantBankScraper(TextSectionScraper):
         amount_section = extract_section(text, "Kredit miqdori", "Kredit muddati")
         amount_match = _MIKROZAJM_AMOUNT_RE.search(amount_section)
 
+        if not rates or not terms or amount_match is None:
+            return None
+
         grace_section = extract_section(text, "Kreditning imtiyozli davri", "Kredit maqsadi")
-        grace_period_months = extract_grace_period_months("Imtiyozli davr" + grace_section)
+        grace_period_months = extract_grace_period_months("Kreditning imtiyozli davri" + grace_section)
 
         payment_section = extract_section(text, "Foiz hisoblash", "Asosiy qarz")
         payment_method = extract_payment_method(payment_section)
-
-        if not rates or not terms or amount_match is None:
-            return None
 
         return Product(
             bank=self.bank_name,
