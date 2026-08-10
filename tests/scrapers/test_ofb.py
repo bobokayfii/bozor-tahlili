@@ -10,6 +10,10 @@ FIXTURE_BY_URL = {
     OFBScraper.CATEGORY_URLS["avtokredit_elektro"]: (FIXTURES_DIR / "ofb_avtokredit_elektro.html").read_text(
         encoding="utf-8"
     ),
+    OFBScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "ofb_mikroqarzlar.html").read_text(encoding="utf-8"),
+    OFBScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (FIXTURES_DIR / "ofb_onlayn_mikroqarz.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -17,13 +21,17 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_ofb_scraper_parses_both_categories():
+def test_ofb_scraper_parses_all_categories():
+    """mikroqarz and mikroqarz_onlayn share ONE fetch of the mikroqarzlar
+    hub page (mikroqarz_onlayn also fetches its own onlayn-mikroqarz page
+    for the term) — so 4 categories produce only 4 total fetch_html calls,
+    not 5, confirming the hub page isn't fetched twice."""
     with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = OFBScraper().run()
 
-    assert mock_fetch.call_count == 2
+    assert mock_fetch.call_count == 4
     categories = {p.category for p in products}
-    assert categories == {"avtokredit", "avtokredit_elektro"}
+    assert categories == {"avtokredit", "avtokredit_elektro", "mikroqarz", "mikroqarz_onlayn"}
     assert all(p.bank == "OFB" for p in products)
 
 
@@ -71,3 +79,53 @@ def test_ofb_avtokredit_elektro_parses_dual_term_and_no_yillik_rate_table():
     assert elektro.requires_collateral is True
     assert elektro.grace_period_months is None
     assert elektro.payment_method is None
+
+
+def test_ofb_mikroqarz_parses_ishonch_card_from_shared_hub_page():
+    """"Ishonch mikroqarz" is the SECOND card on the mikroqarzlar hub page
+    (after "Onlayn mikroqarz"). The bare word "Ishonch" also appears much
+    earlier on the same page inside an unrelated nav dropdown ("OFB
+    Ishonch" — a savings product, "OFB Ishonchli" — a business loan), so a
+    naive extract_section(hub_text, "Ishonch", ...) over the full page
+    would anchor on the wrong, much earlier occurrence; the real
+    implementation first narrows to the text after "Onlayn mikroqarz"
+    (unique on the page) before looking for "Ishonch"."""
+    with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch):
+        products = OFBScraper().run()
+
+    mikroqarz = next(p for p in products if p.category == "mikroqarz")
+    assert mikroqarz.product_name == "Ishonch mikroqarz"
+    assert mikroqarz.rate_min == 24.0
+    assert mikroqarz.rate_max == 24.0
+    assert mikroqarz.term_min_months == 36
+    assert mikroqarz.term_max_months == 36
+    assert mikroqarz.amount_max_som == 100_000_000
+    assert mikroqarz.requires_collateral is False
+    assert mikroqarz.down_payment_pct is None
+    assert mikroqarz.grace_period_months is None
+    assert mikroqarz.payment_method is None
+    assert mikroqarz.source_url == OFBScraper.CATEGORY_URLS["mikroqarz"]
+
+
+def test_ofb_mikroqarz_onlayn_combines_hub_amount_rate_with_own_page_term():
+    """"Onlayn mikroqarz" is the FIRST card on the shared hub page (amount
+    and rate come from there), but the hub page never states its term —
+    that's only on the product's own onlayn-mikroqarz page ("Mikroqarz
+    muddati: 24 oygacha."). This confirms both sources get combined into
+    one product without a second, redundant hub fetch (see
+    test_ofb_scraper_parses_all_categories for the call-count check)."""
+    with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch):
+        products = OFBScraper().run()
+
+    onlayn = next(p for p in products if p.category == "mikroqarz_onlayn")
+    assert onlayn.product_name == "Onlayn mikroqarz"
+    assert onlayn.rate_min == 30.0
+    assert onlayn.rate_max == 30.0
+    assert onlayn.term_min_months == 24
+    assert onlayn.term_max_months == 24
+    assert onlayn.amount_max_som == 50_000_000
+    assert onlayn.requires_collateral is False
+    assert onlayn.down_payment_pct is None
+    assert onlayn.grace_period_months is None
+    assert onlayn.payment_method is None
+    assert onlayn.source_url == OFBScraper.CATEGORY_URLS["mikroqarz_onlayn"]
