@@ -71,7 +71,12 @@ class SaderatBankScraper(TextSectionScraper):
         return products
 
     def _build_avtokredit_product(self, url: str, now: datetime, text: str) -> Product | None:
-        hero = extract_section(text, "Onlayn rasmiylashtirish", "Biz bilan bog'lanish")
+        # End anchor truncated right before the apostrophe in "bog'lanish"
+        # (same convention used in agro.py/aloqa.py, e.g. "Kredit ta",
+        # "Boshlang") since the live page's apostrophe is a curly quote
+        # (U+2018), not the straight ASCII one — matching only the
+        # apostrophe-free prefix avoids depending on which variant renders.
+        hero = extract_section(text, "Onlayn rasmiylashtirish", "Biz bilan bog")
         rates = extract_percentages(hero)
         term_match = _TERM_RE.search(hero)
         amount_match = _AMOUNT_RE.search(hero)
