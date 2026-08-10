@@ -111,9 +111,10 @@ class OFBScraper(TextSectionScraper):
         # ishlatilgan.
         "mikroqarz": "Ishonch mikroqarz",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
-        # Sahifaning H1 sarlavhasida ("Karta haqida batafsil" bo'limidan
-        # oldin) va menyu breadcrumb'ida ikkalasida ham aynan shu shaklda
-        # yozilgan — jonli sahifadan tasdiqlangan.
+        # Sahifaning H1 sarlavhasi aslida teskari so'z tartibida ("Niyat
+        # kredit kartasi") — bu shakl esa navigatsiya menyusidagi havola
+        # matnida ikki marta aynan shu ko'rinishda uchraydi, jonli
+        # sahifadan tasdiqlangan.
         "kredit_karta": "Kredit karta Niyat",
     }
     # Ikkalasi ham avtokredit — sotib olinayotgan avtomobilning o'zi garov
