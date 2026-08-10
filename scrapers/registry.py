@@ -2,6 +2,7 @@ from scrapers.aab import AsiaAllianceBankScraper
 from scrapers.agro import AgroBankScraper
 from scrapers.aloqa import AloqabankScraper
 from scrapers.anorbank import AnorbankScraper
+from scrapers.apex import ApexBankScraper
 from scrapers.asaka import AsakabankScraper
 from scrapers.garant import GarantBankScraper
 from scrapers.hamkor import HamkorBankScraper
@@ -38,4 +39,5 @@ ALL_SCRAPERS = [
     AsiaAllianceBankScraper,
     GarantBankScraper,
     SaderatBankScraper,
+    ApexBankScraper,
 ]
