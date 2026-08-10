@@ -17,6 +17,9 @@ FIXTURE_BY_URL = {
     OFBScraper.CATEGORY_URLS["ipoteka_davlat"]: (FIXTURES_DIR / "ofb_foydali_ipoteka.html").read_text(
         encoding="utf-8"
     ),
+    OFBScraper.CATEGORY_URLS["kredit_karta"]: (FIXTURES_DIR / "ofb_niyat_kredit_kartasi.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -27,16 +30,23 @@ def _fake_fetch(url, *args, **kwargs):
 def test_ofb_scraper_parses_all_categories():
     """mikroqarz and mikroqarz_onlayn share ONE fetch of the mikroqarzlar
     hub page (mikroqarz_onlayn also fetches its own onlayn-mikroqarz page
-    for the term); ipoteka_davlat has its own dedicated page and does not
-    participate in that sharing — so 5 categories produce 5 total
-    fetch_html calls (not 6), confirming the hub page isn't fetched
-    twice."""
+    for the term); ipoteka_davlat and kredit_karta each have their own
+    dedicated page and do not participate in that sharing — so 6
+    categories produce 6 total fetch_html calls (not 7), confirming the
+    hub page isn't fetched twice."""
     with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = OFBScraper().run()
 
-    assert mock_fetch.call_count == 5
+    assert mock_fetch.call_count == 6
     categories = {p.category for p in products}
-    assert categories == {"avtokredit", "avtokredit_elektro", "mikroqarz", "mikroqarz_onlayn", "ipoteka_davlat"}
+    assert categories == {
+        "avtokredit",
+        "avtokredit_elektro",
+        "mikroqarz",
+        "mikroqarz_onlayn",
+        "ipoteka_davlat",
+        "kredit_karta",
+    }
     assert all(p.bank == "OFB" for p in products)
 
 
@@ -175,3 +185,49 @@ def test_ofb_ipoteka_davlat_picks_largest_combined_amount_and_uncaps_240_month_t
     assert ipoteka.grace_period_months == 6
     assert ipoteka.payment_method == "Annuitet, Differensial"
     assert ipoteka.source_url == OFBScraper.CATEGORY_URLS["ipoteka_davlat"]
+
+
+def test_ofb_kredit_karta_parses_clean_parameter_table_and_omits_lossy_grace_period():
+    """"Kredit karta Niyat" lives at a `/kartalar/` URL path, unlike every
+    other OFB category (all under `/kreditlar/`). Its page has a clean
+    "Parametr / Shart" table where each heading ("Amal qilish muddati",
+    "Imtiyozli muddat", "Maksimal summa", "Foiz stavkasi") appears exactly
+    once, so each field is read from a tight, unambiguous slice between
+    two neighboring headings — unlike the other five OFB categories, no
+    multi-step narrowing or bespoke regex is needed here.
+
+    "million so'm" appears twice on the real page (the summary table row
+    and a later FAQ answer), but both state the identical 50 million
+    figure, so this isn't an actual decoy — the narrow "Maksimal summa" ->
+    "Foiz stavkasi" slice only ever reaches the first one anyway. The
+    "Foiz stavkasi" section is deliberately narrowed to end at "Mahsulot
+    va xizmatlar" so it doesn't also swallow the unrelated 0% / 0,5%
+    service-fee percentages just below it in the raw text, which would
+    otherwise drag rate_min down to 0.
+
+    The page states the interest-free period only in DAYS ("45
+    kungacha"), never in months, but Product.grace_period_months is a
+    month-denominated field — 45 // 30 = 1 would understate the true
+    ~1.5-month grace period and rounding up to 2 would overstate it, so
+    there is no lossless conversion. This is the exact same day-vs-month
+    mismatch that caused Apex Bank's kredit_karta category to be excluded
+    entirely (confirmed: scrapers/apex.py's CATEGORY_URLS has no
+    "kredit_karta" key at all). Here the category is kept — because the
+    other four fields (limit, rate, term, product name) are all clean,
+    concrete figures — but grace_period_months alone is left None rather
+    than forcing a misleading rounded value into the wrong unit."""
+    with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch):
+        products = OFBScraper().run()
+
+    kredit_karta = next(p for p in products if p.category == "kredit_karta")
+    assert kredit_karta.product_name == "Kredit karta Niyat"
+    assert kredit_karta.rate_min == 34.0
+    assert kredit_karta.rate_max == 34.0
+    assert kredit_karta.term_min_months == 36
+    assert kredit_karta.term_max_months == 36
+    assert kredit_karta.amount_max_som == 50_000_000
+    assert kredit_karta.requires_collateral is False
+    assert kredit_karta.down_payment_pct is None
+    assert kredit_karta.grace_period_months is None
+    assert kredit_karta.payment_method is None
+    assert kredit_karta.source_url == OFBScraper.CATEGORY_URLS["kredit_karta"]

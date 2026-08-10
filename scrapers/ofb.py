@@ -65,7 +65,18 @@ class OFBScraper(TextSectionScraper):
     BITTA marta fetch qilinib ikkalasiga ham beriladi (pastga qarang).
     mikroqarz_onlayn uchun esa muddat hub sahifasida umuman yo'q, shu
     sabab qo'shimcha ravishda o'zining alohida sahifasi ham
-    (https://ofb.uz/kreditlar/onlayn-mikroqarz) fetch qilinadi."""
+    (https://ofb.uz/kreditlar/onlayn-mikroqarz) fetch qilinadi.
+
+    "kredit_karta" ("Kredit karta Niyat") boshqa barcha kategoriyalardan
+    farqli o'laroq `/kreditlar/` emas, `/kartalar/` yo'lida joylashgan
+    (https://ofb.uz/kartalar/niyat-kredit-kartasi). Bu sahifada boshqa
+    kategoriyalardagi kabi tarqoq FAQ bo'limlari emas, balki ozoda
+    "Parametr / Shart" jadvali bor — har bir sarlavha ("Amal qilish
+    muddati", "Imtiyozli muddat", "Maksimal summa", "Foiz stavkasi")
+    sahifada FAQAT bir marta uchraydi, shu sabab boshqa kategoriyalardagi
+    kabi bir necha bosqichli toraytirish yoki maxsus regexlar kerak
+    emas — har bir maydon o'zining ikki qo'shni sarlavhasi orasidan
+    to'g'ridan-to'g'ri olinadi."""
 
     bank_name = "OFB"
     url = "https://ofb.uz/kreditlar"
@@ -80,6 +91,10 @@ class OFBScraper(TextSectionScraper):
         "mikroqarz": "https://ofb.uz/kreditlar/mikroqarzlar",
         "mikroqarz_onlayn": "https://ofb.uz/kreditlar/onlayn-mikroqarz",
         "ipoteka_davlat": "https://ofb.uz/kreditlar/foydali-ipoteka",
+        # DIQQAT: bu boshqa barcha OFB kategoriyalaridan farqli `/kartalar/`
+        # yo'lida joylashgan, `/kreditlar/`da EMAS — sahifa haqiqatan ham
+        # shu manzilda joylashgani jonli saytdan tasdiqlangan.
+        "kredit_karta": "https://ofb.uz/kartalar/niyat-kredit-kartasi",
     }
     PRODUCT_NAMES = {
         "avtokredit": "Oson avtokredit",
@@ -96,6 +111,10 @@ class OFBScraper(TextSectionScraper):
         # ishlatilgan.
         "mikroqarz": "Ishonch mikroqarz",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
+        # Sahifaning H1 sarlavhasida ("Karta haqida batafsil" bo'limidan
+        # oldin) va menyu breadcrumb'ida ikkalasida ham aynan shu shaklda
+        # yozilgan — jonli sahifadan tasdiqlangan.
+        "kredit_karta": "Kredit karta Niyat",
     }
     # Ikkalasi ham avtokredit — sotib olinayotgan avtomobilning o'zi garov
     # bo'lib xizmat qiladi (boshqa banklardagi avtokredit konvensiyasi
@@ -135,6 +154,17 @@ class OFBScraper(TextSectionScraper):
         # so'zining o'zi ishlatilmasa ham (has_collateral_requirement bu
         # holatda False qaytargan bo'lardi).
         "ipoteka_davlat": True,
+        # Kredit karta — ipoteka/avtokredit kabi jismoniy garov talab
+        # qilmaydi (boshqa banklardagi kredit_karta konvensiyasi bilan bir
+        # xil, masalan scrapers/sqb.py'ning "credit-card-new-uz" sahifasida
+        # ham FORCE_COLLATERAL orqali forceanmagan — sababi sodda: sahifada
+        # "garov" so'zi umuman uchramaydi). Jonli "niyat-kredit-kartasi"
+        # sahifasida ham "garov" so'zi bir marta ham uchramagani
+        # tasdiqlandi, shu sabab bu yerda ham aniq False belgilangan
+        # (standart has_collateral_requirement bu holatda baribir False
+        # qaytargan bo'lardi, lekin boshqa kategoriyalar kabi izchillik
+        # uchun aniq belgilash afzal ko'rildi).
+        "kredit_karta": False,
     }
 
     def run(self) -> list[Product]:
@@ -171,9 +201,12 @@ class OFBScraper(TextSectionScraper):
                         continue
                     onlayn_text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_mikroqarz_onlayn_product(url, now, hub_text, onlayn_text)
-                else:  # ipoteka_davlat
+                elif category == "ipoteka_davlat":
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_ipoteka_davlat_product(url, now, text)
+                else:  # kredit_karta
+                    text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
+                    product = self._build_kredit_karta_product(url, now, text)
             except Exception:
                 continue
             if product is not None:
@@ -474,4 +507,95 @@ class OFBScraper(TextSectionScraper):
             scraped_at=now,
             grace_period_months=grace_period_months,
             payment_method=payment_method,
+        )
+
+    def _build_kredit_karta_product(self, url, now, text):
+        """"Kredit karta Niyat" — boshqa OFB kategoriyalaridan farqli, bu
+        sahifada tarqoq FAQ matni o'rniga ozoda "Parametr / Shart" jadvali
+        bor: "Karta turi" -> "Amal qilish muddati" (3 yil) -> "OFB mobil
+        ilovasida chiqarish narxi" -> "Imtiyozli muddat" (45 kungacha) ->
+        "Maksimal summa" (50 million so'mgacha, qayta tiklanadigan) ->
+        "Foiz stavkasi" (34%) -> "Mahsulot va xizmatlar uchun to'lov
+        komissiyalari". Har bir sarlavha jonli sahifada FAQAT bir marta
+        uchraydi (tekshirilgan), shu sabab bu yerda ham boshqa
+        kategoriyalardagi kabi ko'p bosqichli toraytirish yoki maxsus
+        regex kerak emas — har bir maydon shu jadvaldagi ikki qo'shni
+        sarlavha orasidan to'g'ridan-to'g'ri olinadi.
+
+        "million so'm" iborasi sahifada IKKI marta uchraydi — jadvaldagi
+        "Maksimal summa" qatorida va pastroqdagi "Qanday kredit limiti
+        mavjud?" FAQ javobida ("Karta bo'yicha maksimal limit 50 million
+        so'mgacha") — lekin ikkalasi ham AYNAN BIR XIL qiymatni (50
+        million) bildiradi, shu sabab bu decoy emas, shunchaki
+        takrorlanish; "Maksimal summa" -> "Foiz stavkasi" tor oralig'i
+        baribir faqat birinchisini qamrab oladi va natija to'g'ri chiqadi.
+
+        Stavka bo'limi ("Foiz stavkasi" -> "Mahsulot va xizmatlar")
+        atayin tor tutilgan — agar end_heading berilmasa (yoki juda
+        keng bo'lsa), bo'lim pastroqdagi "0%" (mamlakat ichidagi
+        komissiya) va "0,5 foizi" (mamlakat tashqarisidagi komissiya)
+        kabi butunlay boshqa ma'noli foizlarni ham qamrab olib,
+        rate_max'ni yolg'on ravishda pasaytirib yuborardi (min() 0%'ni
+        olardi). Tor oraliq bilan bo'limda faqat "34%" qoladi — bitta
+        aniq qiymat, oraliq emas (rate_min == rate_max == 34.0).
+
+        Muddat "3 yil" (yalang', "yilgacha"/"yildan" qo'shimchasisiz)
+        standart extract_term_months'ning yalang' "N yil" fallback
+        shoxobchasi orqali muammosiz o'qiladi (12 oy * 3 = 36 oy) —
+        maxsus regex shart emas.
+
+        Imtiyozli (foizsiz) davr — sahifada "45 kungacha foizsiz" bir
+        necha marta takrorlanadi, shu jumladan jadvalning o'zida ham
+        aniq "Imtiyozli muddat: 45 kungacha" shaklida. LEKIN bu loyihada
+        `Product.grace_period_months` maydoni OYLARDA ifodalanadi, sahifa
+        esa muddatni faqat KUNLARDA beradi (45 kun) — bu ikkisi orasida
+        yo'qotishsiz, aniq konvertatsiya yo'q: 45 // 30 = 1 oy desak,
+        haqiqiy 1,5 oylik imtiyozni KAMSITIB ko'rsatamiz (foydalanuvchiga
+        haqiqatdan kamroq imtiyoz bergandek tuyuladi); yaxlitlab 2 ga
+        chiqarsak, ORTIQCHA ko'rsatamiz. Bu aynan shu muammo tufayli
+        Apex Bank'ning kredit_karta sahifasida ("imtiyozli davr faqat
+        KUNLARDA berilgan, sxema esa OYLARNI talab qiladi") butun
+        kategoriya E'TIBORGA OLINMAGAN edi (scrapers/apex.py'da
+        "kredit_karta" CATEGORY_URLS'da umuman yo'q — tekshirilgan).
+
+        Bu yerda esa xuddi shu kunlik-vs-oylik muammo bo'lsa-da,
+        kategoriyaning o'zi TO'LIQ chiqarib tashlanmadi — chunki qolgan
+        to'rtta maydon (limit, stavka, muddat, mahsulot nomi) aniq va
+        foydali, ular haqiqatan mavjud bo'lgan aniq raqamlarga
+        asoslangan. Faqat noaniq/lossy bo'lgan bitta maydon —
+        grace_period_months — None qoldirilgan, negaki noto'g'ri
+        (yaxlitlangan) qiymatni schema birligiga (oy) zo'rlab kiritish
+        "Octobank saboq"iga to'g'ridan-to'g'ri zid keladi: aniq raqam
+        topa olmasang, uni O'YLAB TOPMA — shunchaki None qoldir. Bu yerda
+        "topa olmaslik" emas, balki "topilgan qiymat boshqa birlikda va
+        uni yo'qotishsiz o'girib bo'lmaydi" holati, lekin natija bir xil:
+        None ancha ishonchli, chunki 1 yoki 2 oy — ikkalasi ham
+        haqiqatga teng darajada yaqin/uzoq bo'lardi."""
+        term_section = extract_section(text, "Amal qilish muddati", "OFB mobil ilovasida")
+        terms = extract_term_months(term_section)
+
+        amount_section = extract_section(text, "Maksimal summa", "Foiz stavkasi")
+        amount = extract_amount_som(amount_section)
+
+        rate_section = extract_section(text, "Foiz stavkasi", "Mahsulot va xizmatlar")
+        rates = extract_percentages(rate_section)
+
+        if not rates or not terms or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="kredit_karta",
+            product_name=self.PRODUCT_NAMES["kredit_karta"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=self.FORCE_COLLATERAL["kredit_karta"],
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method=None,
         )
