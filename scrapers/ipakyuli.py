@@ -63,6 +63,7 @@ class IpakYuliBankScraper(TextSectionScraper):
         "avtokredit_brend_birlamchi": "https://ipakyulibank.uz/physical/kreditlar/avtokreditlar/volkswagen-avtokredit",
         "ipoteka_tijorat": "https://ipakyulibank.uz/physical/kreditlar/ipoteka/ipoteka-24",
         "mikroqarz": "https://ipakyulibank.uz/physical/kreditlar/mikroqarzlar/mikroqarz",
+        "mikroqarz_onlayn": "https://ipakyulibank.uz/physical/kreditlar/mikroqarzlar",
         "kredit_karta": "https://ipakyulibank.uz/physical/kartalar/imkoniyatlar-kredit-kartasi",
         "istemol_krediti": "https://ipakyulibank.uz/physical/kreditlar/istemol-krediti",
     }
@@ -74,6 +75,9 @@ class IpakYuliBankScraper(TextSectionScraper):
         "avtokredit": True,
         "avtokredit_ikkilamchi": True,
         "mikroqarz": False,
+        # Kartochkaning o'zida so'zma-so'z "Garovsiz va kafilsiz tezkor
+        # xaridlar uchun tezkor pul" deb yozilgan.
+        "mikroqarz_onlayn": False,
     }
     PRODUCT_NAMES = {
         "avtokredit": "Birlamchi bozor avtokrediti",
@@ -81,6 +85,7 @@ class IpakYuliBankScraper(TextSectionScraper):
         "avtokredit_brend_birlamchi": "Volkswagen uchun avtokredit",
         "ipoteka_tijorat": "Ipoteka-24",
         "mikroqarz": "Kafillik asosida mikroqarz",
+        "mikroqarz_onlayn": "Onlayn mikroqarz",
     }
 
     def run(self):
@@ -101,6 +106,8 @@ class IpakYuliBankScraper(TextSectionScraper):
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
+                elif category == "mikroqarz_onlayn":
+                    product = self._build_mikroqarz_onlayn_product(url, now, text)
                 else:
                     heading_pair = self.CATEGORY_HEADINGS[category]
                     section = extract_section(text, *heading_pair)
@@ -337,4 +344,27 @@ class IpakYuliBankScraper(TextSectionScraper):
             scraped_at=now,
             grace_period_months=None,
             payment_method=None,
+        )
+
+    def _build_mikroqarz_onlayn_product(self, url, now, text):
+        """"Onlayn mikroqarz" — "mikroqarzlar" ro'yxat (hub) sahifasidagi
+        alohida kartochka, "Kafillik asosidagi mikroqarz" (oflayn, o'z
+        detail sahifasiga ega) dan farqli mustaqil mahsulot: rate/term/
+        amount hammasi jonli hub sahifasining o'zida ("Summa\\n100 000 000
+        so'mgacha", "Muddat\\n36 oygacha", "Yillik stavka\\n30,90% dan
+        boshlab") ko'rsatilgan, alohida detail sahifaga o'tish shart emas.
+
+        Kartochka sarlavhasi "Onlayn mikroqarz" hub sahifasida faqat bir
+        marta uchraydi, keyingi kartochka sarlavhasi ("Rasmiy daromadga
+        ega bo'lmaganlar uchun mikroqarz") bilan chegaralanadi — aks holda
+        keyingi kartochkalarning ham "Summa"/"Muddat"/"Yillik stavka"
+        yorliqlari bor, ular aralashib ketardi."""
+        section = extract_section(text, "Onlayn mikroqarz", "Rasmiy daromadga ega bo")
+
+        return self._build_product(
+            "mikroqarz_onlayn",
+            section,
+            url,
+            now,
+            full_text=text,
         )

@@ -4,9 +4,11 @@ from datetime import datetime, timezone
 from scrapers.base import Product, TextSectionScraper
 from scrapers.utils import (
     extract_amount_som,
+    extract_percentages,
     extract_section,
     extract_term_months,
     fetch_html,
+    has_collateral_requirement,
     html_to_text,
 )
 
@@ -64,12 +66,14 @@ class TBCBankScraper(TextSectionScraper):
     url = "https://tbcbank.uz/product/avtokredit/"
     CATEGORY_URLS = {
         "avtokredit_brend_birlamchi": "https://tbcbank.uz/product/avtokredit/",
+        "mikroqarz_onlayn": "https://tbcbank.uz/product/mikrokredit/",
     }
     FORCE_COLLATERAL = {
         "avtokredit_brend_birlamchi": True,
     }
     PRODUCT_NAMES = {
         "avtokredit_brend_birlamchi": "TBC Avtokredit",
+        "mikroqarz_onlayn": "TBC mikroqarz",
     }
 
     def run(self):
@@ -79,7 +83,10 @@ class TBCBankScraper(TextSectionScraper):
             try:
                 html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
                 text = html_to_text(html)
-                product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
+                if category == "avtokredit_brend_birlamchi":
+                    product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
+                else:
+                    product = self._build_mikroqarz_onlayn_product(url, now, text)
             except Exception:
                 continue
 
@@ -120,6 +127,56 @@ class TBCBankScraper(TextSectionScraper):
             amount_max_som=amount,
             requires_collateral=self.FORCE_COLLATERAL["avtokredit_brend_birlamchi"],
             down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method=None,
+        )
+
+    def _build_mikroqarz_onlayn_product(self, url, now, text):
+        """"TBC mikroqarz" — butun mahsulot ilova (TBC Bank Uzbekistan)
+        orqali onlayn rasmiylashtiriladi, filialga borish shart emas —
+        mikroqarz_onlayn ta'rifiga to'g'ri keladi. Sahifada bosh kalkulyator
+        vidjeti "3 oy"dan "36 oy"gacha bo'lgan barcha oylik variantlarni
+        alohida-alohida sanab o'tadi (dropdown ro'yxati) — bu FAQ javobidagi
+        "3 oydan 36 oygacha" oralig'i bilan mos, shuning uchun ziddiyat
+        yo'q. Foiz stavkasi FAQ javobida ("Foiz stavkasini ham tizim
+        belgilaydi: yiliga 29% dan 48% gacha") aniq oraliq sifatida
+        berilgan — shu FAQ javobi tor bo'lim sifatida ajratib olinadi,
+        chunki sahifada boshqa joyda ("Oshirilgan foiz ... kuniga 0,5%"
+        kechiktirilgan to'lov jarimasi) aloqasiz "%" bor, butun sahifa
+        matni ishlatilsa rate_min noto'g'ri 0,5%ga tushib qolardi.
+
+        Maksimal summa alohida marketing bandida ("Uydan turib 100 000 000
+        so'mgacha kredit") aniq so'm bilan berilgan.
+
+        "Garovsiz va kafillarsiz" iborasi sahifada ikki marta aniq
+        yozilgan — has_collateral_requirement() "garovsiz" so'zini inkor
+        signali sifatida taniydi, shuning uchun to'g'ri False qaytaradi,
+        FORCE_COLLATERAL kerak emas."""
+        rate_term_section = extract_section(
+            text, "mikroqarz olish 3 oydan 36 oygacha beriladi", "Arizangiz tasdiqlangandan"
+        )
+        rates = extract_percentages(rate_term_section)
+        terms = extract_term_months("3 oydan 36 oygacha " + rate_term_section)
+
+        amount_section = extract_section(text, "Uydan turib", "kredit")
+        amount = extract_amount_som(amount_section)
+
+        if not rates or not terms or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="mikroqarz_onlayn",
+            product_name=self.PRODUCT_NAMES["mikroqarz_onlayn"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=has_collateral_requirement(text),
+            down_payment_pct=None,
             source_url=url,
             scraped_at=now,
             grace_period_months=None,
