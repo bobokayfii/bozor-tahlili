@@ -14,6 +14,9 @@ FIXTURE_BY_URL = {
     OFBScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (FIXTURES_DIR / "ofb_onlayn_mikroqarz.html").read_text(
         encoding="utf-8"
     ),
+    OFBScraper.CATEGORY_URLS["ipoteka_davlat"]: (FIXTURES_DIR / "ofb_foydali_ipoteka.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -24,14 +27,16 @@ def _fake_fetch(url, *args, **kwargs):
 def test_ofb_scraper_parses_all_categories():
     """mikroqarz and mikroqarz_onlayn share ONE fetch of the mikroqarzlar
     hub page (mikroqarz_onlayn also fetches its own onlayn-mikroqarz page
-    for the term) — so 4 categories produce only 4 total fetch_html calls,
-    not 5, confirming the hub page isn't fetched twice."""
+    for the term); ipoteka_davlat has its own dedicated page and does not
+    participate in that sharing — so 5 categories produce 5 total
+    fetch_html calls (not 6), confirming the hub page isn't fetched
+    twice."""
     with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = OFBScraper().run()
 
-    assert mock_fetch.call_count == 4
+    assert mock_fetch.call_count == 5
     categories = {p.category for p in products}
-    assert categories == {"avtokredit", "avtokredit_elektro", "mikroqarz", "mikroqarz_onlayn"}
+    assert categories == {"avtokredit", "avtokredit_elektro", "mikroqarz", "mikroqarz_onlayn", "ipoteka_davlat"}
     assert all(p.bank == "OFB" for p in products)
 
 
@@ -129,3 +134,44 @@ def test_ofb_mikroqarz_onlayn_combines_hub_amount_rate_with_own_page_term():
     assert onlayn.grace_period_months is None
     assert onlayn.payment_method is None
     assert onlayn.source_url == OFBScraper.CATEGORY_URLS["mikroqarz_onlayn"]
+
+
+def test_ofb_ipoteka_davlat_picks_largest_combined_amount_and_uncaps_240_month_term():
+    """"Foydali ipoteka" is a state-program mortgage. Its "01. Kredit
+    summasi" section lists THREE figures — a combined Tashkent ceiling
+    (1,06 mlrd) plus two smaller state-program sub-limits by region (480
+    mln, 380 mln) and a regional combined ceiling (960 mln); the platform
+    schema wants the single largest overall figure a customer could
+    borrow (1,06 mlrd, Tashkent), which extract_amount_som's built-in
+    max()-of-all-matches already produces correctly without a custom
+    regex.
+
+    Its term is "240 oygacha" (20 years) — well past the standard
+    extract_term_months helper's hard 120-month cap, which would silently
+    drop it entirely (empty list). A dedicated regex is used instead, the
+    same pattern other >120-month mortgage products in this codebase use
+    (see scrapers/bdb.py's _YEAR_TERM_RE).
+
+    Unlike the brief's "may not be present" assumption, a real down
+    payment (25% dan), payment method (annuitet yoki differensial), and
+    grace period (6 oy) ARE all stated on the page — just in a lower
+    "Kreditlash shartlari" detail block rather than the "01/02/03" summary,
+    and only reachable by narrowing past a decoy: an EARLIER, unrelated
+    "Boshlang'ich badal" mention in the "Daromad talablari" section ("agar
+    35% dan bo'lsa, daromadni tasdiqlash talab etilmaydi" — an income
+    verification waiver threshold, not the actual minimum down payment)."""
+    with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch):
+        products = OFBScraper().run()
+
+    ipoteka = next(p for p in products if p.category == "ipoteka_davlat")
+    assert ipoteka.product_name == "Foydali ipoteka"
+    assert ipoteka.rate_min == 17.0
+    assert ipoteka.rate_max == 25.0
+    assert ipoteka.term_min_months == 240
+    assert ipoteka.term_max_months == 240
+    assert ipoteka.amount_max_som == 1_060_000_000
+    assert ipoteka.requires_collateral is True
+    assert ipoteka.down_payment_pct == 25.0
+    assert ipoteka.grace_period_months == 6
+    assert ipoteka.payment_method == "Annuitet, Differensial"
+    assert ipoteka.source_url == OFBScraper.CATEGORY_URLS["ipoteka_davlat"]

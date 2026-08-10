@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from scrapers.base import Product, TextSectionScraper
 from scrapers.utils import (
     extract_amount_som,
+    extract_payment_method,
     extract_percentages,
     extract_section,
     extract_term_months,
@@ -24,6 +25,13 @@ _RATE_TIER_RE = re.compile(r"dan\s*—\s*\n?\s*(?:yillik\s*)?(\d{1,2}(?:,\d{1,2}
 # (u faqat "N oygacha"/"N oydan M oygacha" naqshlarini kutadi). Ikkinchi
 # guruh ixtiyoriy, chunki ba'zan faqat bitta muddat ko'rsatilishi mumkin.
 _TERM_PAIR_RE = re.compile(r"(\d{1,3})\s*(?:yoki\s*(\d{1,3})\s*)?oyga\b")
+# "Foydali ipoteka" (ipoteka_davlat) sahifasida muddat "240 oygacha" (20
+# yil) — standart extract_term_months'ning 120 oylik qattiq chegarasidan
+# oshib ketadi va shu sabab standart funksiya bu qiymatni butunlay
+# CHIQARIB TASHLAYDI (bo'sh ro'yxat qaytaradi). Boshqa banklardagi >120
+# oylik ipoteka muddatlari bilan bir xil yechim — to'g'ridan-to'g'ri
+# regex (masalan scrapers/bdb.py'dagi _YEAR_TERM_RE, scrapers/aab.py).
+_IPOTEKA_DAVLAT_TERM_RE = re.compile(r"(\d{1,3})\s*oygacha")
 
 
 class OFBScraper(TextSectionScraper):
@@ -71,10 +79,14 @@ class OFBScraper(TextSectionScraper):
         # o'zining eng mos, mustaqil sahifasini ko'rsatadi.
         "mikroqarz": "https://ofb.uz/kreditlar/mikroqarzlar",
         "mikroqarz_onlayn": "https://ofb.uz/kreditlar/onlayn-mikroqarz",
+        "ipoteka_davlat": "https://ofb.uz/kreditlar/foydali-ipoteka",
     }
     PRODUCT_NAMES = {
         "avtokredit": "Oson avtokredit",
         "avtokredit_elektro": "Avtokredit BYD",
+        # Sahifa sarlavhasi (<title>) va "Foydali ipoteka" H1/breadcrumb
+        # ikkalasi ham aynan shu shaklda, brifdagi taklif tasdiqlandi.
+        "ipoteka_davlat": "Foydali ipoteka",
         # Brifda "Ishonch mikroqarzi" (grammatik egalik shakli) taklif
         # qilingan edi, lekin na hub sahifada, na mahsulotning o'z alohida
         # sahifasida (https://ofb.uz/kreditlar/ishonch-mikroqarz, faqat
@@ -115,6 +127,14 @@ class OFBScraper(TextSectionScraper):
         # sug'urta polisi (SQB'ning xuddi shu nomdagi "mikroqarz_onlayn"
         # kategoriyasidagi bilan bir xil konvensiya).
         "mikroqarz_onlayn": False,
+        # Ipoteka har doim ko'chmas mulk garovi bilan ta'minlanadi (boshqa
+        # banklardagi ipoteka_davlat konvensiyasi bilan bir xil, masalan
+        # scrapers/sqb.py, scrapers/aab.py, scrapers/ipoteka.py) — sahifaning
+        # o'zida ham "Ta'minot: Sotib olinadigan xonadon va bank
+        # talablariga muvofiq boshqa ta'minot" deyilgan, garchi "garov"
+        # so'zining o'zi ishlatilmasa ham (has_collateral_requirement bu
+        # holatda False qaytargan bo'lardi).
+        "ipoteka_davlat": True,
     }
 
     def run(self) -> list[Product]:
@@ -146,11 +166,14 @@ class OFBScraper(TextSectionScraper):
                     if hub_text is None:
                         continue
                     product = self._build_mikroqarz_product(url, now, hub_text)
-                else:  # mikroqarz_onlayn
+                elif category == "mikroqarz_onlayn":
                     if hub_text is None:
                         continue
                     onlayn_text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_mikroqarz_onlayn_product(url, now, hub_text, onlayn_text)
+                else:  # ipoteka_davlat
+                    text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
+                    product = self._build_ipoteka_davlat_product(url, now, text)
             except Exception:
                 continue
             if product is not None:
@@ -344,4 +367,111 @@ class OFBScraper(TextSectionScraper):
             scraped_at=now,
             grace_period_months=None,
             payment_method=None,
+        )
+
+    def _build_ipoteka_davlat_product(self, url, now, text):
+        """"Foydali ipoteka" — davlat dasturi (Iqtisodiyot va moliya
+        vazirligi mablag'lari) va bank o'z mablag'i aralash moliyalashadigan
+        ipoteka. Sahifada raqamlangan qisqa xulosa bor: "01. Kredit
+        summasi" -> "02. Kredit muddati" -> "03. Foiz stavkasi".
+
+        Summa bo'limida UCHTA raqam bor: "1,06 mlrd so'mgacha —
+        Toshkentda\\n(480 mln so'mgacha davlat dasturi bo'yicha, qolgan
+        summa — bank hisobidan)\\n960 mln so'mgacha — hududlarda\\n(380
+        mln so'mgacha davlat dasturi bo'yicha...)" — bular umumiy
+        Toshkent chegarasi (1,06 mlrd) va ikkita kichikroq davlat-dasturi
+        sub-limiti (480 mln, 380 mln) va hududiy umumiy chegara (960
+        mln). Platformaning sxemasi bitta amount_max_som talab qiladi —
+        mijoz olishi mumkin bo'lgan ENG KATTA umumiy summa, ya'ni 1,06
+        mlrd (Toshkent). extract_amount_som allaqachon barcha topilgan
+        summalar orasidan max() ni oladi, shu sabab qo'shimcha maxsus
+        regexsiz ham to'g'ri (1 060 000 000) natija beradi — mln
+        naqshlari (480/960/380 mln) hammasi 1,06 mlrddan kichik.
+
+        Muddat "240 oygacha" (20 yil) — standart extract_term_months
+        buni 120 oylik qattiq chegarasi tufayli CHIQARIB TASHLAYDI (bo'sh
+        ro'yxat), shu sabab _IPOTEKA_DAVLAT_TERM_RE orqali to'g'ridan-to'g'ri
+        regex bilan olinadi (boshqa >120 oylik ipoteka mahsulotlari bilan
+        bir xil yechim, masalan scrapers/bdb.py).
+
+        Stavka bo'limi "03. Foiz stavkasi" dan sahifadagi KEYINGI "Kredit
+        summasi" uchrashigacha (kalkulyator vidjetining "Kredit summasi"
+        yorlig'i) toraytirilgan — bu juda tor oraliq bo'lib, faqat "Davlat
+        qismi bo'yicha — yiliga 17%\\nBank tomonidan beriladigan qism
+        bo'yicha — yiliga 25%" ni o'z ichiga oladi, begona foizlar yo'q.
+
+        Boshlang'ich badal, imtiyozli davr va to'lov usuli qisqa "01/02/03"
+        xulosada YO'Q, lekin sahifa pastroqda "Kreditlash shartlari"
+        yorlig'ida BATAFSILROQ jadval bor ("Kredit summasi", "Muddati",
+        "Foiz stavkasi", "Boshlang'ich badal" — "25% dan", "To'lov" —
+        "Oylik", "Jadval" — "annuitet yoki differensial", "Ta'minot",
+        "Imtiyoz davrining muddati" — "6 oy"). Bu uchala qiymat ham aniq
+        va bor, brifning "aniq bo'lmasa None" faraz qilingan holatidan
+        farqli o'laroq — implementer sahifani mustaqil tekshirib topdi.
+
+        DIQQAT — noyob so'z "Boshlang'ich badal" sahifada BIR NECHA marta
+        uchraydi: birinchi marta "Daromad talablari" bo'limidagi butunlay
+        boshqa ma'noli jumlada ("Boshlang'ich badal 35% dan bo'lsa,
+        daromadni tasdiqlash talab etilmaydi" — bu daromad tasdiqlashni
+        talab qilmaydigan CHEGARA, eng kam boshlang'ich badal emas!),
+        keyin BATAFSIL jadvaldagi haqiqiy sarlavha ("25% dan"), so'ngra
+        FAQ bo'limida yana bir necha marta. Shu sabab avval "Kredit
+        obyekti" (sahifada FAQAT bir marta, batafsil jadval boshida
+        uchraydi) dan keyingi qoldiq olinadi, so'ngra o'sha qoldiq ichida
+        "Kredit summasi" (batafsil jadvalning o'z sarlavhasi, endi
+        noyob) dan keyingi qism ajratiladi — shu ikki bosqichli
+        toraytirish noto'g'ri, oldinroq joylashgan "35% dan" jumlasini
+        chetlab o'tadi va faqat haqiqiy "Boshlang'ich badal" sarlavhasiga
+        (qiymati "25% dan") yetib boradi.
+
+        Imtiyozli davr uchun standart extract_grace_period_months
+        ishlatilmaydi — u faqat matnda "imtiyozli" so'zi (oxirida "li"
+        bilan) borligini tekshiradi, lekin bu sahifadagi haqiqiy sarlavha
+        "Imtiyoz davrining muddati" ("li"siz) — shu sabab extract_term_months
+        to'g'ridan-to'g'ri "6 oy" (yalang' oy, "gacha"siz) dan 6 ni oladi
+        (funksiyaning yalang' "N oy" fallback shoxobchasi orqali)."""
+        amount_section = extract_section(text, "01. Kredit summasi", "02. Kredit muddati")
+        amount = extract_amount_som(amount_section)
+
+        term_section = extract_section(text, "02. Kredit muddati", "03. Foiz stavkasi")
+        term_match = _IPOTEKA_DAVLAT_TERM_RE.search(term_section)
+        term = int(term_match.group(1)) if term_match else None
+
+        rate_section = extract_section(text, "03. Foiz stavkasi", "Kredit summasi")
+        rates = extract_percentages(rate_section)
+
+        if amount is None or term is None or not rates:
+            return None
+
+        after_kredit_obyekti = extract_section(text, "Kredit obyekti", None)
+        detail_section = extract_section(after_kredit_obyekti, "Kredit summasi", None)
+
+        down_section = extract_section(detail_section, "Boshlang", "To‘lov")
+        down_rates = extract_percentages(down_section)
+        down_payment_pct = min(down_rates) if down_rates else None
+
+        payment_section = extract_section(detail_section, "Jadval", "Ta’minot")
+        payment_method = extract_payment_method(payment_section)
+
+        grace_section = extract_section(
+            detail_section, "Imtiyoz davrining muddati", "zbekiston Respublikasi fuqarosining pasporti"
+        )
+        grace_months = extract_term_months(grace_section)
+        grace_period_months = grace_months[0] if grace_months else None
+
+        return Product(
+            bank=self.bank_name,
+            category="ipoteka_davlat",
+            product_name=self.PRODUCT_NAMES["ipoteka_davlat"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=term,
+            term_max_months=term,
+            amount_max_som=amount,
+            requires_collateral=self.FORCE_COLLATERAL["ipoteka_davlat"],
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
         )
