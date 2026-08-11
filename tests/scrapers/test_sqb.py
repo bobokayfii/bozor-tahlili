@@ -31,15 +31,16 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_sqb_scraper_parses_all_eight_categories():
+def test_sqb_scraper_parses_all_nine_categories():
     with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = SQBScraper().run()
 
-    assert mock_fetch.call_count == 8
+    assert mock_fetch.call_count == 9
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
         "avtokredit_ikkilamchi",
+        "avtokredit_brend_ikkilamchi",
         "ipoteka_tijorat",
         "ipoteka_davlat",
         "mikroqarz",
@@ -48,6 +49,24 @@ def test_sqb_scraper_parses_all_eight_categories():
         "istemol_krediti",
     }
     assert all(p.bank == "SQB" for p in products)
+
+
+def test_sqb_avtokredit_brend_ikkilamchi_matches_generic_ikkilamchi():
+    """"Ikkilamchi bozordan avtotransport" krediti brend cheklovisiz —
+    shu sabab bir xil sahifa "avtokredit_brend_ikkilamchi" toifasiga ham
+    xaritalanadi (bir xil URL, bir xil qiymatlar)."""
+    with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch):
+        products = SQBScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
 
 
 def test_sqb_ipoteka_davlat_parses_correctly():

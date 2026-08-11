@@ -85,6 +85,11 @@ class OFBScraper(TextSectionScraper):
     CATEGORY_URLS = {
         "avtokredit": "https://ofb.uz/kreditlar/oson-avtokredit",
         "avtokredit_ikkilamchi": "https://ofb.uz/kreditlar/ikkilamchi-bozor-uchun-avtokredit",
+        # Sahifada "Avtomobilga qo'yiladigan talablar" bandida faqat yosh
+        # (3 yildan oshmasligi) va narx cheklovi bor, brend cheklovi umuman
+        # yo'q — shu sabab bir xil sahifa "avtokredit_brend_ikkilamchi"
+        # toifasiga ham xaritalanadi.
+        "avtokredit_brend_ikkilamchi": "https://ofb.uz/kreditlar/ikkilamchi-bozor-uchun-avtokredit",
         "avtokredit_elektro": "https://ofb.uz/kreditlar/avtokredit-byd",
         # "mikroqarz" va "mikroqarz_onlayn" ikkalasi ham shu hub/ro'yxat
         # sahifasidagi kartochkalardan summasi+stavkasini oladi — run()da bu
@@ -102,6 +107,7 @@ class OFBScraper(TextSectionScraper):
     PRODUCT_NAMES = {
         "avtokredit": "Oson avtokredit",
         "avtokredit_ikkilamchi": "Ikkilamchi bozor uchun avtokredit",
+        "avtokredit_brend_ikkilamchi": "Ikkilamchi bozor uchun avtokredit",
         "avtokredit_elektro": "Avtokredit BYD",
         # Sahifa sarlavhasi (<title>) va "Foydali ipoteka" H1/breadcrumb
         # ikkalasi ham aynan shu shaklda, brifdagi taklif tasdiqlandi.
@@ -128,6 +134,7 @@ class OFBScraper(TextSectionScraper):
     FORCE_COLLATERAL = {
         "avtokredit": True,
         "avtokredit_ikkilamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
         "avtokredit_elektro": True,
         # Hub sahifasida ("mikroqarzlar") "Ishonch" kartochkasi uchun garov
         # haqida umuman gap yo'q (has_collateral_requirement standart
@@ -195,9 +202,9 @@ class OFBScraper(TextSectionScraper):
                 if category == "avtokredit":
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_avtokredit_product(url, now, text)
-                elif category == "avtokredit_ikkilamchi":
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "avtokredit_elektro":
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_avtokredit_elektro_product(url, now, text)
@@ -282,7 +289,7 @@ class OFBScraper(TextSectionScraper):
             payment_method=None,
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"Ikkilamchi bozor uchun avtokredit" — "Oson avtokredit" bilan
         bir xil FAQ shabloniga ega ("Avtokreditning maksimal miqdori" ->
         "800 mln so'mgacha", "Kredit qancha muddatga beriladi?" -> "48
@@ -298,7 +305,13 @@ class OFBScraper(TextSectionScraper):
         yoziladi, shu sabab aralashmaydi.
 
         "Imtiyoz davrining muddati" -> "Pasport" oralig'ida aniq "ko'zda
-        tutilmagan" — "Oson avtokredit"dagi bilan bir xil naqsh, 0 oy."""
+        tutilmagan" — "Oson avtokredit"dagi bilan bir xil naqsh, 0 oy.
+
+        "Avtomobilga qo'yiladigan talablar" bandida faqat yosh (3 yildan
+        oshmasligi) va narx cheklovi bor, brend cheklovi umuman yo'q — shu
+        sabab bitta haqiqiy sahifa "avtokredit_brend_ikkilamchi" toifasiga
+        ham xaritalanadi (bir xil URL, shu metod ikkalasi uchun ham
+        chaqiriladi, faqat `category` parametri farq qiladi)."""
         amount_section = extract_section(text, "Avtokreditning maksimal miqdori", "Kredit qancha muddatga")
         amount = extract_amount_som(amount_section)
 
@@ -320,14 +333,14 @@ class OFBScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_ikkilamchi",
-            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
-            requires_collateral=self.FORCE_COLLATERAL["avtokredit_ikkilamchi"],
+            requires_collateral=self.FORCE_COLLATERAL[category],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

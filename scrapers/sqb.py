@@ -54,6 +54,11 @@ class SQBScraper(TextSectionScraper):
     CATEGORY_URLS = {
         "avtokredit": "https://sqb.uz/uz/individuals/autoloans/avtokredit-imkon-uz/",
         "avtokredit_ikkilamchi": "https://sqb.uz/uz/individuals/credits/ikkilamchi-bozordan-avtokredit-uz/",
+        # Sahifada brend cheklovi umuman yo'q (istalgan avtomobil markasi/
+        # modeli qabul qilinadi) — shu sabab bir xil sahifa "avtokredit_
+        # brend_ikkilamchi" toifasiga ham xaritalanadi (HamkorBank/Ipoteka
+        # Bank/NBU'dagi bir xil naqsh).
+        "avtokredit_brend_ikkilamchi": "https://sqb.uz/uz/individuals/credits/ikkilamchi-bozordan-avtokredit-uz/",
         "ipoteka_tijorat": "https://sqb.uz/uz/individuals/ipoteka/ishonchli-ipoteka-uz/",
         "ipoteka_davlat": "https://sqb.uz/uz/individuals/ipoteka/exclusive-ipoteka-uz/",
         "mikroqarz": "https://sqb.uz/uz/individuals/credits/mikrokredit-uz/",
@@ -73,6 +78,7 @@ class SQBScraper(TextSectionScraper):
     PRODUCT_NAMES = {
         "avtokredit": "«Avto imkon» avtokrediti",
         "avtokredit_ikkilamchi": "«Ikkilamchi bozordan avtotransport» krediti",
+        "avtokredit_brend_ikkilamchi": "«Ikkilamchi bozordan avtotransport» krediti",
         "ipoteka_tijorat": "Ishonchli ipoteka krediti",
         "ipoteka_davlat": "Exclusive ipoteka",
         "mikroqarz": "Mikrokredit",
@@ -94,6 +100,7 @@ class SQBScraper(TextSectionScraper):
         # avtokredit kategoriyasidagi bilan bir xil sababga ko'ra aniq
         # True belgilangan.
         "avtokredit_ikkilamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
         # "Mikroqarz ta'minoti" bandida so'zma-so'z "kredit qaytmaslik
         # xatari sug'urta polisi" deb yozilgan — mulk/avtomobil garovi
         # emas, faqat sug'urta polisi bilan ta'minlanadi.
@@ -110,8 +117,8 @@ class SQBScraper(TextSectionScraper):
 
                 if category == "avtokredit":
                     product = self._build_avtokredit_product(url, now, text)
-                elif category == "avtokredit_ikkilamchi":
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "ipoteka_davlat":
@@ -157,7 +164,7 @@ class SQBScraper(TextSectionScraper):
             payment_method=payment_method,
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"«Ikkilamchi bozordan avtotransport» krediti" — hero-kartochkada
         ("Kredit summasi" -> "400 mln so'mgacha", "Kredit foiz stavkasi" ->
         "25 % dan", "Kredit muddati" -> "60 oygacha") faqat eng yaxshi
@@ -185,7 +192,14 @@ class SQBScraper(TextSectionScraper):
         ishlatilmagan (aksincha, "kredit hisobiga sotib olinadigan
         avtotransport vositasi" deb tavsiflangan) — shu sabab
         requires_collateral FORCE_COLLATERAL orqali aniq True
-        belgilangan (avtokredit kategoriyasidagi bilan bir xil)."""
+        belgilangan (avtokredit kategoriyasidagi bilan bir xil).
+
+        Sahifada brend cheklovi umuman yo'q ("Ishlatilgan avtomobillar
+        sotiladigan har qanday joydan" — bozor, egasidan, onlayn
+        maydonchadan) — shu sabab bitta haqiqiy sahifa "avtokredit_brend_
+        ikkilamchi" toifasiga ham xaritalanadi (bir xil URL, shu metod
+        ikkalasi uchun ham chaqiriladi, faqat `category` parametri farq
+        qiladi)."""
         block = extract_section(text, "Kredit shartlari", "Hujjatlar")
 
         amount_section = extract_section(block, "Kredit miqdori:", "Minimal boshlang")
@@ -203,7 +217,7 @@ class SQBScraper(TextSectionScraper):
         grace_period_months = extract_grace_period_months("Imtiyozli davr:" + grace_section)
 
         return self._build_product(
-            "avtokredit_ikkilamchi",
+            category,
             section,
             url,
             now,

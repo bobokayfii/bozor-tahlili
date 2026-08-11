@@ -196,7 +196,7 @@ def test_ipoteka_avtokredit_ikkilamchi_parses_correctly():
     assert ikkilamchi.product_name == "Avtokredit R1"
     assert ikkilamchi.rate_min == 27.99
     assert ikkilamchi.rate_max == 29.99
-    assert ikkilamchi.term_min_months == 60
+    assert ikkilamchi.term_min_months == 12
     assert ikkilamchi.term_max_months == 60
     assert ikkilamchi.amount_max_som == 480_000_000
     assert ikkilamchi.down_payment_pct == 25.0

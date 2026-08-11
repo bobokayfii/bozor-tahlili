@@ -79,6 +79,24 @@ def test_ipakyuli_avtokredit_ikkilamchi_parses_correctly():
     assert ikkilamchi.requires_collateral is True
 
 
+def test_ipakyuli_avtokredit_brend_ikkilamchi_matches_generic_ikkilamchi():
+    """"Ikkilamchi bozor uchun avtomobil krediti" brend cheklovisiz —
+    shu sabab bir xil sahifa "avtokredit_brend_ikkilamchi" toifasiga ham
+    xaritalanadi (bir xil URL, bir xil qiymatlar)."""
+    with patch("scrapers.ipakyuli.fetch_html", side_effect=_fake_fetch):
+        products = IpakYuliBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
+
+
 def test_ipakyuli_avtokredit_brend_birlamchi_parses_correctly():
     """"Volkswagen uchun avtokredit" — rasmiy dilerdan yangi Volkswagen/
     Jetta avtomobili uchun. "Foiz stavkasi haqida" bo'limida 3 ta mustaqil

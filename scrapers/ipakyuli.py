@@ -60,6 +60,12 @@ class IpakYuliBankScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": (
             "https://ipakyulibank.uz/physical/kreditlar/avtokreditlar/ikkilamchi-bozor-uchun-avtomobil-krediti"
         ),
+        # Sahifada brend cheklovi umuman yo'q ("Ishlatilgan avtomobillar
+        # sotiladigan har qanday joydan") — shu sabab bir xil sahifa
+        # "avtokredit_brend_ikkilamchi" toifasiga ham xaritalanadi.
+        "avtokredit_brend_ikkilamchi": (
+            "https://ipakyulibank.uz/physical/kreditlar/avtokreditlar/ikkilamchi-bozor-uchun-avtomobil-krediti"
+        ),
         "avtokredit_brend_birlamchi": "https://ipakyulibank.uz/physical/kreditlar/avtokreditlar/volkswagen-avtokredit",
         "ipoteka_tijorat": "https://ipakyulibank.uz/physical/kreditlar/ipoteka/ipoteka-24",
         "mikroqarz": "https://ipakyulibank.uz/physical/kreditlar/mikroqarzlar/mikroqarz",
@@ -74,6 +80,7 @@ class IpakYuliBankScraper(TextSectionScraper):
     FORCE_COLLATERAL = {
         "avtokredit": True,
         "avtokredit_ikkilamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
         "mikroqarz": False,
         # Kartochkaning o'zida so'zma-so'z "Garovsiz va kafilsiz tezkor
         # xaridlar uchun tezkor pul" deb yozilgan.
@@ -82,6 +89,7 @@ class IpakYuliBankScraper(TextSectionScraper):
     PRODUCT_NAMES = {
         "avtokredit": "Birlamchi bozor avtokrediti",
         "avtokredit_ikkilamchi": "Ikkilamchi bozor uchun avtomobil krediti",
+        "avtokredit_brend_ikkilamchi": "Ikkilamchi bozor uchun avtomobil krediti",
         "avtokredit_brend_birlamchi": "Volkswagen uchun avtokredit",
         "ipoteka_tijorat": "Ipoteka-24",
         "mikroqarz": "Kafillik asosida mikroqarz",
@@ -98,8 +106,8 @@ class IpakYuliBankScraper(TextSectionScraper):
 
                 if category == "avtokredit":
                     product = self._build_avtokredit_product(url, now, text)
-                elif category == "avtokredit_ikkilamchi":
-                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "avtokredit_brend_birlamchi":
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
                 elif category == "ipoteka_tijorat":
@@ -154,7 +162,7 @@ class IpakYuliBankScraper(TextSectionScraper):
             payment_method=None,
         )
 
-    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
         """"Ikkilamchi bozor uchun avtomobil krediti" — "Kredit muddati
         bo'yicha foiz stavkasi" jadvali 6 qatordan iborat: har qatorda
         stavka (vergul-o'nlik, masalan "20,90%"), boshlang'ich to'lov
@@ -170,7 +178,14 @@ class IpakYuliBankScraper(TextSectionScraper):
         Boshqa avtokredit sahifalari kabi "Annuitet hamda differentsial
         to'lov jadvali o'rtasidagi farq nima?" umumiy FAQ borligi va
         "imtiyozli davr" haqida gap yo'qligi sababli to'lov usuli va
-        imtiyozli davr taxmin qilinmaydi (None)."""
+        imtiyozli davr taxmin qilinmaydi (None).
+
+        Sahifada brend cheklovi umuman yo'q ("Ishlatilgan avtomobillar
+        sotiladigan har qanday joydan — bozor, egasidan, onlayn
+        maydonchadan") — shu sabab bitta haqiqiy sahifa "avtokredit_brend_
+        ikkilamchi" toifasiga ham xaritalanadi (bir xil URL, shu metod
+        ikkalasi uchun ham chaqiriladi, faqat `category` parametri farq
+        qiladi)."""
         table_section = extract_section(text, "Kredit muddati bo", "Ikkilamchi bozor uchun avtokreditni")
         pairs = _IKKILAMCHI_RATE_TERM_RE.findall(table_section)
         rates = [float(rate.replace(",", ".")) for rate, _term in pairs]
@@ -186,14 +201,14 @@ class IpakYuliBankScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_ikkilamchi",
-            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
-            requires_collateral=self.FORCE_COLLATERAL["avtokredit_ikkilamchi"],
+            requires_collateral=self.FORCE_COLLATERAL[category],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

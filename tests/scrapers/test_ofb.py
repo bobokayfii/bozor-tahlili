@@ -10,6 +10,9 @@ FIXTURE_BY_URL = {
     OFBScraper.CATEGORY_URLS["avtokredit_ikkilamchi"]: (
         FIXTURES_DIR / "ofb_avtokredit_ikkilamchi.html"
     ).read_text(encoding="utf-8"),
+    OFBScraper.CATEGORY_URLS["avtokredit_brend_ikkilamchi"]: (
+        FIXTURES_DIR / "ofb_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     OFBScraper.CATEGORY_URLS["avtokredit_elektro"]: (FIXTURES_DIR / "ofb_avtokredit_elektro.html").read_text(
         encoding="utf-8"
     ),
@@ -34,15 +37,15 @@ def test_ofb_scraper_parses_all_categories():
     """mikroqarz and mikroqarz_onlayn share ONE fetch of the mikroqarzlar
     hub page (mikroqarz_onlayn also fetches its own onlayn-mikroqarz page
     for the term); every other category has its own dedicated page and
-    does not participate in that sharing — so 7 categories produce 7
-    total fetch_html calls (not 8), confirming the hub page isn't fetched
+    does not participate in that sharing — so 8 categories produce 8
+    total fetch_html calls (not 9), confirming the hub page isn't fetched
     twice."""
     with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = OFBScraper().run()
 
-    assert mock_fetch.call_count == 7
-    # A bare total count can't distinguish "hub once + 6 others" from "hub
-    # twice + 5 others" — assert per-URL so the shared-fetch invariant the
+    assert mock_fetch.call_count == 8
+    # A bare total count can't distinguish "hub once + 7 others" from "hub
+    # twice + 6 others" — assert per-URL so the shared-fetch invariant the
     # docstring claims is actually checked, not just coincidentally implied.
     fetched_urls = [call.args[0] for call in mock_fetch.call_args_list]
     assert fetched_urls.count(OFBScraper.CATEGORY_URLS["mikroqarz"]) == 1
@@ -50,6 +53,7 @@ def test_ofb_scraper_parses_all_categories():
     assert categories == {
         "avtokredit",
         "avtokredit_ikkilamchi",
+        "avtokredit_brend_ikkilamchi",
         "avtokredit_elektro",
         "mikroqarz",
         "mikroqarz_onlayn",
@@ -57,6 +61,25 @@ def test_ofb_scraper_parses_all_categories():
         "kredit_karta",
     }
     assert all(p.bank == "OFB" for p in products)
+
+
+def test_ofb_avtokredit_brend_ikkilamchi_matches_generic_ikkilamchi():
+    """"Ikkilamchi bozor uchun avtokredit" brend cheklovisiz (faqat yosh
+    va narx cheklovi bor) — shu sabab bir xil sahifa "avtokredit_brend_
+    ikkilamchi" toifasiga ham xaritalanadi (bir xil URL, bir xil
+    qiymatlar)."""
+    with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch):
+        products = OFBScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
 
 
 def test_ofb_avtokredit_ignores_down_payment_share_percentages():
