@@ -144,9 +144,20 @@ class TrastBankScraper(TextSectionScraper):
         20 kun ichida rasmiylashtirilmasa stavka 25%ga o'zgarishi haqidagi
         SHARTLI jarima stavkasini beradi — bu mahsulotning oddiy e'lon
         qilingan stavka oralig'iga kirmaydi. rate_section end_heading
-        sifatida aynan "Foizni hisoblashning sharti" ishlatilgani (6.1-band
-        sarlavhasining o'zi, bir marta uchraydi) bu 25%ni avtomatik ravishda
-        bo'lim tashqarisida qoldiradi.
+        sifatida "Foizni hisoblashning" ishlatiladi (6.1-band sarlavhasining
+        BOSHI, bir marta uchraydi) — TO'LIQ sarlavha "Foizni hisoblashning
+        sharti" EMAS, chunki jonli saytda "hisoblashning" va "sharti"
+        so'zlari orasidagi bo'sh joy ba'zan oddiy probel, ba'zan
+        uzilmaydigan probel (\xa0) sifatida render qilinadi (sayt tomonidan
+        vaqti-vaqti bilan o'zgaradigan render holati, birinchi jonli
+        tekshiruvdan keyin kuzatilgan) — to'liq ibora ishlatilsa, probel
+        turi mos kelmagan holatda extract_section end_heading'ni topolmay
+        qoladi va bo'lim sahifa oxirigacha cho'zilib, aynan shu 25% jarima
+        stavkasini HAMDA "qarz yuki ko'rsatkichi 50 foizdan oshmasligi"
+        talabidagi aloqasiz 50%ni ham qamrab olib, rate_max'ni yolg'on
+        ravishda 50%ga ko'tarib yuboradi (bu aniq, jonli holatda kuzatilgan
+        xato, farazga asoslanmagan). Qisqartirilgan "Foizni hisoblashning"
+        probel muammosidan butunlay xoli, chunki probeldan OLDIN tugaydi.
       - "To‘lov usuli" (7-band emas, 11-band; apostrof shu yerda ham
         U+2018) -> "Annuitet yoki differensial usulda" — standart
         extract_payment_method ishlaydi, natija "Annuitet, Differensial".
@@ -158,7 +169,7 @@ class TrastBankScraper(TextSectionScraper):
       amount: "Kreditning maksimal miqdori" -> "Muddati"
       term: "Muddati" -> "Boshlang" (ASCII-xavfsiz qisqartma)
       down_payment: "Boshlang" -> "Yillik foiz stavkasi"
-      rate: "Yillik foiz stavkasi" -> "Foizni hisoblashning sharti"
+      rate: "Yillik foiz stavkasi" -> "Foizni hisoblashning"
       payment_method: "To‘lov usuli" -> None (sahifa oxirigacha)
 
     Imtiyozli davr: DIQQAT — bu ipoteka_tijorat'dan farqli holat emas,
@@ -389,12 +400,12 @@ class TrastBankScraper(TextSectionScraper):
         down_rates = [float(m.replace(",", ".")) for m in _FOIZ_RE.findall(down_section)]
         down_payment_pct = min(down_rates) if down_rates else None
 
-        # end_heading "Foizni hisoblashning sharti" (6.1-band sarlavhasi,
+        # end_heading "Foizni hisoblashning" (6.1-band sarlavhasi,
         # sahifada bir marta uchraydi) bu bo'limni garov 20 kun ichida
         # rasmiylashtirilmasa stavka 25%ga o'zgarishi haqidagi shartli
         # JARIMA bandidan avval to'xtatadi — 25% asosiy stavka oralig'iga
         # kirmaydi (tekshirilgan, farazga asoslanmagan).
-        rate_section = extract_section(text, "Yillik foiz stavkasi", "Foizni hisoblashning sharti")
+        rate_section = extract_section(text, "Yillik foiz stavkasi", "Foizni hisoblashning")
         rates = [float(m.replace(",", ".")) for m in _FOIZ_RE.findall(rate_section)]
 
         payment_section = extract_section(text, "To‘lov usuli", None)
