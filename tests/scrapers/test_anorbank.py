@@ -42,6 +42,25 @@ def test_anorbank_avtokredit_parses_correctly():
     assert product.grace_period_months is None
 
 
+def test_anorbank_avtokredit_ikkilamchi_matches_generic_avtokredit():
+    """Автокредит 3.0's page explicitly notes that its rate/term fields
+    also apply to secondary-market purchases ("Ikkilamchi bozordan
+    Avtokredit tanlash jarayonida...") — one product covers both markets,
+    so the same page/values are also mapped to avtokredit_ikkilamchi."""
+    with patch("scrapers.anorbank.fetch_html", side_effect=_fake_fetch):
+        products = AnorbankScraper().run()
+
+    avtokredit = next(p for p in products if p.category == "avtokredit")
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    assert ikkilamchi.product_name == avtokredit.product_name
+    assert ikkilamchi.rate_min == avtokredit.rate_min
+    assert ikkilamchi.rate_max == avtokredit.rate_max
+    assert ikkilamchi.term_min_months == avtokredit.term_min_months
+    assert ikkilamchi.term_max_months == avtokredit.term_max_months
+    assert ikkilamchi.amount_max_som == avtokredit.amount_max_som
+    assert ikkilamchi.requires_collateral is True
+
+
 def test_anorbank_avtokredit_brend_birlamchi_parses_correctly():
     """Автокредит 4.0 — UzAuto Motors (Onix/Tracker/Damas) promo, 0% flat
     rate. The 0% is the page's own single stated figure (not a range), so

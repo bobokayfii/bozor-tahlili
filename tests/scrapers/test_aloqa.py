@@ -9,6 +9,9 @@ FIXTURE_BY_URL = {
     AloqabankScraper.CATEGORY_URLS["avtokredit"]: (FIXTURES_DIR / "aloqa_avtokredit.html").read_text(
         encoding="utf-8"
     ),
+    AloqabankScraper.CATEGORY_URLS["avtokredit_ikkilamchi"]: (
+        FIXTURES_DIR / "aloqa_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     AloqabankScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
         FIXTURES_DIR / "aloqa_avtokredit_brend_birlamchi.html"
     ).read_text(encoding="utf-8"),
@@ -38,6 +41,33 @@ def test_aloqa_avtokredit_yields_no_product_without_stated_amount():
 
     categories = {p.category for p in products}
     assert "avtokredit" not in categories
+
+
+def test_aloqa_avtokredit_ikkilamchi_parses_correctly():
+    """"Avtokredit - "ikkilamchi bozor uchun"" — "Kredit maqsadi" bandida
+    aniq yozilgan: faqat 5 yildan oshmagan "UzAuto Motors" AJ ishlab
+    chiqargan yengil avtomobillar uchun (mahalliy brend, boshqa Aloqabank
+    ikkilamchi-emas sahifalaridan farqli — shu sabab avtokredit_brend_
+    ikkilamchi EMAS, avtokredit_ikkilamchi toifasiga tegishli). Qiymatlar
+    "Kredit shartlari" bo'limining yagona "23% dan" o'rniga, to'liq
+    diapazon beruvchi interaktiv slayder-vidjetdan olinadi ("23 %dan -
+    25,5 %gacha", "15 %dan - 85 %gacha", "500 ming so'mdan - 300 million
+    so'mgacha", "3 oydan boshlab - 60 oygacha")."""
+    with patch("scrapers.aloqa.fetch_html", side_effect=_fake_fetch):
+        products = AloqabankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    assert ikkilamchi.bank == "Aloqabank"
+    assert ikkilamchi.product_name == 'Avtokredit - "ikkilamchi bozor uchun"'
+    assert ikkilamchi.rate_min == 23.0
+    assert ikkilamchi.rate_max == 25.5
+    assert ikkilamchi.term_min_months == 3
+    assert ikkilamchi.term_max_months == 60
+    assert ikkilamchi.amount_max_som == 300_000_000
+    assert ikkilamchi.down_payment_pct == 15.0
+    assert ikkilamchi.grace_period_months == 0
+    assert ikkilamchi.payment_method == "Annuitet, Differensial"
+    assert ikkilamchi.requires_collateral is True
 
 
 def test_aloqa_avtokredit_brend_birlamchi_parses_correctly():

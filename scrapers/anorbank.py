@@ -39,17 +39,31 @@ class AnorbankScraper(TextSectionScraper):
     nazarda tutiladi, biroq sahifa matnida bu alohida so'z bilan
     aytilmaydi. grace_period_months esa None qattiq kodlangan, chunki
     ikkala avtokredit sahifasida ham imtiyozli davr haqida hech qanday
-    ma'lumot yo'q."""
+    ma'lumot yo'q.
+
+    "Автокредит 3.0" sahifasining o'zbekcha (JS-render qilinmagan) qismida
+    "Foiz stavkasi" va "Avtokredit muddati" maydonlariga biriktirilgan
+    izoh bor: "Ikkilamchi bozordan Avtokredit tanlash jarayonida, kredit
+    muddati va uning boshlang'ich to'lovi avtotransport vositasining
+    ishlab chiqarilgan yiliga bog'liq" — ya'ni bu BITTA mahsulot HAM
+    birlamchi, HAM ikkilamchi bozorni qamrab oladi (talab: "Ishlab
+    chiqarilgan Uzbekistanda, 5 yildan oshmagan" — mahalliy/UzAuto brend,
+    Aloqabank'ning shunga o'xshash ikkilamchi mahsuloti bilan bir xil
+    naqsh). Shu sabab bir xil sahifa/qiymatlar "avtokredit_ikkilamchi"
+    toifasiga ham xaritalanadi (aniq alohida ikkilamchi-xos raqamlar
+    berilmagani uchun bir xil e'lon qilingan bazaviy stavka ishlatiladi)."""
 
     bank_name = "Anorbank"
     url = "https://anorbank.uz/uz/credits/avtokredit/"
     CATEGORY_URLS = {
         "avtokredit": "https://anorbank.uz/uz/credits/avtokredit/",
+        "avtokredit_ikkilamchi": "https://anorbank.uz/uz/credits/avtokredit/",
         "avtokredit_brend_birlamchi": "https://anorbank.uz/uz/credits/avtokredit4-0/",
         "mikroqarz_onlayn": "https://anorbank.uz/uz/credits/udobnyy-mikrozaym/",
     }
     PRODUCT_NAMES = {
         "avtokredit": "Автокредит 3.0",
+        "avtokredit_ikkilamchi": "Автокредит 3.0",
         "avtokredit_brend_birlamchi": "Автокредит 4.0",
         "mikroqarz_onlayn": "Удобный микрозайм",
     }

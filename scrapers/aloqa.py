@@ -26,6 +26,9 @@ _ELEKTRO_RATE_RE = re.compile(r"(\d{1,2},\d)%")
 _ELEKTRO_DOWN_RE = re.compile(r"(\d{1,2})%\**\s*dan boshlab")
 _ELEKTRO_TERM_RE = re.compile(r"(\d{1,2})\s*\n\s*yoki\n\s*(\d{1,2})\s*\n\s*oy")
 _ELEKTRO_AMOUNT_RE = re.compile(r"(\d+(?:,\d+)?)\s*milliard\s*so.mgacha")
+_IKKILAMCHI_SLIDER_PCT_RE = re.compile(r"(\d{1,2}(?:\.\d{1,2})?)\s*%dan\s*\n+\s*(\d{1,2}(?:\.\d{1,2})?)\s*%gacha")
+_IKKILAMCHI_SLIDER_TERM_RE = re.compile(r"(\d{1,3})\s*oydan boshlab\s*\n+\s*(\d{1,3})\s*oygacha")
+_IKKILAMCHI_SLIDER_AMOUNT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*million\s*so.mgacha")
 
 
 class AloqabankScraper(TextSectionScraper):
@@ -53,6 +56,7 @@ class AloqabankScraper(TextSectionScraper):
     url = "https://aloqabank.uz/uz/private/crediting/"
     CATEGORY_URLS = {
         "avtokredit": "https://aloqabank.uz/uz/private/crediting/avtokredit-birlamchi-bozor-uchun/",
+        "avtokredit_ikkilamchi": "https://aloqabank.uz/uz/private/crediting/avtokredit-ikkilamchi-bozor-uchun4940/",
         "avtokredit_brend_birlamchi": "https://aloqabank.uz/uz/private/crediting/avtokredit-import-/",
         "ipoteka_tijorat": "https://aloqabank.uz/uz/private/crediting/ipoteka-secondary/",
         "ipoteka_davlat": "https://aloqabank.uz/uz/private/crediting/primary-mortgage/",
@@ -63,6 +67,7 @@ class AloqabankScraper(TextSectionScraper):
     }
     PRODUCT_NAMES = {
         "avtokredit": "Avtokredit - birlamchi bozor uchun",
+        "avtokredit_ikkilamchi": 'Avtokredit - "ikkilamchi bozor uchun"',
         "avtokredit_brend_birlamchi": "Avtokredit import",
         "ipoteka_tijorat": "Ipoteka (ikkilamchi bozor)",
         "ipoteka_davlat": "Ipoteka krediti - Iqtisodiyot va moliya vazirligi mablag'lari hisobidan",
@@ -79,6 +84,8 @@ class AloqabankScraper(TextSectionScraper):
 
                 if category == "avtokredit_brend_birlamchi":
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
+                elif category == "avtokredit_ikkilamchi":
+                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
                 elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "ipoteka_davlat":
@@ -142,6 +149,71 @@ class AloqabankScraper(TextSectionScraper):
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=has_collateral_requirement(text),
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
+
+    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+        """"Avtokredit - "ikkilamchi bozor uchun"" — "Kredit maqsadi" bandida
+        aniq yozilgan: "Ishlab chiqarilganiga 5 yildan oshmagan, ya'ni
+        2022-yil va undan keyingi yillarda 'UzAuto Motors' AJ tomonidan
+        ishlab chiqarilgan yengil avtotransport vositasini ikkilamchi
+        bozordan sotib olish uchun" — ya'ni FAQAT UzAuto Motors (mahalliy)
+        brendiga cheklangan, boshqa Aloqabank ikkilamchi-emas sahifalaridan
+        farqli (masalan "avtokredit-import-", "avtokredit-byd-avto-") bu
+        brend-cheklovsiz EMAS — shu sabab "avtokredit_ikkilamchi" (umumiy,
+        mahalliy brend) toifasiga tegishli, "avtokredit_brend_ikkilamchi"ga
+        (GM/BYD/KIA/... import brendlar) EMAS.
+
+        Sahifada "Kredit shartlari" nomli aniq bo'lim ("Yillik foiz
+        stavkasi" -> "23% dan") faqat pastki chegarani beradi. Undan oldin
+        esa alohida interaktiv slayder-vidjet bor — bu yerda "Foiz
+        stavkasi" ("23 %dan" -> "25,5 %gacha"), "Boshlang'ich badal
+        miqdori" ("15 %dan" -> "85 %gacha"), "Kredit summasi" ("500 ming
+        so'mdan" -> "300 million so'mgacha") va "Kredit muddati" ("3
+        oydan boshlab" -> "60 oygacha") — TO'LIQ diapazon sifatida
+        beriladi (bitta standart qiymat emas, chinakam min-max chegara),
+        va bu qiymatlar pptx-da mustaqil tasdiqlangan raqamlar bilan aynan
+        mos keladi. Shu sabab aynan shu slayder-vidjet — pastroqdagi
+        "Kredit shartlari"ning yagona "23% dan" qiymatidan farqli — asosiy
+        manba sifatida ishlatiladi. "%dan...%gacha" naqshi sahifada FAQAT
+        ikki marta uchraydi (stavka, keyin boshlang'ich badal) — shu sabab
+        findall natijasidagi birinchi juftlik stavka, ikkinchisi badal."""
+        pct_pairs = _IKKILAMCHI_SLIDER_PCT_RE.findall(text)
+        if len(pct_pairs) < 2:
+            return None
+        rate_min, rate_max = (float(v) for v in pct_pairs[0])
+        down_payment_pct = float(pct_pairs[1][0])
+
+        term_match = _IKKILAMCHI_SLIDER_TERM_RE.search(text)
+        if not term_match:
+            return None
+        term_min, term_max = int(term_match.group(1)), int(term_match.group(2))
+
+        amount_match = _IKKILAMCHI_SLIDER_AMOUNT_RE.search(text)
+        amount = round(float(amount_match.group(1).replace(",", ".")) * 1_000_000) if amount_match else None
+        if amount is None:
+            return None
+
+        payment_method_section = extract_section(text, "Toʻlov usuli", "Rasmiylashtirish usuli")
+        payment_method = extract_payment_method(payment_method_section)
+
+        grace_section = extract_section(text, "Rasmiylashtirish usuli", "Axborot varaqasi")
+        grace_period_months = extract_grace_period_months("imtiyozli" + grace_section)
+
+        return Product(
+            bank=self.bank_name,
+            category="avtokredit_ikkilamchi",
+            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            rate_min=rate_min,
+            rate_max=rate_max,
+            term_min_months=term_min,
+            term_max_months=term_max,
             amount_max_som=amount,
             requires_collateral=has_collateral_requirement(text),
             down_payment_pct=down_payment_pct,
