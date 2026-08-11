@@ -27,7 +27,7 @@ def test_bdb_avtokredit_parses_correctly():
         products = BDBScraper().run()
 
     product = next(p for p in products if p.category == "avtokredit")
-    assert product.bank == "BDB"
+    assert product.bank == "BRB"
     assert product.rate_min == 23.0
     assert product.rate_max == 27.0
     assert product.term_min_months == 36

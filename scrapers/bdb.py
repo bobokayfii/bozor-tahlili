@@ -48,7 +48,7 @@ class BDBScraper(TextSectionScraper):
     "To'lov turi"/"Ta'minot turi" esa ASCII apostrof bilan to'g'ridan-to'g'ri
     tekshirilgani uchun o'zgarishsiz qoldirilgan."""
 
-    bank_name = "BDB"
+    bank_name = "BRB"
     url = "https://brb.uz/jismoniy-shaxslarga/kreditlar/avtokredit"
     CATEGORY_URLS = {
         "avtokredit": "https://brb.uz/jismoniy-shaxslarga/kreditlar/avtokredit",

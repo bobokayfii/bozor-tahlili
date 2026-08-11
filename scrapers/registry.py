@@ -14,7 +14,6 @@ from scrapers.kapital import KapitalBankScraper
 from scrapers.mikrokreditbank import MikrokreditBankScraper
 from scrapers.nbu import NBUScraper
 from scrapers.ofb import OFBScraper
-from scrapers.saderat import SaderatBankScraper
 from scrapers.sqb import SQBScraper
 from scrapers.tbc import TBCBankScraper
 from scrapers.tenge import TengeBankScraper
@@ -41,7 +40,6 @@ ALL_SCRAPERS = [
     AnorbankScraper,
     AsiaAllianceBankScraper,
     GarantBankScraper,
-    SaderatBankScraper,
     ApexBankScraper,
     BDBScraper,
     OFBScraper,
