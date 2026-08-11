@@ -84,6 +84,7 @@ class OFBScraper(TextSectionScraper):
     url = "https://ofb.uz/kreditlar"
     CATEGORY_URLS = {
         "avtokredit": "https://ofb.uz/kreditlar/oson-avtokredit",
+        "avtokredit_ikkilamchi": "https://ofb.uz/kreditlar/ikkilamchi-bozor-uchun-avtokredit",
         "avtokredit_elektro": "https://ofb.uz/kreditlar/avtokredit-byd",
         # "mikroqarz" va "mikroqarz_onlayn" ikkalasi ham shu hub/ro'yxat
         # sahifasidagi kartochkalardan summasi+stavkasini oladi — run()da bu
@@ -100,6 +101,7 @@ class OFBScraper(TextSectionScraper):
     }
     PRODUCT_NAMES = {
         "avtokredit": "Oson avtokredit",
+        "avtokredit_ikkilamchi": "Ikkilamchi bozor uchun avtokredit",
         "avtokredit_elektro": "Avtokredit BYD",
         # Sahifa sarlavhasi (<title>) va "Foydali ipoteka" H1/breadcrumb
         # ikkalasi ham aynan shu shaklda, brifdagi taklif tasdiqlandi.
@@ -125,6 +127,7 @@ class OFBScraper(TextSectionScraper):
     # yozilmasa ham.
     FORCE_COLLATERAL = {
         "avtokredit": True,
+        "avtokredit_ikkilamchi": True,
         "avtokredit_elektro": True,
         # Hub sahifasida ("mikroqarzlar") "Ishonch" kartochkasi uchun garov
         # haqida umuman gap yo'q (has_collateral_requirement standart
@@ -192,6 +195,9 @@ class OFBScraper(TextSectionScraper):
                 if category == "avtokredit":
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_avtokredit_product(url, now, text)
+                elif category == "avtokredit_ikkilamchi":
+                    text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
+                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
                 elif category == "avtokredit_elektro":
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_avtokredit_elektro_product(url, now, text)
@@ -269,6 +275,59 @@ class OFBScraper(TextSectionScraper):
             term_max_months=max(terms),
             amount_max_som=amount,
             requires_collateral=self.FORCE_COLLATERAL["avtokredit"],
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=None,
+        )
+
+    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+        """"Ikkilamchi bozor uchun avtokredit" — "Oson avtokredit" bilan
+        bir xil FAQ shabloniga ega ("Avtokreditning maksimal miqdori" ->
+        "800 mln so'mgacha", "Kredit qancha muddatga beriladi?" -> "48
+        oygacha"), lekin stavka jadvali boshqacha shaklda: "Foiz stavkasi
+        qancha?" javobida ikkita alohida gap bor — "boshlang'ich to'lov
+        kamida 30% bo'lsa — yillik 26,9%" va "40% dan yuqori bo'lsa —
+        yillik 24,9%" — bu yerda tier ulushi HAM "yillik" so'zidan OLDIN,
+        HAM undan keyin foiz belgisi bilan yozilgan bo'lishi mumkin
+        ("Oson avtokredit"dagi "dan —" naqshiga mos kelmaydi), shu sabab
+        _RATE_TIER_RE o'rniga to'g'ridan-to'g'ri "yillik N%" iboralari
+        qidiriladi — ikkala qatorda ham faqat shu so'zdan keyin keladigan
+        raqam haqiqiy stavka, tier ulushlari (30%/40%) "yillik" so'zisiz
+        yoziladi, shu sabab aralashmaydi.
+
+        "Imtiyoz davrining muddati" -> "Pasport" oralig'ida aniq "ko'zda
+        tutilmagan" — "Oson avtokredit"dagi bilan bir xil naqsh, 0 oy."""
+        amount_section = extract_section(text, "Avtokreditning maksimal miqdori", "Kredit qancha muddatga")
+        amount = extract_amount_som(amount_section)
+
+        term_section = extract_section(text, "Kredit qancha muddatga beriladi?", "Foiz stavkasi qancha?")
+        terms = extract_term_months(term_section)
+
+        rate_section = extract_section(text, "Foiz stavkasi qancha?", "Boshlang")
+        rates = [float(m.replace(",", ".")) for m in re.findall(r"yillik\s*(\d{1,2}(?:,\d{1,2})?)%", rate_section)]
+
+        down_payment_section = extract_section(text, "Minimal boshlang", "Boshlang")
+        down_payment_rates = extract_percentages(down_payment_section)
+        down_payment_pct = min(down_payment_rates) if down_payment_rates else None
+
+        grace_section = extract_section(text, "Imtiyoz davrining muddati", "Pasport")
+        grace_period_months = extract_grace_period_months("imtiyozli" + grace_section)
+
+        if not rates or not terms or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="avtokredit_ikkilamchi",
+            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=self.FORCE_COLLATERAL["avtokredit_ikkilamchi"],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

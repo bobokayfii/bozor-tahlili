@@ -7,6 +7,9 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 FIXTURE_BY_URL = {
     OFBScraper.CATEGORY_URLS["avtokredit"]: (FIXTURES_DIR / "ofb_avtokredit.html").read_text(encoding="utf-8"),
+    OFBScraper.CATEGORY_URLS["avtokredit_ikkilamchi"]: (
+        FIXTURES_DIR / "ofb_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     OFBScraper.CATEGORY_URLS["avtokredit_elektro"]: (FIXTURES_DIR / "ofb_avtokredit_elektro.html").read_text(
         encoding="utf-8"
     ),
@@ -30,22 +33,23 @@ def _fake_fetch(url, *args, **kwargs):
 def test_ofb_scraper_parses_all_categories():
     """mikroqarz and mikroqarz_onlayn share ONE fetch of the mikroqarzlar
     hub page (mikroqarz_onlayn also fetches its own onlayn-mikroqarz page
-    for the term); ipoteka_davlat and kredit_karta each have their own
-    dedicated page and do not participate in that sharing — so 6
-    categories produce 6 total fetch_html calls (not 7), confirming the
-    hub page isn't fetched twice."""
+    for the term); every other category has its own dedicated page and
+    does not participate in that sharing — so 7 categories produce 7
+    total fetch_html calls (not 8), confirming the hub page isn't fetched
+    twice."""
     with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = OFBScraper().run()
 
-    assert mock_fetch.call_count == 6
-    # A bare total count can't distinguish "hub once + 5 others" from "hub
-    # twice + 4 others" — assert per-URL so the shared-fetch invariant the
+    assert mock_fetch.call_count == 7
+    # A bare total count can't distinguish "hub once + 6 others" from "hub
+    # twice + 5 others" — assert per-URL so the shared-fetch invariant the
     # docstring claims is actually checked, not just coincidentally implied.
     fetched_urls = [call.args[0] for call in mock_fetch.call_args_list]
     assert fetched_urls.count(OFBScraper.CATEGORY_URLS["mikroqarz"]) == 1
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
+        "avtokredit_ikkilamchi",
         "avtokredit_elektro",
         "mikroqarz",
         "mikroqarz_onlayn",
@@ -79,6 +83,30 @@ def test_ofb_avtokredit_ignores_down_payment_share_percentages():
     # "noma'lum" emas.
     assert avtokredit.grace_period_months == 0
     assert avtokredit.payment_method is None
+
+
+def test_ofb_avtokredit_ikkilamchi_parses_tiered_rate_with_yillik_prefix():
+    """"Ikkilamchi bozor uchun avtokredit" shares the same FAQ template as
+    "Oson avtokredit", but its rate answer phrases the two tiers
+    differently ("boshlang'ich to'lov kamida 30% bo'lsa — yillik 26,9%";
+    "40% dan yuqori bo'lsa — yillik 24,9%") — neither line matches the
+    "dan —" pattern _RATE_TIER_RE looks for, so the two rates are picked
+    up via the "yillik N%" phrase instead, which appears only once per
+    tier and never next to the 30%/40% down-payment shares themselves."""
+    with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch):
+        products = OFBScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    assert ikkilamchi.product_name == "Ikkilamchi bozor uchun avtokredit"
+    assert ikkilamchi.rate_min == 24.9
+    assert ikkilamchi.rate_max == 26.9
+    assert ikkilamchi.term_min_months == 48
+    assert ikkilamchi.term_max_months == 48
+    assert ikkilamchi.amount_max_som == 800_000_000
+    assert ikkilamchi.down_payment_pct == 30.0
+    assert ikkilamchi.requires_collateral is True
+    assert ikkilamchi.grace_period_months == 0
+    assert ikkilamchi.payment_method is None
 
 
 def test_ofb_avtokredit_elektro_parses_dual_term_and_no_yillik_rate_table():
