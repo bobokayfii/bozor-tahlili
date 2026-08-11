@@ -274,15 +274,20 @@ class TrastBankScraper(TextSectionScraper):
     def run(self) -> list[Product]:
         """"mikroqarz" bir umumiy bo'lak ustida standart
         extract_percentages/extract_term_months/extract_amount_som bilan
-        to'g'ri ishlaydigan oddiy hol bo'lgani uchun bazaviy klassning
-        generik CATEGORY_URLS/CATEGORY_HEADINGS yo'lidan (BaseScraper.run())
-        o'tadi — quyidagi else shoxobchasi shuning uchun mavjud, xuddi
-        scrapers/ofb.py'ning run()idagi kabi. "ipoteka_tijorat" va
-        "ipoteka_davlat" esa (mos ravishda) so'z shaklidagi foizlar/
-        vergul-o'nlikli summa va "N oydan ko'p bo'lmagan" muddat shakli
-        tufayli o'zlarining maxsus _build_*_product metodlariga muhtoj
-        (yuqoridagi docstring'ga qarang), shu sabab BITTA umumiy generik
-        CATEGORY_HEADINGS bo'limiga sig'dirib bo'lmaydi."""
+        to'g'ri ishlaydigan oddiy hol bo'lgani uchun quyidagi else
+        shoxobchasida TextSectionScraper.run()ning generik CATEGORY_URLS/
+        CATEGORY_HEADINGS yo'li (scrapers/base.py) qo'lda takrorlanadi —
+        BaseScraper.run() emas (u CATEGORY_URLS'ni umuman bilmaydi), balki
+        aynan TextSectionScraper.run(), xuddi scrapers/sqb.py'ning
+        run()idagi generik else shoxobchasi kabi (bu yerda esa
+        down_payment_pct/grace_period_months/payment_method ham
+        uzatiladi, chunki "mikroqarz"ning GRACE_PERIOD_HEADINGS'i shu
+        orqali ishga tushadi). "ipoteka_tijorat" va "ipoteka_davlat" esa
+        (mos ravishda) so'z shaklidagi foizlar/vergul-o'nlikli summa va
+        "N oydan ko'p bo'lmagan" muddat shakli tufayli o'zlarining maxsus
+        _build_*_product metodlariga muhtoj (yuqoridagi docstring'ga
+        qarang), shu sabab BITTA umumiy generik CATEGORY_HEADINGS
+        bo'limiga sig'dirib bo'lmaydi."""
         now = datetime.now(timezone.utc)
         products: list[Product] = []
 
