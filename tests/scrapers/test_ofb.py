@@ -38,6 +38,11 @@ def test_ofb_scraper_parses_all_categories():
         products = OFBScraper().run()
 
     assert mock_fetch.call_count == 6
+    # A bare total count can't distinguish "hub once + 5 others" from "hub
+    # twice + 4 others" — assert per-URL so the shared-fetch invariant the
+    # docstring claims is actually checked, not just coincidentally implied.
+    fetched_urls = [call.args[0] for call in mock_fetch.call_args_list]
+    assert fetched_urls.count(OFBScraper.CATEGORY_URLS["mikroqarz"]) == 1
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
@@ -69,7 +74,10 @@ def test_ofb_avtokredit_ignores_down_payment_share_percentages():
     assert avtokredit.amount_max_som == 800_000_000
     assert avtokredit.down_payment_pct == 25.0
     assert avtokredit.requires_collateral is True
-    assert avtokredit.grace_period_months is None
+    # "Kreditlash shartlari" bo'limidagi "Imtiyoz davrining muddati" qatori
+    # aniq "ko'zda tutilmagan" deb yozilgan — bu real "yo'q" signali (0 oy),
+    # "noma'lum" emas.
+    assert avtokredit.grace_period_months == 0
     assert avtokredit.payment_method is None
 
 
@@ -92,7 +100,7 @@ def test_ofb_avtokredit_elektro_parses_dual_term_and_no_yillik_rate_table():
     assert elektro.amount_max_som == 800_000_000
     assert elektro.down_payment_pct == 25.0
     assert elektro.requires_collateral is True
-    assert elektro.grace_period_months is None
+    assert elektro.grace_period_months == 0
     assert elektro.payment_method is None
 
 
@@ -141,8 +149,12 @@ def test_ofb_mikroqarz_onlayn_combines_hub_amount_rate_with_own_page_term():
     assert onlayn.amount_max_som == 50_000_000
     assert onlayn.requires_collateral is False
     assert onlayn.down_payment_pct is None
-    assert onlayn.grace_period_months is None
-    assert onlayn.payment_method is None
+    # Onlayn-mikroqarz'ning o'z sahifasida (hub'da emas) "Jadval turi" ->
+    # "Annuitet yoki differensial." va "Imtiyoz davrining muddati" ->
+    # "ko'zda tutilmagan" aniq bor — ikkalasi ham qo'shimcha fetchsiz,
+    # muddat uchun allaqachon xotiradagi onlayn_text'dan olinadi.
+    assert onlayn.grace_period_months == 0
+    assert onlayn.payment_method == "Annuitet, Differensial"
     assert onlayn.source_url == OFBScraper.CATEGORY_URLS["mikroqarz_onlayn"]
 
 

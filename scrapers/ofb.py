@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from scrapers.base import Product, TextSectionScraper
 from scrapers.utils import (
     extract_amount_som,
+    extract_grace_period_months,
     extract_payment_method,
     extract_percentages,
     extract_section,
@@ -52,12 +53,13 @@ class OFBScraper(TextSectionScraper):
     cho'ziladigan bo'limlarda) begona foiz/raqamlar bor, bitta umumiy
     kengroq section'ga sig'dirib bo'lmaydi.
 
-    Har ikkala sahifada ham pastroqda "payment_type"/"grace_period" kabi
-    inglizcha placeholder so'zlar bilan generik kredit atamalari jadvali
-    bor (barcha OFB mahsulot sahifalarida takrorlanadigan umumiy shablon,
-    "annuitet"/"differensial"/"imtiyozli" so'zlarini o'z ichiga oladi,
-    lekin mahsulotga xos aniq qiymat bermaydi) — shu sabab payment_method
-    va grace_period_months ikkala kategoriyada ham None qoladi.
+    Har ikkala sahifada ham pastroqda "Kreditlash shartlari" umumiy
+    shablon jadvali bor — "Jadval turi" (to'lov usuli) qatori bu ikkala
+    avtokredit sahifasida yo'q (shu sabab payment_method None qoladi), lekin
+    "Imtiyoz davrining muddati" qatori BOR va aniq "ko'zda tutilmagan" deb
+    yozilgan — bu real, mahsulotga xos "imtiyozli davr yo'q" signali (0 oy),
+    "noma'lum" emas, shu sabab grace_period_months ikkalasida ham 0 qilib
+    to'ldiriladi (pastga qarang).
 
     "mikroqarz" ("Ishonch mikroqarz") va "mikroqarz_onlayn" ("Onlayn
     mikroqarz") — ikkalasi ham https://ofb.uz/kreditlar/mikroqarzlar hub
@@ -231,7 +233,13 @@ class OFBScraper(TextSectionScraper):
         chiqadi, lekin bu ishonchsiz edi). Shu sabab o'rniga keyingi
         HAQIQIY sarlavha — "Qaysi avtomobillarni kreditga olish mumkin?"
         — end_heading sifatida ishlatiladi, bu bo'limni bitta aniq "25%"
-        ga toraytiradi."""
+        ga toraytiradi.
+
+        "Imtiyoz davrining muddati" -> "Pasport" (hujjatlar ro'yxatidagi
+        keyingi band, sahifada FAQAT bir marta uchraydi) oralig'ida aniq
+        "ko'zda tutilmagan" deb yozilgan — standart extract_grace_period_months
+        "imtiyozli" so'zi borligini talab qilgani uchun (sarlavhaning o'zida
+        yo'q, "imtiyoz" xolos) bu so'z qo'lda prefiks sifatida qo'shiladi."""
         amount_section = extract_section(text, "Avtokreditning maksimal miqdori", "Kredit qancha muddatga")
         amount = extract_amount_som(amount_section)
 
@@ -244,6 +252,9 @@ class OFBScraper(TextSectionScraper):
         down_payment_section = extract_section(text, "Minimal boshlang", "Qaysi avtomobillarni")
         down_payment_rates = extract_percentages(down_payment_section)
         down_payment_pct = min(down_payment_rates) if down_payment_rates else None
+
+        grace_section = extract_section(text, "Imtiyoz davrining muddati", "Pasport")
+        grace_period_months = extract_grace_period_months("imtiyozli" + grace_section)
 
         if not rates or not terms or amount is None:
             return None
@@ -261,7 +272,7 @@ class OFBScraper(TextSectionScraper):
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,
-            grace_period_months=None,
+            grace_period_months=grace_period_months,
             payment_method=None,
         )
 
@@ -277,7 +288,13 @@ class OFBScraper(TextSectionScraper):
         ASCII-xavfsiz anchor ishlatib bo'lmaydi, chunki sahifada yuqorida
         alohida umumiy kredit kalkulyatori vidjeti bor va "Boshlang" so'zi
         o'sha yerda ham bir necha marta takrorlanadi — shu sabab to'liq,
-        noyob ibora talab qilinadi."""
+        noyob ibora talab qilinadi.
+
+        "Imtiyoz davrining muddati" -> "Pasport" oralig'ida aniq "ko'zda
+        tutilmagan" deb yozilgan, xuddi "Oson avtokredit" sahifasidagi
+        bilan bir xil ("imtiyozli" so'zi qo'lda prefiks sifatida
+        qo'shiladi, chunki sarlavhaning o'zida "imtiyoz" bor, "imtiyozli"
+        emas)."""
         amount_section = extract_section(text, "Avtokredit miqdori", "Kredit qancha muddatga")
         amount = extract_amount_som(amount_section)
 
@@ -293,6 +310,9 @@ class OFBScraper(TextSectionScraper):
         )
         down_payment_rates = extract_percentages(down_payment_section)
         down_payment_pct = min(down_payment_rates) if down_payment_rates else None
+
+        grace_section = extract_section(text, "Imtiyoz davrining muddati", "Pasport")
+        grace_period_months = extract_grace_period_months("imtiyozli" + grace_section)
 
         if not rates or not terms or amount is None:
             return None
@@ -310,7 +330,7 @@ class OFBScraper(TextSectionScraper):
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,
-            grace_period_months=None,
+            grace_period_months=grace_period_months,
             payment_method=None,
         )
 
@@ -375,13 +395,27 @@ class OFBScraper(TextSectionScraper):
         muddati\\n24 oygacha." bo'limi "Foiz stavkasi" sarlavhasigacha
         toraytirilgan (bu sahifada pastroqda 125%/50% kabi begona foizlar
         bor, lekin ular term emas, rate maydoniga aloqasi yo'q, shu bilan
-        birga end_heading qo'shilishi bo'limni yanada toraytiradi)."""
+        birga end_heading qo'shilishi bo'limni yanada toraytiradi).
+
+        to'lov usuli va imtiyozli davr onlayn-mikroqarz'ning o'z sahifasida
+        (hub'da emas) bor: "Jadval turi" -> "Arizani ko" oralig'ida aniq
+        "Annuitet yoki differensial." (bu sarlavha sahifada FAQAT bir marta
+        uchraydi), "Imtiyoz davrining muddati" -> "Pasport" oralig'ida esa
+        "ko'zda tutilmagan" (boshqa OFB avtokredit sahifalaridagi bilan bir
+        xil naqsh) — ikkalasi ham qo'shimcha fetch talab qilmaydi, chunki
+        onlayn_text muddat uchun allaqachon xotirada."""
         amount_rate_section = extract_section(hub_text, "Onlayn mikroqarz", "Ishonch")
         amount = extract_amount_som(amount_rate_section)
         rates = extract_percentages(amount_rate_section)
 
         term_section = extract_section(onlayn_text, "Mikroqarz muddati", "Foiz stavkasi")
         terms = extract_term_months(term_section)
+
+        payment_method_section = extract_section(onlayn_text, "Jadval turi", "Arizani ko")
+        payment_method = extract_payment_method(payment_method_section)
+
+        grace_section = extract_section(onlayn_text, "Imtiyoz davrining muddati", "Pasport")
+        grace_period_months = extract_grace_period_months("imtiyozli" + grace_section)
 
         if not rates or not terms or amount is None:
             return None
@@ -399,8 +433,8 @@ class OFBScraper(TextSectionScraper):
             down_payment_pct=None,
             source_url=url,
             scraped_at=now,
-            grace_period_months=None,
-            payment_method=None,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
         )
 
     def _build_ipoteka_davlat_product(self, url, now, text):
