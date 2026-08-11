@@ -20,6 +20,15 @@ from scrapers.utils import (
 # mumkinligi sababli qayta ishlatish uchun modul darajasida saqlanadi.
 _FOIZ_RE = re.compile(r"(\d{1,2}(?:[.,]\d{1,2})?)\s*foiz")
 
+# "Sharq bahori ipoteka krediti" sahifasi (Task 3, ipoteka_davlat) muddatni
+# "240 oydan ko'p bo'lmagan muddatga" shaklida beradi — standart
+# extract_term_months bu iborani tanimaydi (faqat "N oygacha"/"N oydan M
+# oygacha" ni biladi) va bu qiymatni umuman topa olmaydi. Bundan tashqari,
+# extract_term_months o'zining 120 oylik qattiq chegarasi tufayli 240ni
+# baribir chiqarib tashlagan bo'lardi, shu sabab bu qiymat bevosita, standart
+# funksiyani chetlab o'tib, shu maxsus regex bilan olinadi.
+_TERM_NOT_MORE_RE = re.compile(r"(\d{1,3})\s*oydan\s*ko")
+
 
 class TrastBankScraper(TextSectionScraper):
     """TrastBank (trustbank.uz).
@@ -97,9 +106,74 @@ class TrastBankScraper(TextSectionScraper):
     garov/kafillik/sug'urta talab qilinishiga qaramay False qaytarardi
     (tekshirilgan) — shu sabab bu yerda aniq force qilish ayniqsa muhim.
 
-    ipoteka_davlat — TrastBank uchun boshqa, alohida topshiriq doirasida
-    keyinroq shu faylga qo'shiladi; bu yerda u uchun joy egallovchi
-    (placeholder) yozuv YO'Q.
+    ipoteka_davlat ("Sharq bahori ipoteka krediti", https://trustbank.uz/uz/
+    private/crediting/sharq-bahori-ipoteka-krediti/) — Yangi Toshkent
+    shahridagi "Sharq bahori" turar-joy majmuasidan kvartira sotib olish
+    uchun davlat (Iqtisodiyot va moliya vazirligi mablag'lari) va bank o'z
+    mablag'lari aralash moliyalashtiruvidagi ipoteka krediti. Xuddi
+    ipoteka_tijorat'dagi kabi raqamlangan jadval (invoys-uslubidagi
+    "1/2/3..." qatorlar, har bir band nomi FAQAT bir marta uchraydi,
+    tekshirilgan), shu sabab bu ham o'zining _build_ipoteka_davlat_product
+    metodiga ega, GENERIK CATEGORY_HEADINGS yo'liga sig'maydi:
+      - "Kreditning maksimal miqdori" (3-band) -> "800,0 mln so'mdan ko'p
+        bo'lmagan miqdorda", 3.1-bandda esa moliyalashtirish manbasi
+        bo'yicha kichikroq sub-limit ham beriladi ("480,0 mln so'mgacha",
+        davlat/bank qismlariga bo'lingan) — bu ikkinchisi umumiy 800 mln
+        chegarasidan past bo'lgani uchun ustuvorlik unga tegmaydi.
+        ipoteka_tijorat'dagi bilan bir xil vergul-o'nlik tuzoq: ",0 mln" ->
+        " mln" almashtirilgandan keyin extract_amount_som -> 800_000_000
+        (tekshirilgan, max([800, 480] mln)dan 800 chiqadi).
+      - "Muddati" (4-band) -> "240 oydan ko'p bo'lmagan muddatga" — bu
+        standart "N oygacha"/"N oydan M oygacha" naqshlaridan farqli so'z
+        shakli, standart extract_term_months buni topa olmaydi (va topsa
+        ham, o'zining 120 oylik qattiq chegarasi 240ni chiqarib tashlagan
+        bo'lardi). Shu sabab modul darajasidagi _TERM_NOT_MORE_RE bilan
+        bevosita, extract_term_months'ni umuman chaqirmasdan olinadi:
+        tekshirilgan, group(1) == "240" -> term_min_months=term_max_months=
+        240.
+      - "Boshlang‘ich badal" (5-band, apostrof U+2018, repr() bilan
+        tasdiqlangan — ipoteka_tijorat'dagi bilan bir xil) -> "Iqtisodiyot
+        va moliya vazirligi mablag'lari hisobidan ajratiladigan qismi
+        uchun: 15 foiz" / "Bankning o'z mablag'lari hisobidan ajratiladigan
+        qismi uchun: 20 foiz" — _FOIZ_RE bilan, min() = 15.0.
+      - "Yillik foiz stavkasi" (6-band) -> "Doimiy daromadga ega bo'lganlar
+        uchun: 17 foiz" / "O'zini-o'zi band qilganlar uchun: 18 foiz" —
+        _FOIZ_RE bilan, min=17.0, max=18.0. HAQIQIY JARIMA-STAVKA TUZOG'I
+        (tekshirilgan, farazga asoslanmagan): darhol keyingi 6.1-band
+        ("Foizni hisoblashning sharti-o'zgarmas yoki o'zgaruvchan") garov
+        20 kun ichida rasmiylashtirilmasa stavka 25%ga o'zgarishi haqidagi
+        SHARTLI jarima stavkasini beradi — bu mahsulotning oddiy e'lon
+        qilingan stavka oralig'iga kirmaydi. rate_section end_heading
+        sifatida aynan "Foizni hisoblashning sharti" ishlatilgani (6.1-band
+        sarlavhasining o'zi, bir marta uchraydi) bu 25%ni avtomatik ravishda
+        bo'lim tashqarisida qoldiradi.
+      - "To‘lov usuli" (7-band emas, 11-band; apostrof shu yerda ham
+        U+2018) -> "Annuitet yoki differensial usulda" — standart
+        extract_payment_method ishlaydi, natija "Annuitet, Differensial".
+        Sahifada "annuitet"/"differen" so'zlari bu banddan boshqa hech
+        qayerda uchramaydi (tekshirilgan), shu sabab end_heading=None
+        (sahifa oxirigacha) xavfsiz.
+
+    Bo'lim chegaralari (barchasi sahifada FAQAT bir marta uchraydi):
+      amount: "Kreditning maksimal miqdori" -> "Muddati"
+      term: "Muddati" -> "Boshlang" (ASCII-xavfsiz qisqartma)
+      down_payment: "Boshlang" -> "Yillik foiz stavkasi"
+      rate: "Yillik foiz stavkasi" -> "Foizni hisoblashning sharti"
+      payment_method: "To‘lov usuli" -> None (sahifa oxirigacha)
+
+    Imtiyozli davr: DIQQAT — bu ipoteka_tijorat'dan farqli holat emas,
+    aslida BIR XIL naqsh: sahifa muqaddima paragrafida (raqamlangan
+    jadvaldan OLDIN) aynan "Kreditning imtiyozli davri mavjud emas" deb
+    yozilgan (tekshirilgan, jonli sahifada faqat shu bir joyda uchraydi) —
+    shu sabab extract_grace_period_months(text) to'g'ridan-to'g'ri butun
+    sahifa matni ustida ishlatiladi va natija 0 oy (haqiqiy "yo'q" signali,
+    "noma'lum" emas).
+
+    requires_collateral: FORCE_COLLATERAL orqali qat'iy True belgilangan —
+    ipoteka_tijorat/boshqa banklardagi ipoteka konvensiyasi bilan bir xil
+    (scrapers/sqb.py, scrapers/ofb.py). Sahifaning "Ta'minot" bandida ham
+    ko'chmas mulk (kredit hisobiga sotib olinayotgan uy-joy) ta'minot
+    sifatida ko'rsatilgan.
 
     ipoteka_tijorat ("Bankning o'z mablag'lari hisobidan ajratiladigan
     ipoteka krediti", https://trustbank.uz/uz/private/crediting/bankning
@@ -170,6 +244,7 @@ class TrastBankScraper(TextSectionScraper):
             "https://trustbank.uz/uz/private/crediting/"
             "bankning-o-z-mablag-lari-hisobidan-ajratiladigan-ipoteka-krediti/"
         ),
+        "ipoteka_davlat": "https://trustbank.uz/uz/private/crediting/sharq-bahori-ipoteka-krediti/",
     }
     CATEGORY_HEADINGS = {
         "mikroqarz": ("Doimiy daromadga ega bo", "Mikroqarz rasmiylashtirishda"),
@@ -184,10 +259,16 @@ class TrastBankScraper(TextSectionScraper):
         # PRODUCT_NAMES yozuvlari bilan izchillik uchun sahifadagi haqiqiy
         # Unicode apostrof (U+2018) o'rniga ASCII apostrof ishlatilgan.
         "ipoteka_tijorat": "Bankning o'z mablag'lari hisobidan ajratiladigan ipoteka krediti",
+        # Sahifa <title>'i va H1 sarlavhasida bezakli qiyshiq tirnoqlar
+        # (U+201C/U+201D, "Sharq bahori" ipoteka krediti) ishlatilgan bo'lsa
+        # ham, boshqa PRODUCT_NAMES yozuvlari bilan izchillik uchun oddiy
+        # matn shaklida (tirnoqsiz) saqlanadi.
+        "ipoteka_davlat": "Sharq bahori ipoteka krediti",
     }
     FORCE_COLLATERAL = {
         "mikroqarz": True,
         "ipoteka_tijorat": True,
+        "ipoteka_davlat": True,
     }
 
     def run(self) -> list[Product]:
@@ -196,11 +277,12 @@ class TrastBankScraper(TextSectionScraper):
         to'g'ri ishlaydigan oddiy hol bo'lgani uchun bazaviy klassning
         generik CATEGORY_URLS/CATEGORY_HEADINGS yo'lidan (BaseScraper.run())
         o'tadi — quyidagi else shoxobchasi shuning uchun mavjud, xuddi
-        scrapers/ofb.py'ning run()idagi kabi. "ipoteka_tijorat" esa so'z
-        shaklidagi foizlar va vergul-o'nlikli summa tufayli maxsus
-        _build_ipoteka_tijorat_product'ga muhtoj (yuqoridagi docstring'ga
-        qarang), shu sabab BITTA umumiy generik CATEGORY_HEADINGS bo'limiga
-        sig'dirib bo'lmaydi."""
+        scrapers/ofb.py'ning run()idagi kabi. "ipoteka_tijorat" va
+        "ipoteka_davlat" esa (mos ravishda) so'z shaklidagi foizlar/
+        vergul-o'nlikli summa va "N oydan ko'p bo'lmagan" muddat shakli
+        tufayli o'zlarining maxsus _build_*_product metodlariga muhtoj
+        (yuqoridagi docstring'ga qarang), shu sabab BITTA umumiy generik
+        CATEGORY_HEADINGS bo'limiga sig'dirib bo'lmaydi."""
         now = datetime.now(timezone.utc)
         products: list[Product] = []
 
@@ -211,6 +293,8 @@ class TrastBankScraper(TextSectionScraper):
 
                 if category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
+                elif category == "ipoteka_davlat":
+                    product = self._build_ipoteka_davlat_product(url, now, text)
                 else:  # mikroqarz — generik yo'l
                     heading_pair = self.CATEGORY_HEADINGS.get(category)
                     if heading_pair is not None:
@@ -272,6 +356,65 @@ class TrastBankScraper(TextSectionScraper):
             term_max_months=max(terms),
             amount_max_som=amount,
             requires_collateral=self.FORCE_COLLATERAL["ipoteka_tijorat"],
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
+
+    def _build_ipoteka_davlat_product(self, url: str, now: datetime, text: str) -> Product | None:
+        """Yuqoridagi klass docstring'idagi izohga qarang. ipoteka_tijorat
+        bilan bir xil ikkita maxsus holat (so'z shaklidagi foizlar/_FOIZ_RE
+        va vergul-o'nlikli "800,0 mln so'mdan ko'p bo'lmagan miqdorda"
+        summasi) qayta ishlatiladi, lekin muddat BUTUNLAY boshqacha so'z
+        shaklida ("240 oydan ko'p bo'lmagan muddatga") kelgani uchun
+        standart extract_term_months o'rniga modul darajasidagi
+        _TERM_NOT_MORE_RE bevosita ishlatiladi — extract_term_months
+        umuman chaqirilmaydi, aks holda uning 120 oylik qattiq chegarasi
+        240ni jimgina yo'qotib qo'yardi."""
+        amount_section = extract_section(text, "Kreditning maksimal miqdori", "Muddati")
+        amount = extract_amount_som(amount_section.replace(",0 mln", " mln"))
+
+        term_section = extract_section(text, "Muddati", "Boshlang")
+        term_match = _TERM_NOT_MORE_RE.search(term_section)
+        terms = [int(term_match.group(1))] if term_match else []
+
+        down_section = extract_section(text, "Boshlang", "Yillik foiz stavkasi")
+        down_rates = [float(m.replace(",", ".")) for m in _FOIZ_RE.findall(down_section)]
+        down_payment_pct = min(down_rates) if down_rates else None
+
+        # end_heading "Foizni hisoblashning sharti" (6.1-band sarlavhasi,
+        # sahifada bir marta uchraydi) bu bo'limni garov 20 kun ichida
+        # rasmiylashtirilmasa stavka 25%ga o'zgarishi haqidagi shartli
+        # JARIMA bandidan avval to'xtatadi — 25% asosiy stavka oralig'iga
+        # kirmaydi (tekshirilgan, farazga asoslanmagan).
+        rate_section = extract_section(text, "Yillik foiz stavkasi", "Foizni hisoblashning sharti")
+        rates = [float(m.replace(",", ".")) for m in _FOIZ_RE.findall(rate_section)]
+
+        payment_section = extract_section(text, "To‘lov usuli", None)
+        payment_method = extract_payment_method(payment_section)
+
+        # ipoteka_tijorat'dagi bilan bir xil naqsh (brief'ning aksincha
+        # bashoratidan farqli, jonli sahifada tekshirilgan): muqaddima
+        # paragrafida aynan "Kreditning imtiyozli davri mavjud emas" deb
+        # yozilgan, shu sabab bu haqiqiy "yo'q" (0 oy) signali, "noma'lum"
+        # (None) emas.
+        grace_period_months = extract_grace_period_months(text)
+
+        if not rates or not terms or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="ipoteka_davlat",
+            product_name=self.PRODUCT_NAMES["ipoteka_davlat"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=self.FORCE_COLLATERAL["ipoteka_davlat"],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,
