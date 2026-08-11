@@ -30,7 +30,7 @@ def test_trastbank_mikroqarz_combines_three_customer_segments_into_one_range():
     28/29/30 for segment 2; 24/25/26, then 25/26.5/27.9 for segment 3) and
     all three amount figures (100 mln, 50,0 mln, 100 mln) are genuinely
     published for the live product, just spread across sub-tables."""
-    with patch("scrapers.trastbank.fetch_html", side_effect=_fake_fetch):
+    with patch("scrapers.base.fetch_html", side_effect=_fake_fetch):
         products = TrastBankScraper().run()
 
     assert len(products) == 1
@@ -53,7 +53,7 @@ def test_trastbank_mikroqarz_grace_period_is_explicitly_none_available():
     """The page states, right before the first segment table, "Mikroqarzning
     imtiyozli davri: mavjud emas" ("no grace period available") — a real
     "none" signal (0 months), not an "unknown" (which would be None)."""
-    with patch("scrapers.trastbank.fetch_html", side_effect=_fake_fetch):
+    with patch("scrapers.base.fetch_html", side_effect=_fake_fetch):
         products = TrastBankScraper().run()
 
     product = products[0]
@@ -69,7 +69,7 @@ def test_trastbank_mikroqarz_force_collateral_overrides_false_negative_auto_dete
     pledge) is required by every one of the three customer segments. This
     is exactly why FORCE_COLLATERAL is used instead of auto-detection for
     this category."""
-    with patch("scrapers.trastbank.fetch_html", side_effect=_fake_fetch):
+    with patch("scrapers.base.fetch_html", side_effect=_fake_fetch):
         products = TrastBankScraper().run()
 
     product = products[0]
@@ -77,7 +77,7 @@ def test_trastbank_mikroqarz_force_collateral_overrides_false_negative_auto_dete
 
 
 def test_trastbank_scraper_fetches_only_the_microloans_page():
-    with patch("scrapers.trastbank.fetch_html", side_effect=_fake_fetch) as mock_fetch:
+    with patch("scrapers.base.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         TrastBankScraper().run()
 
     assert mock_fetch.call_count == 1

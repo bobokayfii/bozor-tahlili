@@ -1,15 +1,4 @@
-from datetime import datetime, timezone
-
-from scrapers.base import Product, TextSectionScraper
-from scrapers.utils import (
-    extract_amount_som,
-    extract_grace_period_months,
-    extract_percentages,
-    extract_section,
-    extract_term_months,
-    fetch_html,
-    html_to_text,
-)
+from scrapers.base import TextSectionScraper
 
 
 class TrastBankScraper(TextSectionScraper):
@@ -37,7 +26,11 @@ class TrastBankScraper(TextSectionScraper):
     haqiqiy belgi U+2018 '‘' — "Mikroqarz rasmiylashtirishda" gacha, bu
     ikkinchisi sahifada FAQAT bir marta uchraydi va uchala toifadan keyin,
     hujjatlar ro'yxati boshida keladi), so'ng shu bo'lak ustida standart
-    extract_percentages/extract_term_months/extract_amount_som ishlatiladi:
+    extract_percentages/extract_term_months/extract_amount_som ishlatiladi
+    (CATEGORY_HEADINGS orqali, umumiy TextSectionScraper.run()ning standart
+    yo'li bilan — bu kategoriya uchun maxsus run()/_build_* metodi shart
+    emas, chunki barcha maydonlar bitta oddiy bo'lak ustida standart
+    funksiyalar bilan to'g'ri chiqadi):
       - rates: {28,29,30,31.9,24,25,26,26.5,27.9} -> min=24.0, max=31.9
         (barcha besh stavka jadvalidan, uchala toifaning haqiqiysi).
       - terms: standart extract_term_months avval "N oydan M oygacha" range
@@ -61,16 +54,17 @@ class TrastBankScraper(TextSectionScraper):
 
     Imtiyozli davr: sahifa muqaddimasida (birinchi jadvaldan OLDIN) aniq
     "Mikroqarzning imtiyozli davri: mavjud emas" deb yozilgan — bu real
-    "yo'q" signali (0 oy), "noma'lum" emas. Grace bo'lagi asosiy jadval
-    bo'lagi bilan bir xil, allaqachon tekshirilgan "Doimiy daromadga ega
-    bo" sarlavhasi bilan chegaralanadi (bu ikkinchi sarlavha darhol undan
-    keyin kelmaydi, lekin oralig'idagi bo'sh matnda "imtiyozli" so'zi
-    boshqa hech qayerda uchramaydi, shu sabab bu tor chegara xavfsiz).
+    "yo'q" signali (0 oy), "noma'lum" emas. GRACE_PERIOD_HEADINGS orqali
+    "Mikroqarzning imtiyozli davri" dan "Doimiy daromadga ega bo" gacha
+    (bu ikkinchi sarlavha darhol undan keyin kelmaydi, lekin oralig'idagi
+    bo'sh matnda "imtiyozli" so'zi boshqa hech qayerda uchramaydi, shu sabab
+    bu tor chegara xavfsiz) chegaralanadi.
 
     down_payment_pct va payment_method: sahifaning bu bo'limida umuman
     tilga olinmagan (jonli sahifada "Boshlang'ich"/"Jadval turi"/
     "annuitet"/"differen" so'zlarining birortasi ham uchramasligi
-    tasdiqlangan) — shu sabab ikkalasi ham None qoldiriladi.
+    tasdiqlangan) — DOWN_PAYMENT_HEADINGS/PAYMENT_METHOD_HEADINGS
+    belgilanmagani uchun ikkalasi ham tabiiy ravishda None qoladi.
 
     requires_collateral: FORCE_COLLATERAL orqali qat'iy True belgilangan —
     barcha uch toifa ham kafillik/sug'urta/garov turlaridan birortasini
@@ -92,55 +86,15 @@ class TrastBankScraper(TextSectionScraper):
     CATEGORY_URLS = {
         "mikroqarz": "https://trustbank.uz/uz/private/crediting/microloans/",
     }
+    CATEGORY_HEADINGS = {
+        "mikroqarz": ("Doimiy daromadga ega bo", "Mikroqarz rasmiylashtirishda"),
+    }
+    GRACE_PERIOD_HEADINGS = {
+        "mikroqarz": ("Mikroqarzning imtiyozli davri", "Doimiy daromadga ega bo"),
+    }
     PRODUCT_NAMES = {
         "mikroqarz": "Mikroqarz",
     }
     FORCE_COLLATERAL = {
         "mikroqarz": True,
     }
-
-    def run(self) -> list[Product]:
-        now = datetime.now(timezone.utc)
-        products: list[Product] = []
-
-        for category, url in self.CATEGORY_URLS.items():
-            try:
-                text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
-                if category == "mikroqarz":
-                    product = self._build_mikroqarz_product(url, now, text)
-                else:  # pragma: no cover - defensive, no other category exists yet
-                    product = None
-            except Exception:
-                continue
-            if product is not None:
-                products.append(product)
-        return products
-
-    def _build_mikroqarz_product(self, url: str, now: datetime, text: str) -> Product | None:
-        section = extract_section(text, "Doimiy daromadga ega bo", "Mikroqarz rasmiylashtirishda")
-
-        rates = extract_percentages(section)
-        terms = extract_term_months(section)
-        amount = extract_amount_som(section)
-        if not rates or not terms or amount is None:
-            return None
-
-        grace_section = extract_section(text, "Mikroqarzning imtiyozli davri", "Doimiy daromadga ega bo")
-        grace_period_months = extract_grace_period_months("imtiyozli" + grace_section)
-
-        return Product(
-            bank=self.bank_name,
-            category="mikroqarz",
-            product_name=self.PRODUCT_NAMES["mikroqarz"],
-            rate_min=min(rates),
-            rate_max=max(rates),
-            term_min_months=min(terms),
-            term_max_months=max(terms),
-            amount_max_som=amount,
-            requires_collateral=self.FORCE_COLLATERAL["mikroqarz"],
-            down_payment_pct=None,
-            source_url=url,
-            scraped_at=now,
-            grace_period_months=grace_period_months,
-            payment_method=None,
-        )
