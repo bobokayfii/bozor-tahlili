@@ -12,6 +12,13 @@ import turonbankLogo from '../assets/bank-logos/turonbank.svg'
 import xalqBankiLogo from '../assets/bank-logos/xalqbank.svg'
 import asakabankLogo from '../assets/bank-logos/asakabank.svg'
 import infinbankLogo from '../assets/bank-logos/infinbank.svg'
+import aloqabankLogo from '../assets/bank-logos/aloqabank.svg'
+import anorbankLogo from '../assets/bank-logos/anorbank.svg'
+import garantbankLogo from '../assets/bank-logos/garantbank.svg'
+import asiaalliancebankLogo from '../assets/bank-logos/asiaalliancebank.svg'
+import brbLogo from '../assets/bank-logos/brb.svg'
+import ofbLogo from '../assets/bank-logos/ofb.svg'
+import trastbankLogo from '../assets/bank-logos/trastbank.svg'
 
 const BANK_LOGOS: Record<string, string> = {
   nbu: nbuLogo,
@@ -28,6 +35,13 @@ const BANK_LOGOS: Record<string, string> = {
   'xalq banki': xalqBankiLogo,
   asakabank: asakabankLogo,
   infinbank: infinbankLogo,
+  aloqabank: aloqabankLogo,
+  anorbank: anorbankLogo,
+  'garant bank': garantbankLogo,
+  'asia alliance bank': asiaalliancebankLogo,
+  brb: brbLogo,
+  ofb: ofbLogo,
+  trastbank: trastbankLogo,
 }
 
 export function getBankLogo(bank: string): string | undefined {
