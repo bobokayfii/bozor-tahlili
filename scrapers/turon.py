@@ -19,6 +19,13 @@ _BREND_IKKILAMCHI_RATE_RE = re.compile(r"Ikkilamchi avtotransport uchun\s*-\s*(\
 _BREND_IKKILAMCHI_TERM_RE = re.compile(r"Ikkilamchi bozor uchun\s*-\s*(\d+)\s*oy")
 _BREND_IKKILAMCHI_DOWN_RE = re.compile(r"Ikkilamchi bozor uchun\s*-\s*(\d+)%")
 _MORTGAGE_TERM_RE = re.compile(r"Kredit muddati\s*\n+\s*(\d{1,2})\s*yil\b")
+# "Avtokredit 'Imkoniyat 2.0'" sahifasidagi ikkilamchi-bozor stavka qatori
+# "Ikkilamchi bozor" va "uchun" orasida ODDIY probel emas, uzilmaydigan
+# probel (\xa0) ishlatadi ("Birlamchi bozor uchun:" qatorida esa oddiy
+# probel bor) — \s* shu ikkalasini ham qamrab oladi. Muddat/badal
+# qatorlarida esa oddiy probel ishlatilgani uchun mavjud
+# _BREND_IKKILAMCHI_TERM_RE/_BREND_IKKILAMCHI_DOWN_RE qayta ishlatiladi.
+_IMKONIYAT_IKKILAMCHI_RATE_RE = re.compile(r"Ikkilamchi bozor\s*uchun:\s*\n*(\d{1,2}(?:[.,]\d{1,2})?)%")
 
 
 class TuronBankScraper(TextSectionScraper):
@@ -56,6 +63,11 @@ class TuronBankScraper(TextSectionScraper):
     url = "https://turonbank.uz/uz/private/crediting/"
     CATEGORY_URLS = {
         "avtokredit": "https://turonbank.uz/uz/private/crediting/uzauto-motors-avtokredit/",
+        # "Imkoniyat 2.0" — birlamchi bozor uchun brendsiz umumiy avtokredit
+        # emas, chunki "avtokredit" toifasi allaqachon "UzAuto Motors"
+        # sahifasidan olinadi; bu yerda faqat sahifaning IKKILAMCHI bozor
+        # qismi ishlatiladi (pastga qarang).
+        "avtokredit_ikkilamchi": "https://turonbank.uz/uz/private/crediting/avtokredit-imkoniyat/",
         "avtokredit_brend_birlamchi": "https://turonbank.uz/uz/private/crediting/avtokredit-ecogreencar/",
         # "Green Avto" sahifasining o'zi HAM birlamchi, HAM ikkilamchi bozor
         # shartlarini o'z ichiga oladi (bir xil URL, ikkinchi marta olinadi
@@ -67,6 +79,7 @@ class TuronBankScraper(TextSectionScraper):
     }
     PRODUCT_NAMES = {
         "avtokredit": '"UzAuto Motors" Avtokrediti',
+        "avtokredit_ikkilamchi": 'Avtokredit "Imkoniyat 2.0"',
         "avtokredit_brend_birlamchi": '"Green Avto" Avtokrediti',
         "avtokredit_brend_ikkilamchi": '"Green Avto" Avtokrediti',
         "ipoteka_tijorat": '"Yanada oson" ipoteka krediti',
@@ -91,6 +104,8 @@ class TuronBankScraper(TextSectionScraper):
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "avtokredit":
                     product = self._build_avtokredit_product(url, now, text)
+                elif category == "avtokredit_ikkilamchi":
+                    product = self._build_avtokredit_ikkilamchi_product(url, now, text)
                 else:
                     product = None
             except Exception:
@@ -122,6 +137,72 @@ class TuronBankScraper(TextSectionScraper):
             now,
             full_text=text,
             down_payment_pct=down_payment_pct,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
+
+    def _build_avtokredit_ikkilamchi_product(self, url, now, text):
+        """Avtokredit "Imkoniyat 2.0" — bitta sahifada HAM birlamchi, HAM
+        ikkilamchi bozor shartlarini o'z ichiga oladi (Green Avto
+        sahifasidagi bilan bir xil naqsh); "avtokredit" toifasi allaqachon
+        "UzAuto Motors" sahifasidan olingani uchun bu yerdan faqat
+        IKKILAMCHI qism ishlatiladi: "Ikkilamchi bozor uchun - 48 oygacha"
+        (muddat), "Ikkilamchi bozor uchun - 50%" (boshlang'ich badal) va
+        "Ikkilamchi bozor uchun: 25%" (stavka, bitta aniq qiymat, tierlar
+        yo'q). DIQQAT: stavka qatorida "bozor" va "uchun" orasida
+        uzilmaydigan probel (\xa0) ishlatilgan — muddat/badal qatorlarida
+        esa oddiy probel, shu sabab stavka uchun alohida
+        _IMKONIYAT_IKKILAMCHI_RATE_RE kerak, muddat/badal uchun esa "Green
+        Avto" sahifasida allaqachon tekshirilgan
+        _BREND_IKKILAMCHI_TERM_RE/_BREND_IKKILAMCHI_DOWN_RE qayta
+        ishlatiladi (ikkalasi ham shu bank saytining umumiy "Ikkilamchi
+        bozor uchun - N ..." shabloniga mos, bank-page-xos emas).
+
+        "Kreditning maksimal summasi" boshqa Turonbank sahifalaridagi kabi
+        so'm o'rniga "BHMning 2000 barobaridan oshmagan" deb berilgan —
+        literal son emas, shu sabab e'tiborga olinmaydi; o'rniga
+        interaktiv kalkulyatorning "Zarur summa" slayderi bank hisoblagan
+        aniq ekvivalentni beradi ("824 million so'mgacha", "avtokredit"
+        toifasidagi bilan bir xil yechim).
+
+        To'lov usuli/imtiyozli davr — butun sahifaga (ham birlamchi, ham
+        ikkilamchi qismga) tegishli umumiy ma'lumotlar: "To'lov usuli:
+        Annuitet", "Imtiyozli davr: Yo'q" (0 oy) — "avtokredit" toifasidagi
+        bilan bir xil tor bo'limlardan olinadi."""
+        rate_match = _IMKONIYAT_IKKILAMCHI_RATE_RE.search(text)
+        rate = float(rate_match.group(1).replace(",", ".")) if rate_match else None
+
+        term_match = _BREND_IKKILAMCHI_TERM_RE.search(text)
+        term = int(term_match.group(1)) if term_match else None
+
+        down_payment_match = _BREND_IKKILAMCHI_DOWN_RE.search(text)
+        down_payment_pct = float(down_payment_match.group(1)) if down_payment_match else None
+
+        amount_section = extract_section(text, "Zarur summa", "Kredit muddati")
+        amount = extract_amount_som(amount_section)
+
+        payment_method_section = extract_section(text, "lov usuli", "Rasmiylashtirish usuli")
+        payment_method = extract_payment_method(payment_method_section)
+
+        grace_section = extract_section(text, "Imtiyozli davr", "Jismoniy shaxslar uchun tariflar")
+        grace_period_months = extract_grace_period_months("Imtiyozli davr" + grace_section)
+
+        if rate is None or term is None or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="avtokredit_ikkilamchi",
+            product_name=self.PRODUCT_NAMES["avtokredit_ikkilamchi"],
+            rate_min=rate,
+            rate_max=rate,
+            term_min_months=term,
+            term_max_months=term,
+            amount_max_som=amount,
+            requires_collateral=has_collateral_requirement(text),
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
             grace_period_months=grace_period_months,
             payment_method=payment_method,
         )

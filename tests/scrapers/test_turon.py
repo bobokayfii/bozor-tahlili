@@ -9,6 +9,9 @@ FIXTURE_BY_URL = {
     TuronBankScraper.CATEGORY_URLS["avtokredit"]: (FIXTURES_DIR / "turon_avtokredit.html").read_text(
         encoding="utf-8"
     ),
+    TuronBankScraper.CATEGORY_URLS["avtokredit_ikkilamchi"]: (
+        FIXTURES_DIR / "turon_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     TuronBankScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
         FIXTURES_DIR / "turon_avtokredit_brend_birlamchi.html"
     ).read_text(encoding="utf-8"),
@@ -43,6 +46,36 @@ def test_turon_avtokredit_parses_correctly():
     assert avtokredit.down_payment_pct == 30.0
     assert avtokredit.grace_period_months == 0
     assert avtokredit.payment_method == "Annuitet"
+
+
+def test_turon_avtokredit_ikkilamchi_parses_correctly():
+    """Avtokredit "Imkoniyat 2.0" — bitta sahifada birlamchi VA ikkilamchi
+    bozor shartlari aralash beriladi ("avtokredit" toifasi allaqachon
+    "UzAuto Motors" sahifasidan olinadi, shu sabab bu yerdan faqat
+    IKKILAMCHI qism olinadi): "Ikkilamchi bozor uchun - 48 oygacha"
+    (muddat), "Ikkilamchi bozor uchun - 50%" (boshlang'ich badal, oddiy
+    probel bilan), "Ikkilamchi bozor\xa0uchun: 25%" (stavka, DIQQAT —
+    "bozor" va "uchun" orasida uzilmaydigan probel \xa0, oddiy probel
+    emas — shu sabab stavka uchun alohida regex kerak, muddat/badal
+    uchun esa "Green Avto" sahifasidagi umumiy regexlar qayta
+    ishlatiladi). Summa rasmiy ro'yxatda "BHMning 2000 barobaridan
+    oshmagan" deb berilgan — bank hisoblagan "Zarur summa" kalkulyator
+    slayderining so'm ekvivalenti ("824 million so'mgacha") ishlatiladi."""
+    with patch("scrapers.turon.fetch_html", side_effect=_fake_fetch):
+        products = TuronBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    assert ikkilamchi.bank == "Turonbank"
+    assert ikkilamchi.product_name == 'Avtokredit "Imkoniyat 2.0"'
+    assert ikkilamchi.rate_min == 25.0
+    assert ikkilamchi.rate_max == 25.0
+    assert ikkilamchi.term_min_months == 48
+    assert ikkilamchi.term_max_months == 48
+    assert ikkilamchi.amount_max_som == 824_000_000
+    assert ikkilamchi.down_payment_pct == 50.0
+    assert ikkilamchi.grace_period_months == 0
+    assert ikkilamchi.payment_method == "Annuitet"
+    assert ikkilamchi.requires_collateral is True
 
 
 def test_turon_avtokredit_brend_birlamchi_parses_correctly():
