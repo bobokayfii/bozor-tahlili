@@ -18,6 +18,7 @@ from scrapers.saderat import SaderatBankScraper
 from scrapers.sqb import SQBScraper
 from scrapers.tbc import TBCBankScraper
 from scrapers.tenge import TengeBankScraper
+from scrapers.trastbank import TrastBankScraper
 from scrapers.turon import TuronBankScraper
 from scrapers.xalqbank import XalqBankScraper
 
@@ -44,4 +45,5 @@ ALL_SCRAPERS = [
     ApexBankScraper,
     BDBScraper,
     OFBScraper,
+    TrastBankScraper,
 ]
