@@ -40,6 +40,7 @@ class MikrokreditBankScraper(TextSectionScraper):
         "avtokredit_brend_ikkilamchi": "https://mkbank.uz/uz/private/crediting/car-loan-second/",
         "avtokredit_elektro": "https://mkbank.uz/uz/private/crediting/avtokredit-leapmotor/",
         "mikroqarz": "https://mkbank.uz/uz/private/crediting/microloan/",
+        "mikroqarz_onlayn": "https://mkbank.uz/uz/private/crediting/microloan/",
         "ipoteka_davlat": "https://mkbank.uz/uz/private/crediting/imkoniyat-ipotekasi-krediti/",
         # Taxminiy (best-guess) — sinf docstringiga qarang.
         "kredit_karta": "https://mkbank.uz/uz/private/crediting/qulay-overdraft/",
@@ -62,6 +63,7 @@ class MikrokreditBankScraper(TextSectionScraper):
         "avtokredit_brend_ikkilamchi": "Foydalanilgan avtomobillar uchun avtokredit",
         "avtokredit_elektro": "Avtokredit Leapmotor",
         "mikroqarz": "Mikroqarz",
+        "mikroqarz_onlayn": 'Onlayn Mikroqarz "Ommabop"',
         "ipoteka_davlat": "Imkoniyat ipotekasi krediti",
     }
 
@@ -88,6 +90,8 @@ class MikrokreditBankScraper(TextSectionScraper):
                     product = self._build_avtokredit_elektro_product(url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
+                elif category == "mikroqarz_onlayn":
+                    product = self._build_mikroqarz_onlayn_product(url, now)
                 elif category == "ipoteka_davlat":
                     product = self._build_ipoteka_davlat_product(url, now, text)
                 else:
@@ -204,6 +208,33 @@ class MikrokreditBankScraper(TextSectionScraper):
             scraped_at=now,
             grace_period_months=grace_period_months,
             payment_method=payment_method,
+        )
+
+    def _build_mikroqarz_onlayn_product(self, url, now):
+        """"Onlayn Mikroqarz 'Ommabop'" — "mikroqarzlar" hub sahifasidagi
+        kartochka Mavrid mobil ilovasini yuklab olishni taklif qiladi,
+        lekin hech qanday stavka/muddat/summa raqamini ko'rsatmaydi (avval
+        bu yerda "Vaqtincha to'xtatilgan" yozuvi bor edi, 2026-08-12
+        holatiga ko'ra u ham yo'qolgan). Foydalanuvchining aniq
+        ko'rsatmasiga ko'ra, sayt raqam bermagan hollarda mustaqil
+        tasdiqlangan pptx manbasidan olinadi ("Ommabop-2": 26-29%, 24
+        oygacha, 50 mln so'mgacha)."""
+        return Product(
+            bank=self.bank_name,
+            category="mikroqarz_onlayn",
+            product_name=self.PRODUCT_NAMES["mikroqarz_onlayn"],
+            rate_min=26.0,
+            rate_max=29.0,
+            term_min_months=1,
+            term_max_months=24,
+            amount_max_som=50_000_000,
+            requires_collateral=False,
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method=None,
+            special_terms="Raqamlar pptx manbasidan — saytda stavka/muddat ko'rsatilmagan",
         )
 
     def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):

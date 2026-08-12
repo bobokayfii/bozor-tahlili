@@ -25,18 +25,6 @@ UNAVAILABLE_BANKS: dict[str, list[UnavailableBank]] = {
     "istemol_krediti": [
         UnavailableBank(bank="AgroBank", reason="Mahsulot mavjud emas"),
     ],
-    "mikroqarz_onlayn": [
-        # Mikrokreditbank'ning "mikroqarzlar" hub sahifasidagi "Onlayn
-        # Mikroqarz" (Ommabop, Mavrid ilovasi orqali) kartochkasi 2026-08-12
-        # holatiga ko'ra endi "Vaqtincha to'xtatilgan" deb yozilmagan (bu
-        # yozuv 2026-08-10'da bor edi, hozir yo'q) — lekin kartochkaning
-        # o'zida hech qanday stavka/muddat/summa ko'rsatilmagan, faqat
-        # Mavrid ilovasini yuklab olish taklif qilinadi (Google Play/App
-        # Store havolalari). Saytda haqiqiy raqamlar yo'qligi sababli
-        # Product qurib bo'lmaydi — pptx'dagi "26-29%, 50 mln" taxminiy
-        # raqamlarini tasdiqlab bo'lmadi, shu sabab ular ishlatilmadi.
-        UnavailableBank(bank="Mikrokreditbank", reason="Faqat mobil ilova orqali, saytda stavka ko'rsatilmagan"),
-    ],
 }
 
 

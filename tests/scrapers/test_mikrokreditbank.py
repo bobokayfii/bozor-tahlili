@@ -40,11 +40,11 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_mikrokreditbank_scraper_parses_all_nine_categories():
+def test_mikrokreditbank_scraper_parses_all_ten_categories():
     with patch("scrapers.mikrokreditbank.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = MikrokreditBankScraper().run()
 
-    assert mock_fetch.call_count == 9
+    assert mock_fetch.call_count == 10
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
@@ -53,11 +53,31 @@ def test_mikrokreditbank_scraper_parses_all_nine_categories():
         "avtokredit_brend_ikkilamchi",
         "avtokredit_elektro",
         "mikroqarz",
+        "mikroqarz_onlayn",
         "kredit_karta",
         "istemol_krediti",
         "ipoteka_davlat",
     }
     assert all(p.bank == "Mikrokreditbank" for p in products)
+
+
+def test_mikrokreditbank_mikroqarz_onlayn_uses_pptx_sourced_figures():
+    """"Onlayn Mikroqarz 'Ommabop'" kartochkasi Mavrid ilovasini yuklab
+    olishni taklif qiladi, lekin hech qanday stavka/muddat/summa
+    ko'rsatmaydi — foydalanuvchining aniq ko'rsatmasiga ko'ra, sayt raqam
+    bermagan hollarda mustaqil tasdiqlangan pptx manbasidan olinadi
+    (26-29%, 24 oygacha, 50 mln so'm)."""
+    with patch("scrapers.mikrokreditbank.fetch_html", side_effect=_fake_fetch):
+        products = MikrokreditBankScraper().run()
+
+    onlayn = next(p for p in products if p.category == "mikroqarz_onlayn")
+    assert onlayn.bank == "Mikrokreditbank"
+    assert onlayn.product_name == 'Onlayn Mikroqarz "Ommabop"'
+    assert onlayn.rate_min == 26.0
+    assert onlayn.rate_max == 29.0
+    assert onlayn.term_max_months == 24
+    assert onlayn.amount_max_som == 50_000_000
+    assert onlayn.requires_collateral is False
 
 
 def test_mikrokreditbank_avtokredit_elektro_parses_correctly():

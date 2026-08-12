@@ -12,6 +12,9 @@ FIXTURE_BY_URL = {
     TBCBankScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (
         FIXTURES_DIR / "tbc_mikroqarz_onlayn.html"
     ).read_text(encoding="utf-8"),
+    TBCBankScraper.CATEGORY_URLS["kredit_karta"]: (
+        FIXTURES_DIR / "tbc_kredit_karta.html"
+    ).read_text(encoding="utf-8"),
 }
 
 
@@ -90,3 +93,23 @@ def test_tbc_mikroqarz_onlayn_parses_correctly():
     assert onlayn.grace_period_months is None
     assert onlayn.payment_method is None
     assert onlayn.requires_collateral is False
+
+
+def test_tbc_kredit_karta_uses_pptx_sourced_figures():
+    """"TBC Osmon" kredit kartasi sahifasida haqiqiy foiz stavkasi umuman
+    ko'rsatilmagan ("Bu foiz stavkasini TBC UZ ilovasining ... 'Shartlar'
+    bo'limida bilib olishingiz mumkin" deyilgan) — foydalanuvchining aniq
+    ko'rsatmasiga ko'ra, sayt raqam bermagan hollarda mustaqil
+    tasdiqlangan pptx manbasidan olinadi (0-50%, 50 mln so'm limit,
+    "Аннуитетный, дифференциальный" to'lov usuli)."""
+    with patch("scrapers.tbc.fetch_html", side_effect=_fake_fetch):
+        products = TBCBankScraper().run()
+
+    karta = next(p for p in products if p.category == "kredit_karta")
+    assert karta.bank == "TBC Bank"
+    assert karta.product_name == '"TBC Osmon" kredit kartasi'
+    assert karta.rate_min == 0.0
+    assert karta.rate_max == 50.0
+    assert karta.amount_max_som == 50_000_000
+    assert karta.payment_method == "Annuitet, Differensial"
+    assert karta.requires_collateral is False

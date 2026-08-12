@@ -67,13 +67,16 @@ class TBCBankScraper(TextSectionScraper):
     CATEGORY_URLS = {
         "avtokredit_brend_birlamchi": "https://tbcbank.uz/product/avtokredit/",
         "mikroqarz_onlayn": "https://tbcbank.uz/product/mikrokredit/",
+        "kredit_karta": "https://tbcbank.uz/product/credit-card/",
     }
     FORCE_COLLATERAL = {
         "avtokredit_brend_birlamchi": True,
+        "kredit_karta": False,
     }
     PRODUCT_NAMES = {
         "avtokredit_brend_birlamchi": "TBC Avtokredit",
         "mikroqarz_onlayn": "TBC mikroqarz",
+        "kredit_karta": '"TBC Osmon" kredit kartasi',
     }
 
     def run(self):
@@ -85,6 +88,8 @@ class TBCBankScraper(TextSectionScraper):
                 text = html_to_text(html)
                 if category == "avtokredit_brend_birlamchi":
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
+                elif category == "kredit_karta":
+                    product = self._build_kredit_karta_product(url, now)
                 else:
                     product = self._build_mikroqarz_onlayn_product(url, now, text)
             except Exception:
@@ -93,6 +98,38 @@ class TBCBankScraper(TextSectionScraper):
             if product is not None:
                 products.append(product)
         return products
+
+    def _build_kredit_karta_product(self, url, now):
+        """"TBC Osmon" kredit kartasi — sahifaning o'zida (55 kunlik
+        imtiyozli davr, 50 mln so'mlik limit va jarima stavkalari bundan
+        mustasno) haqiqiy foiz stavkasi umuman ko'rsatilmagan — "Bu foiz
+        stavkasini TBC UZ ilovasining ... 'Shartlar' bo'limida bilib
+        olishingiz mumkin" deb aniq yozilgan. Saytdan stavka olib
+        bo'lmagani uchun (foydalanuvchining aniq ko'rsatmasiga ko'ra)
+        raqamlar mustaqil tasdiqlangan pptx manbasidan olindi (0-50%,
+        55 kun imtiyozli davr, 50 mln so'm limit, "Аннуитетный,
+        дифференциальный" to'lov usuli) — bu bitta istisno, boshqa hech
+        bir toifada pptx raqamlari to'g'ridan-to'g'ri ishlatilmaydi."""
+        return Product(
+            bank=self.bank_name,
+            category="kredit_karta",
+            product_name=self.PRODUCT_NAMES["kredit_karta"],
+            rate_min=0.0,
+            rate_max=50.0,
+            term_min_months=1,
+            term_max_months=2,
+            amount_max_som=50_000_000,
+            requires_collateral=self.FORCE_COLLATERAL["kredit_karta"],
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method="Annuitet, Differensial",
+            special_terms=(
+                "Imtiyozli (foizsiz) davr: 55 kungacha — aylanma kredit karta, "
+                "oylik muddat emas (pptx manbasidan, saytda raqamlar ko'rsatilmagan)"
+            ),
+        )
 
     def _build_avtokredit_brend_birlamchi_product(self, url, now, text):
         terms_section = extract_section(
