@@ -11,6 +11,9 @@ _TERM_RE = re.compile(r"Срок до (\d{1,3})\s*месяцев")
 _MIKROZAYM_AMOUNT_RE = re.compile(r"До (\d{1,4})\s*млн\s*сум")
 _MIKROZAYM_RATE_RE = re.compile(r"от (\d{1,2})% до (\d{1,2})%")
 _MIKROZAYM_TERM_RE = re.compile(r"Срок (\d{1,3}) месяцев")
+_KARTA_AMOUNT_RE = re.compile(r"(\d{1,3})\s*mln\s*so.mgacha")
+_KARTA_VALIDITY_RE = re.compile(r"(\d{1,3})\s*oy davomida amal qiladi")
+_KARTA_CONTRACT_TERM_RE = re.compile(r"amal qilish muddati\s*-\s*(\d{1,3})\s*oy")
 
 
 class AnorbankScraper(TextSectionScraper):
@@ -60,12 +63,14 @@ class AnorbankScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": "https://anorbank.uz/uz/credits/avtokredit/",
         "avtokredit_brend_birlamchi": "https://anorbank.uz/uz/credits/avtokredit4-0/",
         "mikroqarz_onlayn": "https://anorbank.uz/uz/credits/udobnyy-mikrozaym/",
+        "kredit_karta": "https://anorbank.uz/uz/cards/card-installment-uz/",
     }
     PRODUCT_NAMES = {
         "avtokredit": "Автокредит 3.0",
         "avtokredit_ikkilamchi": "Автокредит 3.0",
         "avtokredit_brend_birlamchi": "Автокредит 4.0",
         "mikroqarz_onlayn": "Удобный микрозайм",
+        "kredit_karta": "ANOR nasiya muddatli to'lov kartasi",
     }
 
     def run(self) -> list[Product]:
@@ -77,6 +82,8 @@ class AnorbankScraper(TextSectionScraper):
                 text = html_to_text(html)
                 if category == "mikroqarz_onlayn":
                     product = self._build_mikrozaym_product(url, now, text)
+                elif category == "kredit_karta":
+                    product = self._build_kredit_karta_product(url, now, text)
                 else:
                     product = self._build_avtokredit_product(category, url, now, text)
             except Exception:
@@ -84,6 +91,46 @@ class AnorbankScraper(TextSectionScraper):
             if product is not None:
                 products.append(product)
         return products
+
+    def _build_kredit_karta_product(self, url: str, now: datetime, text: str) -> Product | None:
+        """"ANOR nasiya muddatli to'lov kartasi" — hamkorlar tarmog'i
+        doirasida foydalanilganda komissiya 0% (haqiqiy foiz stavkasi
+        yo'q, boshqa kartaga o'tkazmalar uchun esa muddatga bog'liq
+        komissiya — 1/3/6/12 oy uchun 5,5%/12%/20%/35% — qo'llanadi, lekin
+        bu "foiz stavkasi" emas, alohida komissiya modeli).
+
+        "Muddatli to'lov kartasi 48 oy davomida amal qiladi" (karta
+        amal qilish muddati) va "Muddatli to'lov bo'yicha shartnoma amal
+        qilish muddati - 36 oy" (shartnoma muddati) — ikkalasi ham sahifada
+        aniq yozilgan, pptx'dagi "36-48 oy" oralig'iga mos keladi. Limit
+        "50 mln so'mgacha" / "50 000 000 so'mgacha" ikkala shaklda ham
+        takrorlanadi."""
+        amount_match = _KARTA_AMOUNT_RE.search(text)
+        amount = int(amount_match.group(1)) * 1_000_000 if amount_match else None
+
+        validity_match = _KARTA_VALIDITY_RE.search(text)
+        contract_match = _KARTA_CONTRACT_TERM_RE.search(text)
+        if not (validity_match and contract_match and amount):
+            return None
+
+        terms = [int(validity_match.group(1)), int(contract_match.group(1))]
+
+        return Product(
+            bank=self.bank_name,
+            category="kredit_karta",
+            product_name=self.PRODUCT_NAMES["kredit_karta"],
+            rate_min=0.0,
+            rate_max=0.0,
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=False,
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method="Differensial",
+        )
 
     def _build_avtokredit_product(self, category: str, url: str, now: datetime, text: str) -> Product | None:
         section = extract_section(text, "Условия автокредита", "Kalkulyator")

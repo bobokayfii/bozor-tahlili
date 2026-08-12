@@ -19,6 +19,7 @@ import asiaalliancebankLogo from '../assets/bank-logos/asiaalliancebank.svg'
 import brbLogo from '../assets/bank-logos/brb.svg'
 import ofbLogo from '../assets/bank-logos/ofb.svg'
 import trastbankLogo from '../assets/bank-logos/trastbank.svg'
+import apexLogo from '../assets/bank-logos/apex.svg'
 
 const BANK_LOGOS: Record<string, string> = {
   nbu: nbuLogo,
@@ -42,6 +43,7 @@ const BANK_LOGOS: Record<string, string> = {
   brb: brbLogo,
   ofb: ofbLogo,
   trastbank: trastbankLogo,
+  'apex bank': apexLogo,
 }
 
 export function getBankLogo(bank: string): string | undefined {

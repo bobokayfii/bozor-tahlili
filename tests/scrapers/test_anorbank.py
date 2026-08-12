@@ -15,6 +15,9 @@ FIXTURE_BY_URL = {
     AnorbankScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (FIXTURES_DIR / "anorbank_mikrozaym.html").read_text(
         encoding="utf-8"
     ),
+    AnorbankScraper.CATEGORY_URLS["kredit_karta"]: (FIXTURES_DIR / "anorbank_kredit_karta.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -97,3 +100,24 @@ def test_anorbank_mikrozaym_onlayn_parses_correctly():
     assert product.down_payment_pct is None
     assert product.requires_collateral is False
     assert product.payment_method is None
+
+
+def test_anorbank_kredit_karta_parses_correctly():
+    """"ANOR nasiya muddatli to'lov kartasi" — hamkorlar tarmog'ida
+    foydalanilganda komissiya 0% (haqiqiy foiz stavkasi yo'q, boshqa
+    kartaga o'tkazmalar uchun muddatga bog'liq komissiya bor, lekin bu
+    "foiz stavkasi" emas). Karta 48 oy amal qiladi, shartnoma muddati 36
+    oy — ikkalasi ham sahifada aniq yozilgan."""
+    with patch("scrapers.anorbank.fetch_html", side_effect=_fake_fetch):
+        products = AnorbankScraper().run()
+
+    product = next(p for p in products if p.category == "kredit_karta")
+    assert product.product_name == "ANOR nasiya muddatli to'lov kartasi"
+    assert product.rate_min == 0.0
+    assert product.rate_max == 0.0
+    assert product.term_min_months == 36
+    assert product.term_max_months == 48
+    assert product.amount_max_som == 50_000_000
+    assert product.down_payment_pct is None
+    assert product.requires_collateral is False
+    assert product.payment_method == "Differensial"
