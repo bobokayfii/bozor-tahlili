@@ -38,6 +38,7 @@ class MikrokreditBankScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": "https://mkbank.uz/uz/private/crediting/car-loan-second/",
         "avtokredit_brend_birlamchi": "https://mkbank.uz/uz/private/crediting/avtokrediti-adm-global-/",
         "avtokredit_brend_ikkilamchi": "https://mkbank.uz/uz/private/crediting/car-loan-second/",
+        "avtokredit_elektro": "https://mkbank.uz/uz/private/crediting/avtokredit-leapmotor/",
         "mikroqarz": "https://mkbank.uz/uz/private/crediting/microloan/",
         "ipoteka_davlat": "https://mkbank.uz/uz/private/crediting/imkoniyat-ipotekasi-krediti/",
         # Taxminiy (best-guess) — sinf docstringiga qarang.
@@ -52,12 +53,14 @@ class MikrokreditBankScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": True,
         "avtokredit_brend_birlamchi": True,
         "avtokredit_brend_ikkilamchi": True,
+        "avtokredit_elektro": True,
     }
     PRODUCT_NAMES = {
         "avtokredit": "Avtokredit UzAuto Motors",
         "avtokredit_ikkilamchi": "Foydalanilgan avtomobillar uchun avtokredit",
         "avtokredit_brend_birlamchi": "Avtokredit ADM GLOBAL",
         "avtokredit_brend_ikkilamchi": "Foydalanilgan avtomobillar uchun avtokredit",
+        "avtokredit_elektro": "Avtokredit Leapmotor",
         "mikroqarz": "Mikroqarz",
         "ipoteka_davlat": "Imkoniyat ipotekasi krediti",
     }
@@ -81,6 +84,8 @@ class MikrokreditBankScraper(TextSectionScraper):
                     product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "avtokredit_brend_birlamchi":
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
+                elif category == "avtokredit_elektro":
+                    product = self._build_avtokredit_elektro_product(url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
                 elif category == "ipoteka_davlat":
@@ -292,6 +297,55 @@ class MikrokreditBankScraper(TextSectionScraper):
             term_max_months=max(terms),
             amount_max_som=amount,
             requires_collateral=self.FORCE_COLLATERAL["avtokredit_brend_birlamchi"],
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
+
+    def _build_avtokredit_elektro_product(self, url, now, text):
+        """"Avtokredit Leapmotor" — "Leapmotor" avtomobilini xarid qilish
+        uchun avtokredit ("Skyline Global" bilan hamkorlikda). Leapmotor —
+        xitoylik elektromobil brendi, "Kredit maqsadi" bandida aniq
+        "Leapmotor avtomobilini birlamchi bozordan xarid qilish uchun"
+        deyilgan (faqat birlamchi bozor, ikkilamchi haqida gap yo'q).
+
+        ADM GLOBAL sahifasidagi bilan bir xil jadval shabloni: "LEAPMOTOR"
+        sarlavhasi ostida boshlang'ich badal ulushi (25%-60%) x muddat
+        (12-60 oy) bo'yicha guruhlangan bitta narx jadvali (0,0% dan 16,0%
+        gacha). Ulush yorliqlari butun son, haqiqiy stavkalar vergul-kasr
+        — shu farq orqali _ADM_RATE_RE/_ADM_TIER_RE bilan ajratiladi (ADM
+        GLOBAL bilan bir xil regexlar qayta ishlatiladi, chunki naqsh
+        bank-sahifa-xos emas, umumiy shablon)."""
+        block = extract_section(text, "LEAPMOTOR", "Kredit oluvchi bankka")
+        rates = [float(m.replace(",", ".")) for m in self._ADM_RATE_RE.findall(block)]
+        terms = [int(m) for m in self._ADM_TERM_RE.findall(block)]
+        tiers = [int(m) for m in self._ADM_TIER_RE.findall(block)]
+        down_payment_pct = float(min(tiers)) if tiers else None
+
+        amount_section = extract_section(text, "Kredit miqdori", "Kredit maqsadi")
+        amount = extract_amount_som(amount_section)
+
+        payment_method_section = extract_section(text, "lov usuli", "Kreditni rasmiylashtirish")
+        payment_method = extract_payment_method(payment_method_section)
+
+        grace_section = extract_section(text, "Imtiyozli davr", "Kredit ta")
+        grace_period_months = extract_grace_period_months("Imtiyozli davr" + grace_section)
+
+        if not rates or not terms or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="avtokredit_elektro",
+            product_name=self.PRODUCT_NAMES["avtokredit_elektro"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=self.FORCE_COLLATERAL["avtokredit_elektro"],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

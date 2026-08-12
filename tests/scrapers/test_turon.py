@@ -15,6 +15,9 @@ FIXTURE_BY_URL = {
     TuronBankScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
         FIXTURES_DIR / "turon_avtokredit_brend_birlamchi.html"
     ).read_text(encoding="utf-8"),
+    TuronBankScraper.CATEGORY_URLS["avtokredit_elektro"]: (
+        FIXTURES_DIR / "turon_avtokredit_brend_birlamchi.html"
+    ).read_text(encoding="utf-8"),
     TuronBankScraper.CATEGORY_URLS["ipoteka_tijorat"]: (
         FIXTURES_DIR / "turon_ipoteka_tijorat.html"
     ).read_text(encoding="utf-8"),
@@ -104,6 +107,26 @@ def test_turon_avtokredit_brend_birlamchi_parses_correctly():
     assert brend.grace_period_months == 0
     assert brend.payment_method == "Annuitet, Differensial"
     assert brend.requires_collateral is True
+
+
+def test_turon_avtokredit_elektro_matches_brend_birlamchi():
+    """"Green Avto" sahifasining "Kredit maqsadi" bandida "birlamchi
+    bozordan (yoqilg'i turi benzin, dizel, elektromobil hamda gibrid)"
+    deyilgan — birlamchi jadval barcha yoqilg'i turlarini bitta stavka
+    bilan qamrab oladi, alohida elektro-xos jadval yo'q — shu sabab bir
+    xil sahifa/qiymatlar "avtokredit_elektro" toifasiga ham xaritalanadi."""
+    with patch("scrapers.turon.fetch_html", side_effect=_fake_fetch):
+        products = TuronBankScraper().run()
+
+    brend = next(p for p in products if p.category == "avtokredit_brend_birlamchi")
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    assert elektro.product_name == brend.product_name
+    assert elektro.rate_min == brend.rate_min
+    assert elektro.rate_max == brend.rate_max
+    assert elektro.term_min_months == brend.term_min_months
+    assert elektro.term_max_months == brend.term_max_months
+    assert elektro.amount_max_som == brend.amount_max_som
+    assert elektro.requires_collateral is True
 
 
 def test_turon_avtokredit_brend_ikkilamchi_parses_correctly():

@@ -74,6 +74,13 @@ class TuronBankScraper(TextSectionScraper):
         # — chunki ikkilamchi qismning stavka/muddat/badal qiymatlari
         # birlamchidan butunlay farq qiladi va alohida kategoriya hisoblanadi).
         "avtokredit_brend_ikkilamchi": "https://turonbank.uz/uz/private/crediting/avtokredit-ecogreencar/",
+        # "Kredit maqsadi" bandida so'zma-so'z "birlamchi bozordan (yoqilg'i
+        # turi benzin, dizel, elektromobil hamda gibrid)" deyilgan — ya'ni
+        # birlamchi jadval barcha yoqilg'i turlarini (elektromobil/gibrid
+        # ham) bitta stavka bilan qamrab oladi, alohida elektro-xos jadval
+        # yo'q — shu sabab bir xil sahifa/qiymatlar "avtokredit_elektro"
+        # toifasiga ham xaritalanadi.
+        "avtokredit_elektro": "https://turonbank.uz/uz/private/crediting/avtokredit-ecogreencar/",
         "ipoteka_tijorat": "https://turonbank.uz/uz/private/crediting/ipoteka-krediti-yagona-oson/",
         "mikroqarz": "https://turonbank.uz/uz/private/crediting/mikroqarz/",
     }
@@ -82,6 +89,7 @@ class TuronBankScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": 'Avtokredit "Imkoniyat 2.0"',
         "avtokredit_brend_birlamchi": '"Green Avto" Avtokrediti',
         "avtokredit_brend_ikkilamchi": '"Green Avto" Avtokrediti',
+        "avtokredit_elektro": '"Green Avto" Avtokrediti',
         "ipoteka_tijorat": '"Yanada oson" ipoteka krediti',
         "mikroqarz": "Mikroqarz",
     }
@@ -96,8 +104,8 @@ class TuronBankScraper(TextSectionScraper):
 
                 if category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
-                elif category == "avtokredit_brend_birlamchi":
-                    product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
+                elif category in ("avtokredit_brend_birlamchi", "avtokredit_elektro"):
+                    product = self._build_avtokredit_brend_birlamchi_product(category, url, now, text)
                 elif category == "avtokredit_brend_ikkilamchi":
                     product = self._build_avtokredit_brend_ikkilamchi_product(url, now, text)
                 elif category == "ipoteka_tijorat":
@@ -207,7 +215,7 @@ class TuronBankScraper(TextSectionScraper):
             payment_method=payment_method,
         )
 
-    def _build_avtokredit_brend_birlamchi_product(self, url, now, text):
+    def _build_avtokredit_brend_birlamchi_product(self, category, url, now, text):
         """"Green Avto" Avtokrediti — "Chetdan import qilingan ...
         birlamchi bozordan (benzin, dizel, elektromobil hamda gibrid) va
         ikkilamchi bozordan (benzin) avtotransport vositalarini sotib olish
@@ -220,6 +228,13 @@ class TuronBankScraper(TextSectionScraper):
         badal ulushiga qarab 22.99% / 21.99% / 20.99%) va alohida
         "Birlamchi bozor uchun - N oy" / "- N% dan boshlab" iboralaridan
         muddat va boshlang'ich badal olinadi.
+
+        Birlamchi jadval o'zi barcha yoqilg'i turlarini (benzin, dizel,
+        elektromobil, gibrid) bitta stavka bilan qamrab oladi — alohida
+        elektro-xos jadval yo'q — shu sabab bir xil sahifa/qiymatlar
+        "avtokredit_elektro" toifasiga ham xaritalanadi (bir xil URL, shu
+        metod ikkalasi uchun ham chaqiriladi, faqat `category` parametri
+        farq qiladi).
 
         "Kreditning maksimal summasi" rasmiy ro'yxatda so'm o'rniga "2000
         (BHM)" sifatida berilgan — BHM qiymati farmon asosida o'zgarib
@@ -251,8 +266,8 @@ class TuronBankScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_brend_birlamchi",
-            product_name=self.PRODUCT_NAMES["avtokredit_brend_birlamchi"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=term,
