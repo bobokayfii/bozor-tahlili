@@ -9,6 +9,9 @@ FIXTURE_BY_URL = {
     BDBScraper.CATEGORY_URLS["avtokredit"]: (FIXTURES_DIR / "bdb_avtokredit.html").read_text(encoding="utf-8"),
     BDBScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "bdb_mikroqarz.html").read_text(encoding="utf-8"),
     BDBScraper.CATEGORY_URLS["ipoteka_davlat"]: (FIXTURES_DIR / "bdb_ipoteka.html").read_text(encoding="utf-8"),
+    BDBScraper.CATEGORY_URLS["istemol_krediti"]: (FIXTURES_DIR / "brb_istemol_krediti.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -76,4 +79,26 @@ def test_bdb_ipoteka_davlat_parses_correctly():
     assert product.down_payment_pct == 15.0
     assert product.requires_collateral is True
     assert product.grace_period_months == 6
+    assert product.payment_method == "Annuitet, Differensial"
+
+
+def test_bdb_istemol_krediti_parses_correctly():
+    """"Asosiy shartlar" bo'limi mijoz segmenti bo'yicha 3 qatorli jadval
+    beradi: "Kredit muddati" (5/3/5 yilgacha), "Kredit foiz stavkasi"
+    (23%/25%/27%) — bu jadval sahifa yuqorisidagi qisqacha xulosa
+    kartochkasidan ("23% -27%", "5 yilgacha") ustuvor, chunki muddat
+    bo'yicha ham aniq oraliq (3-5 yil) beradi."""
+    with patch("scrapers.bdb.fetch_html", side_effect=_fake_fetch):
+        products = BDBScraper().run()
+
+    product = next(p for p in products if p.category == "istemol_krediti")
+    assert product.bank == "BRB"
+    assert product.product_name == "Iste'mol krediti"
+    assert product.rate_min == 23.0
+    assert product.rate_max == 27.0
+    assert product.term_min_months == 36
+    assert product.term_max_months == 60
+    assert product.amount_max_som == 200_000_000
+    assert product.requires_collateral is True
+    assert product.grace_period_months == 3
     assert product.payment_method == "Annuitet, Differensial"

@@ -54,11 +54,13 @@ class BDBScraper(TextSectionScraper):
         "avtokredit": "https://brb.uz/jismoniy-shaxslarga/kreditlar/avtokredit",
         "mikroqarz": "https://brb.uz/jismoniy-shaxslarga/kreditlar/mikroqarz",
         "ipoteka_davlat": "https://brb.uz/jismoniy-shaxslarga/ipoteka/birlamchi-ipoteka",
+        "istemol_krediti": "https://brb.uz/jismoniy-shaxslarga/kreditlar/potrebitelskiy-kredit",
     }
     PRODUCT_NAMES = {
         "avtokredit": "Avtokredit",
         "mikroqarz": "Mikroqarz",
         "ipoteka_davlat": "Birlamchi ipoteka",
+        "istemol_krediti": "Iste'mol krediti",
     }
 
     def run(self) -> list[Product]:
@@ -72,6 +74,8 @@ class BDBScraper(TextSectionScraper):
                     product = self._build_avtokredit_product(url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
+                elif category == "istemol_krediti":
+                    product = self._build_istemol_krediti_product(url, now, text)
                 else:
                     product = self._build_ipoteka_product(url, now, text)
             except Exception:
@@ -120,6 +124,53 @@ class BDBScraper(TextSectionScraper):
             scraped_at=now,
             grace_period_months=grace_period_months,
             payment_method=extract_payment_method(section),
+        )
+
+    def _build_istemol_krediti_product(self, url: str, now: datetime, text: str) -> Product | None:
+        """"Iste'mol krediti" — sahifadagi "Asosiy shartlar" bo'limi mijoz
+        segmenti bo'yicha 3 ta qatordan iborat jadval beradi: "Kredit
+        muddati" (5/3/5 yilgacha), "Kredit foiz stavkasi" (23%/25%/27%).
+        Bu jadval sahifa yuqorisidagi qisqacha xulosa kartochkasidan
+        ("Foiz stavkasi: 23% -27%") ustuvor, chunki muddat bo'yicha ham
+        aniq oraliq (3-5 yil) beradi. Ta'minot shartli: 100 mln so'mgacha
+        summalar uchun faqat kafillik+sug'urta, undan yuqori summalar
+        uchun avtotransport/ko'chmas mulk garovi — shu sabab boshqa
+        istemol_krediti mahsulotlari (Ipoteka Bank, SQB va h.k.) bilan
+        izchillik uchun requires_collateral=True qattiq belgilangan."""
+        block = extract_section(text, "Asosiy shartlar", "zbekiston Respublikasi fuqarosi bo")
+
+        term_section = extract_section(block, "Kredit muddati", "Kredit foiz stavkasi")
+        term_years = [int(m) for m in _YEAR_TERM_RE.findall(term_section)]
+
+        rate_section = extract_section(block, "Kredit foiz stavkasi", "Kredit miqdori")
+        rates = extract_percentages(rate_section)
+
+        amount_section = extract_section(block, "Kredit miqdori", "Imtiyozli davr")
+        amount = extract_amount_som(amount_section)
+
+        if not term_years or not rates or amount is None:
+            return None
+
+        grace_section = extract_section(block, "Imtiyozli davr", "To'lov grafiki")
+        grace_period_months = extract_grace_period_months("Imtiyozli davr" + grace_section)
+
+        payment_section = extract_section(block, "To'lov grafiki", "Ta")
+
+        return Product(
+            bank=self.bank_name,
+            category="istemol_krediti",
+            product_name=self.PRODUCT_NAMES["istemol_krediti"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(term_years) * 12,
+            term_max_months=max(term_years) * 12,
+            amount_max_som=amount,
+            requires_collateral=True,
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=extract_payment_method(payment_section),
         )
 
     def _build_mikroqarz_product(self, url: str, now: datetime, text: str) -> Product | None:

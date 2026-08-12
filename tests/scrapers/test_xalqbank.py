@@ -12,6 +12,9 @@ FIXTURE_BY_URL = {
     XalqBankScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (FIXTURES_DIR / "xb_mikroqarz.html").read_text(
         encoding="utf-8"
     ),
+    XalqBankScraper.CATEGORY_URLS["istemol_krediti"]: (
+        FIXTURES_DIR / "xalqbank_istemol_krediti.html"
+    ).read_text(encoding="utf-8"),
 }
 
 
@@ -59,3 +62,27 @@ def test_xalqbank_mikroqarz_onlayn_parses_correctly():
     assert mikroqarz.grace_period_months is None
     assert mikroqarz.payment_method == "Annuitet"
     assert mikroqarz.requires_collateral is True
+
+
+def test_xalqbank_istemol_krediti_parses_correctly():
+    """"Iste'mol krediti" — kalkulyator vidjeti faqat bitta stavka
+    ("26.99%") ko'rsatadi, lekin "Iste'mol kreditining qo'shimcha
+    ma'lumotlari" bandida to'liq muddat-stavka jadvali bor: "1 yilga
+    yillik 23 foiz, 2 yilga yillik 26.99 foiz, 3 yilga yillik 26.99 foiz"
+    — shu jadval ustuvor manba. Summa kalkulyatorning o'z chegarasidan
+    ("1 000 000 so'm" — "27 000 000 so'm") olinadi."""
+    with patch("scrapers.base.fetch_html", side_effect=_fake_fetch):
+        products = XalqBankScraper().run()
+
+    istemol = next(p for p in products if p.category == "istemol_krediti")
+    assert istemol.bank == "Xalq Banki"
+    assert istemol.product_name == "Iste'mol krediti"
+    assert istemol.rate_min == 23.0
+    assert istemol.rate_max == 26.99
+    assert istemol.term_min_months == 12
+    assert istemol.term_max_months == 36
+    assert istemol.amount_max_som == 27_000_000
+    assert istemol.down_payment_pct == 0.0
+    assert istemol.grace_period_months is None
+    assert istemol.payment_method == "Annuitet, Differensial"
+    assert istemol.requires_collateral is False

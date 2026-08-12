@@ -1,10 +1,12 @@
 import re
 
-from scrapers.base import TextSectionScraper
+from scrapers.base import Product, TextSectionScraper
+from scrapers.utils import extract_amount_som, extract_section
 
 _DOWN_PAYMENT_RE = re.compile(
     r"Boshlang.ich badal - (\d+) foiz \(Uzautomotors avtomobillari uchun - (\d+) foiz\)"
 )
+_ISTEMOL_TIER_RE = re.compile(r"(\d)\s*yilga yillik\s*(\d{1,2}(?:\.\d{1,2})?)\s*foiz")
 
 
 class XalqBankScraper(TextSectionScraper):
@@ -56,13 +58,27 @@ class XalqBankScraper(TextSectionScraper):
     bildirmaydi, shuning uchun standart (scoping'siz) qidiruv butun sahifa
     matnidan tasodifiy son topib, yolg'on natija berardi; shu sabab bu
     kategoriya uchun grace_period_months ham to'g'ridan-to'g'ri None
-    qilib belgilanadi."""
+    qilib belgilanadi.
+
+    "Iste'mol kreditlari" (xb.uz/page/physical-credit-consumption) — sayt
+    izlash orqali topildi (pptx'ning "Green iste'mol krediti" nomidagi
+    sahifasi endi ishlamaydi/bo'sh qaytadi, bu sahifa haqiqiy va real
+    ma'lumot beradi). Kalkulyator vidjetining o'zida faqat bitta yagona
+    stavka ("26.99%") ko'rsatiladi, lekin "Iste'mol kreditining qo'shimcha
+    ma'lumotlari" bandida to'liq muddat-stavka jadvali bor: "1 yilga
+    yillik 23 foiz, 2 yilga yillik 26.99 foiz, 3 yilga yillik 26.99 foiz"
+    — shu jadval ustuvor manba (rate_min=23, rate_max=26.99, term 12-36
+    oy, yillar oyga ko'paytiriladi). Summa kalkulyatorning o'z chegarasidan
+    ("1 000 000 so'm" — "27 000 000 so'm") olinadi. Boshlang'ich to'lov
+    slayderi "0%"dan boshlanadi. Ta'minot — "Sug'urta polisi" (mulk/ko'chmas
+    mulk garovi emas), shu sabab requires_collateral False."""
 
     bank_name = "Xalq Banki"
     url = "https://xb.uz/page/kreditlar"
     CATEGORY_URLS = {
         "avtokredit": "https://xb.uz/page/onlayn-avtokredit",
         "mikroqarz_onlayn": "https://xb.uz/page/onlayn-mikroqarz",
+        "istemol_krediti": "https://xb.uz/page/physical-credit-consumption",
     }
     CATEGORY_HEADINGS = {
         "avtokredit": ("Kredit foizi:", "Onlayn-Avtokredit"),
@@ -74,6 +90,7 @@ class XalqBankScraper(TextSectionScraper):
     PRODUCT_NAMES = {
         "avtokredit": "Onlayn-Avtokredit",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
+        "istemol_krediti": "Iste'mol krediti",
     }
     PAYMENT_METHOD_HEADINGS = {
         "avtokredit": ("Kreditning to'lov grafigi", "Muhim shartlar"),
@@ -94,6 +111,9 @@ class XalqBankScraper(TextSectionScraper):
         grace_period_months=None,
         **kwargs,
     ):
+        if category == "istemol_krediti":
+            return self._build_istemol_krediti_product(source_url, scraped_at, full_text or section)
+
         section = section.replace("ООО", "000")
         if category == "avtokredit" and down_payment_pct is None and full_text is not None:
             match = _DOWN_PAYMENT_RE.search(full_text)
@@ -111,4 +131,33 @@ class XalqBankScraper(TextSectionScraper):
             down_payment_pct=down_payment_pct,
             grace_period_months=grace_period_months,
             **kwargs,
+        )
+
+    def _build_istemol_krediti_product(self, url, now, text):
+        tiers = _ISTEMOL_TIER_RE.findall(text)
+        if not tiers:
+            return None
+        rates = [float(rate) for _year, rate in tiers]
+        terms = [int(year) * 12 for year, _rate in tiers]
+
+        amount_section = extract_section(text, "Kredit summasi", "Muddati")
+        amount = extract_amount_som(amount_section)
+        if amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="istemol_krediti",
+            product_name=self.PRODUCT_NAMES["istemol_krediti"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=False,
+            down_payment_pct=0.0,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method="Annuitet, Differensial",
         )
