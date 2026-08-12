@@ -53,6 +53,12 @@ class SQBScraper(TextSectionScraper):
     url = "https://sqb.uz/uz/individuals/credits/"
     CATEGORY_URLS = {
         "avtokredit": "https://sqb.uz/uz/individuals/autoloans/avtokredit-imkon-uz/",
+        # Sahifada "kredit birlamchi bozordan yangi avtomobil sotib olish
+        # uchun ajratiladi" deyilgan — brend/yoqilg'i turi cheklovi yo'q,
+        # istalgan (shu jumladan elektromobil) yangi avtomobilga beriladi —
+        # shu sabab bir xil sahifa "avtokredit_elektro" toifasiga ham
+        # xaritalanadi.
+        "avtokredit_elektro": "https://sqb.uz/uz/individuals/autoloans/avtokredit-imkon-uz/",
         "avtokredit_ikkilamchi": "https://sqb.uz/uz/individuals/credits/ikkilamchi-bozordan-avtokredit-uz/",
         # Sahifada brend cheklovi umuman yo'q (istalgan avtomobil markasi/
         # modeli qabul qilinadi) — shu sabab bir xil sahifa "avtokredit_
@@ -77,6 +83,7 @@ class SQBScraper(TextSectionScraper):
     }
     PRODUCT_NAMES = {
         "avtokredit": "«Avto imkon» avtokrediti",
+        "avtokredit_elektro": "«Avto imkon» avtokrediti",
         "avtokredit_ikkilamchi": "«Ikkilamchi bozordan avtotransport» krediti",
         "avtokredit_brend_ikkilamchi": "«Ikkilamchi bozordan avtotransport» krediti",
         "ipoteka_tijorat": "Ishonchli ipoteka krediti",
@@ -86,6 +93,7 @@ class SQBScraper(TextSectionScraper):
     }
     FORCE_COLLATERAL = {
         "avtokredit": True,
+        "avtokredit_elektro": True,
         # Ipoteka doim sotib olinayotgan ko'chmas mulk garovi bilan
         # ta'minlanadi; sahifadagi umumiy garov tekshiruvi boshqa
         # aloqasiz "garovsiz" iborasi tufayli yolg'on-manfiy berishi
@@ -115,8 +123,8 @@ class SQBScraper(TextSectionScraper):
                 html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
                 text = html_to_text(html)
 
-                if category == "avtokredit":
-                    product = self._build_avtokredit_product(url, now, text)
+                if category in ("avtokredit", "avtokredit_elektro"):
+                    product = self._build_avtokredit_product(category, url, now, text)
                 elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
                     product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "ipoteka_tijorat":
@@ -138,7 +146,13 @@ class SQBScraper(TextSectionScraper):
                 products.append(product)
         return products
 
-    def _build_avtokredit_product(self, url, now, text):
+    def _build_avtokredit_product(self, category, url, now, text):
+        """avtokredit ("«Avto imkon» avtokrediti") sahifasida "kredit
+        birlamchi bozordan yangi avtomobil sotib olish uchun ajratiladi"
+        deyilgan — brend yoki yoqilg'i turi bo'yicha hech qanday cheklov
+        yo'q, shu sabab bir xil sahifa/qiymatlar "avtokredit_elektro"
+        toifasiga ham xaritalanadi (bir xil URL, shu metod ikkalasi uchun
+        ham chaqiriladi, faqat `category` parametri farq qiladi)."""
         rate_section = extract_section(text, "Foiz stavkalari", "Qo'shimcha shartlar")
         term_amount_section = extract_section(text, "Kredit muddati:", "badal")
         section = f"{rate_section}\n{term_amount_section}"
@@ -154,7 +168,7 @@ class SQBScraper(TextSectionScraper):
         grace_period_months = extract_grace_period_months("Imtiyozli davr:" + grace_section)
 
         return self._build_product(
-            "avtokredit",
+            category,
             section,
             url,
             now,

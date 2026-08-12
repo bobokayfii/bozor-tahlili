@@ -31,14 +31,15 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_sqb_scraper_parses_all_nine_categories():
+def test_sqb_scraper_parses_all_ten_categories():
     with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = SQBScraper().run()
 
-    assert mock_fetch.call_count == 9
+    assert mock_fetch.call_count == 10
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
+        "avtokredit_elektro",
         "avtokredit_ikkilamchi",
         "avtokredit_brend_ikkilamchi",
         "ipoteka_tijorat",
@@ -49,6 +50,25 @@ def test_sqb_scraper_parses_all_nine_categories():
         "istemol_krediti",
     }
     assert all(p.bank == "SQB" for p in products)
+
+
+def test_sqb_avtokredit_elektro_matches_generic_avtokredit():
+    """"«Avto imkon» avtokrediti" sahifasida "kredit birlamchi bozordan
+    yangi avtomobil sotib olish uchun ajratiladi" deyilgan — brend/yoqilg'i
+    turi cheklovi yo'q, shu sabab bir xil sahifa "avtokredit_elektro"
+    toifasiga ham xaritalanadi (bir xil URL, bir xil qiymatlar)."""
+    with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch):
+        products = SQBScraper().run()
+
+    avtokredit = next(p for p in products if p.category == "avtokredit")
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    assert elektro.product_name == avtokredit.product_name
+    assert elektro.rate_min == avtokredit.rate_min
+    assert elektro.rate_max == avtokredit.rate_max
+    assert elektro.term_min_months == avtokredit.term_min_months
+    assert elektro.term_max_months == avtokredit.term_max_months
+    assert elektro.amount_max_som == avtokredit.amount_max_som
+    assert elektro.requires_collateral is True
 
 
 def test_sqb_avtokredit_brend_ikkilamchi_matches_generic_ikkilamchi():

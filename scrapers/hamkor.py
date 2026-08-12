@@ -70,6 +70,10 @@ class HamkorBankScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": "https://hamkorbank.uz/uz/physical/credits/autolight/",
         "avtokredit_brend_birlamchi": "https://hamkorbank.uz/uz/physical/credits/auto-kia-sonet/",
         "avtokredit_brend_ikkilamchi": "https://hamkorbank.uz/uz/physical/credits/autolight/",
+        # "Auto light" brend cheklovisiz (istalgan brend/model qabul
+        # qilinadi) — shu sabab bir xil sahifa "avtokredit_elektro"
+        # toifasiga ham xaritalanadi.
+        "avtokredit_elektro": "https://hamkorbank.uz/uz/physical/credits/autolight/",
         "ipoteka_tijorat": "https://hamkorbank.uz/uz/physical/mortgage/bank-mortgage/",
         "ipoteka_davlat": "https://hamkorbank.uz/uz/physical/mortgage/mortgage-new-build/",
         "mikroqarz": "https://hamkorbank.uz/uz/physical/credits/microcredit-plus/",
@@ -80,12 +84,14 @@ class HamkorBankScraper(TextSectionScraper):
     FORCE_COLLATERAL = {
         "avtokredit_ikkilamchi": True,
         "avtokredit_brend_ikkilamchi": True,
+        "avtokredit_elektro": True,
     }
     PRODUCT_NAMES = {
         "avtokredit": "Auto DAMAS",
         "avtokredit_ikkilamchi": "Auto light avtokrediti",
         "avtokredit_brend_birlamchi": "Auto KIA Sonet",
         "avtokredit_brend_ikkilamchi": "Auto light avtokrediti",
+        "avtokredit_elektro": "Auto light avtokrediti",
         "ipoteka_tijorat": "Bank ipotekasi",
         "ipoteka_davlat": "Yangi qurilgan uy-joy uchun ipoteka",
         "mikroqarz": "Mikrokredit Plus",
@@ -103,7 +109,7 @@ class HamkorBankScraper(TextSectionScraper):
 
                 if category in ("avtokredit", "avtokredit_brend_birlamchi"):
                     product = self._build_avtokredit_product(category, url, now, text)
-                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi", "avtokredit_elektro"):
                     product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
