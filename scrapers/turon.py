@@ -26,6 +26,16 @@ _MORTGAGE_TERM_RE = re.compile(r"Kredit muddati\s*\n+\s*(\d{1,2})\s*yil\b")
 # qatorlarida esa oddiy probel ishlatilgani uchun mavjud
 # _BREND_IKKILAMCHI_TERM_RE/_BREND_IKKILAMCHI_DOWN_RE qayta ishlatiladi.
 _IMKONIYAT_IKKILAMCHI_RATE_RE = re.compile(r"Ikkilamchi bozor\s*uchun:\s*\n*(\d{1,2}(?:[.,]\d{1,2})?)%")
+# "Yangi hayot" ipoteka sahifasida qiymat o'z yorlig'idan OLDIN keladi
+# ("18% dan\n...\nFoiz stavkasi"), sahifa pastida esa boshqa (aloqasiz)
+# mahsulotlarning bir xil "Foiz stavkasi"/"Kredit muddati" yorliqlari
+# takrorlanadi — shu sabab faqat BIRINCHI (o'z) uchrashuv olinadi (.search,
+# .findall emas). "Boshlang'ich to'lov" esa aksincha, o'z yorlig'idan
+# KEYIN keladi — ikkala tartib ham shu bank sahifasida haqiqiy tekshirilgan.
+_YANGI_HAYOT_RATE_RE = re.compile(r"(\d{1,2}(?:,\d{1,2})?)%\s*dan\s*\n+\s*Foiz stavkasi")
+_YANGI_HAYOT_TERM_RE = re.compile(r"(\d{1,3})\s*oygacha\s*\n+\s*Kredit muddati")
+_YANGI_HAYOT_AMOUNT_RE = re.compile(r"([\d\s]+)so.m\s*\n+\s*Kredit miqdori")
+_YANGI_HAYOT_DOWN_RE = re.compile(r"Boshlang.ich to.lov\s*\n+\s*\n?\s*(\d{1,2})%")
 
 
 class TuronBankScraper(TextSectionScraper):
@@ -82,6 +92,11 @@ class TuronBankScraper(TextSectionScraper):
         # toifasiga ham xaritalanadi.
         "avtokredit_elektro": "https://turonbank.uz/uz/private/crediting/avtokredit-ecogreencar/",
         "ipoteka_tijorat": "https://turonbank.uz/uz/private/crediting/ipoteka-krediti-yagona-oson/",
+        # "Yangi hayot" — "Iqtisodiyot va moliya vazirligi hamda bankning
+        # o'z mablag'lari hisobidan" deb aniq yozilgan (davlat mablag'i
+        # ishtiroki bor), boshqa banklarning ipoteka_davlat mahsulotlari
+        # bilan bir xil konvensiya (masalan NBU/Mikrokreditbank).
+        "ipoteka_davlat": "https://turonbank.uz/uz/private/crediting/yangi-hayot-ipoteka-krediti/",
         "mikroqarz": "https://turonbank.uz/uz/private/crediting/mikroqarz/",
     }
     PRODUCT_NAMES = {
@@ -91,6 +106,7 @@ class TuronBankScraper(TextSectionScraper):
         "avtokredit_brend_ikkilamchi": '"Green Avto" Avtokrediti',
         "avtokredit_elektro": '"Green Avto" Avtokrediti',
         "ipoteka_tijorat": '"Yanada oson" ipoteka krediti',
+        "ipoteka_davlat": '"Yangi hayot" ipoteka krediti',
         "mikroqarz": "Mikroqarz",
     }
 
@@ -110,6 +126,8 @@ class TuronBankScraper(TextSectionScraper):
                     product = self._build_avtokredit_brend_ikkilamchi_product(url, now, text)
                 elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
+                elif category == "ipoteka_davlat":
+                    product = self._build_ipoteka_davlat_product(url, now, text)
                 elif category == "avtokredit":
                     product = self._build_avtokredit_product(url, now, text)
                 elif category == "avtokredit_ikkilamchi":
@@ -375,6 +393,61 @@ class TuronBankScraper(TextSectionScraper):
             term_max_months=term,
             amount_max_som=amount,
             requires_collateral=has_collateral_requirement(text),
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
+
+    def _build_ipoteka_davlat_product(self, url, now, text):
+        """""Yangi hayot" ipoteka krediti — "Iqtisodiyot va moliya vazirligi
+        hamda bankning o'z mablag'lari hisobidan birlamchi bozordan uy-joy
+        sotib olish uchun ipoteka krediti" deb aniq yozilgan (davlat
+        mablag'i ishtiroki bor). Sahifada davlat mablag'i qismi uchun
+        o'zgaruvchan stavka ("Markaziy bank asosiy stavkasi + 4%")
+        ko'rsatilgan — sonli qiymatga aylantirib bo'lmaydi, shu sabab
+        e'tiborga olinmaydi; o'rniga sahifa yuqorisidagi qisqacha xulosa
+        kartochkasining o'zi bergan yagona aniq stavka ("18% dan")
+        ishlatiladi.
+
+        Kartochkada qiymat o'z yorlig'idan OLDIN keladi ("18% dan\\n...\\n
+        Foiz stavkasi" kabi), sahifa pastida esa boshqa (aloqasiz)
+        mahsulotlarning bir xil yorliqlari takrorlanadi — shu sabab faqat
+        BIRINCHI (o'z) uchrashuv olinadi (.search, butun sahifa bo'yicha
+        emas). "Boshlang'ich to'lov" esa aksincha, o'z yorlig'idan KEYIN
+        keladi."""
+        rate_match = _YANGI_HAYOT_RATE_RE.search(text)
+        term_match = _YANGI_HAYOT_TERM_RE.search(text)
+        amount_match = _YANGI_HAYOT_AMOUNT_RE.search(text)
+        if not (rate_match and term_match and amount_match):
+            return None
+
+        rate = float(rate_match.group(1).replace(",", "."))
+        term = int(term_match.group(1))
+        amount = extract_amount_som(amount_match.group(1) + " so'm")
+
+        down_match = _YANGI_HAYOT_DOWN_RE.search(text)
+        down_payment_pct = float(down_match.group(1)) if down_match else None
+
+        grace_section = extract_section(text, "Imtiyozli davr", "Kredit bo")
+        grace_period_months = extract_grace_period_months("Imtiyozli davr" + grace_section)
+
+        payment_method = extract_payment_method(extract_section(text, "lov usuli", "Rasmiylashtirish usuli"))
+
+        if amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="ipoteka_davlat",
+            product_name=self.PRODUCT_NAMES["ipoteka_davlat"],
+            rate_min=rate,
+            rate_max=rate,
+            term_min_months=term,
+            term_max_months=term,
+            amount_max_som=amount,
+            requires_collateral=True,
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

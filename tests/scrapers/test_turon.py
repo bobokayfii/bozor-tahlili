@@ -21,6 +21,9 @@ FIXTURE_BY_URL = {
     TuronBankScraper.CATEGORY_URLS["ipoteka_tijorat"]: (
         FIXTURES_DIR / "turon_ipoteka_tijorat.html"
     ).read_text(encoding="utf-8"),
+    TuronBankScraper.CATEGORY_URLS["ipoteka_davlat"]: (
+        FIXTURES_DIR / "turon_yangi_hayot_ipoteka.html"
+    ).read_text(encoding="utf-8"),
     TuronBankScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "turon_mikroqarz.html").read_text(
         encoding="utf-8"
     ),
@@ -178,6 +181,33 @@ def test_turon_ipoteka_tijorat_parses_correctly():
     assert tijorat.grace_period_months == 0
     assert tijorat.payment_method == "Annuitet, Differensial"
     assert tijorat.requires_collateral is True
+
+
+def test_turon_ipoteka_davlat_parses_correctly():
+    """""Yangi hayot" ipoteka krediti — "Iqtisodiyot va moliya vazirligi
+    hamda bankning o'z mablag'lari hisobidan" deb aniq yozilgan (davlat
+    mablag'i ishtiroki bor). Davlat qismi uchun o'zgaruvchan stavka
+    ("Markaziy bank asosiy stavkasi + 4%") sonli qiymatga aylantirilmaydi
+    — o'rniga sahifa yuqorisidagi qisqacha xulosa kartochkasining yagona
+    aniq stavkasi ("18% dan") ishlatiladi. Qiymat o'z yorlig'idan OLDIN
+    keladi ("18% dan\\n...\\nFoiz stavkasi"), sahifa pastida boshqa
+    mahsulotlarning bir xil yorliqlari takrorlanganligi uchun faqat
+    BIRINCHI uchrashuv olinadi."""
+    with patch("scrapers.turon.fetch_html", side_effect=_fake_fetch):
+        products = TuronBankScraper().run()
+
+    davlat = next(p for p in products if p.category == "ipoteka_davlat")
+    assert davlat.bank == "Turonbank"
+    assert davlat.product_name == '"Yangi hayot" ipoteka krediti'
+    assert davlat.rate_min == 18.0
+    assert davlat.rate_max == 18.0
+    assert davlat.term_min_months == 240
+    assert davlat.term_max_months == 240
+    assert davlat.amount_max_som == 1_380_000_000
+    assert davlat.down_payment_pct == 15.0
+    assert davlat.grace_period_months == 0
+    assert davlat.payment_method == "Annuitet, Differensial"
+    assert davlat.requires_collateral is True
 
 
 def test_turon_mikroqarz_parses_correctly():
