@@ -42,6 +42,7 @@ class MikrokreditBankScraper(TextSectionScraper):
         "mikroqarz": "https://mkbank.uz/uz/private/crediting/microloan/",
         "mikroqarz_onlayn": "https://mkbank.uz/uz/private/crediting/microloan/",
         "ipoteka_davlat": "https://mkbank.uz/uz/private/crediting/imkoniyat-ipotekasi-krediti/",
+        "ipoteka_tijorat": "https://mkbank.uz/uz/private/crediting/mortgage-loan-secondary-market/",
         # Taxminiy (best-guess) — sinf docstringiga qarang.
         "kredit_karta": "https://mkbank.uz/uz/private/crediting/qulay-overdraft/",
         "istemol_krediti": "https://mkbank.uz/uz/private/crediting/consumer-loan/",
@@ -55,6 +56,7 @@ class MikrokreditBankScraper(TextSectionScraper):
         "avtokredit_brend_birlamchi": True,
         "avtokredit_brend_ikkilamchi": True,
         "avtokredit_elektro": True,
+        "ipoteka_tijorat": True,
     }
     PRODUCT_NAMES = {
         "avtokredit": "Avtokredit UzAuto Motors",
@@ -65,6 +67,7 @@ class MikrokreditBankScraper(TextSectionScraper):
         "mikroqarz": "Mikroqarz",
         "mikroqarz_onlayn": 'Onlayn Mikroqarz "Ommabop"',
         "ipoteka_davlat": "Imkoniyat ipotekasi krediti",
+        "ipoteka_tijorat": "Universal ipoteka",
     }
 
     _ADM_RATE_RE = re.compile(r"(\d{1,2},\d{1,2})%")
@@ -94,6 +97,8 @@ class MikrokreditBankScraper(TextSectionScraper):
                     product = self._build_mikroqarz_onlayn_product(url, now)
                 elif category == "ipoteka_davlat":
                     product = self._build_ipoteka_davlat_product(url, now, text)
+                elif category == "ipoteka_tijorat":
+                    product = self._build_ipoteka_tijorat_product(url, now, text)
                 else:
                     heading_pair = self.CATEGORY_HEADINGS[category]
                     section = extract_section(text, *heading_pair)
@@ -104,6 +109,79 @@ class MikrokreditBankScraper(TextSectionScraper):
             if product is not None:
                 products.append(product)
         return products
+
+    def _build_ipoteka_tijorat_product(self, url, now, text):
+        """"Universal ipoteka" ("Ikkilamchi bozor uchun ipoteka krediti"
+        sahifasi, mortgage-loan-secondary-market/) — bankning o'z mablag'lari
+        hisobidan, ikkilamchi bozordan uy-joy sotib olish uchun (ipoteka_davlat
+        kategoriyasidagi "Imkoniyat ipotekasi krediti"dan farqli, u aniq
+        "Moliya vazirligi mablag'lari" deb yozilgan davlat mahsuloti).
+
+        Sahifa yuqorisida toza statistik kartochka bor: "1 648 000 000
+        so'mgacha" (qiymat) -> "kredit miqdori" (kichik harf bilan yorliq,
+        QIYMATDAN KEYIN keladi) -> "24%-26%" -> "yillik stavka" -> "20
+        yilgacha" -> "kredit muddati". Bu uch band pastroqdagi "Kredit
+        shartlari" bo'limida katta harf bilan ("Kredit miqdori" va h.k.)
+        TAKRORLANADI (jami 6+ marta) — shu sabab standart extract_section
+        katta harfli sarlavhalar bilan ishlatilsa noto'g'ri (keyingi)
+        joyga tushib qolardi. Kichik harfli yorliqlar sahifada FAQAT bir
+        marta uchraydi, shu sabab ular ustuvor ishlatiladi: "bozoridan
+        uy-joy xarid qilish uchun" (tavsif matni, statistik kartochkadan
+        oldin, ham bir marta uchraydi) dan "kredit miqdori" gacha bo'lgan
+        oraliqda summa, "kredit miqdori" dan "yillik stavka" gacha stavka,
+        "yillik stavka" dan "kredit muddati" gacha muddat.
+
+        Muddat "20 yilgacha" (yil, oy emas) — _MORTGAGE_TERM_RE (klass
+        darajasida allaqachon mavjud, ipoteka_davlat uchun ham ishlatiladi)
+        bilan yil->oy ga aylantiriladi.
+
+        Boshlang'ich badal "Foydalanish shartlari" bo'limida so'z shaklida:
+        "Boshlang'ich badalning eng kam miqdori: 25% (uy-joyning oldi-sotdi
+        qiymatidan)." — bu ibora sahifada bir marta uchraydi, standart
+        extract_percentages bilan olinadi.
+
+        Imtiyozli davr "Kredit shartlari" bo'limida aniq "Imtiyozli davr:
+        Yo'q" deb yozilgan (bir marta uchraydi) — bu haqiqiy "yo'q" (0 oy)
+        signali, "noma'lum" emas."""
+        amount_section = extract_section(text, "bozoridan uy-joy xarid qilish uchun", "kredit miqdori")
+        amount = extract_amount_som(amount_section)
+
+        rate_section = extract_section(text, "kredit miqdori", "yillik stavka")
+        rates = extract_percentages(rate_section)
+
+        term_section = extract_section(text, "yillik stavka", "kredit muddati")
+        term_match = self._MORTGAGE_TERM_RE.search(term_section)
+        term = int(term_match.group(1)) * 12 if term_match else None
+
+        down_section = extract_section(text, "Boshlang‘ich badalning eng kam miqdori", "Yillik foiz stavkasi")
+        down_rates = extract_percentages(down_section)
+        down_payment_pct = min(down_rates) if down_rates else None
+
+        payment_method_section = extract_section(text, "To'lov usuli", "Kreditni rasmiylashtirish usuli")
+        payment_method = extract_payment_method(payment_method_section)
+
+        grace_section = extract_section(text, "Imtiyozli davr", "Kredit ta")
+        grace_period_months = extract_grace_period_months("Imtiyozli davr" + grace_section)
+
+        if not rates or term is None or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="ipoteka_tijorat",
+            product_name=self.PRODUCT_NAMES["ipoteka_tijorat"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=term,
+            term_max_months=term,
+            amount_max_som=amount,
+            requires_collateral=self.FORCE_COLLATERAL["ipoteka_tijorat"],
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
 
     def _build_ipoteka_davlat_product(self, url, now, text):
         """"Imkoniyat ipotekasi krediti" — "Mahalla yettiligi" tavsiyasi

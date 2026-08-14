@@ -58,6 +58,7 @@ class TengeBankScraper(TextSectionScraper):
         "avtokredit_elektro": "https://tengebank.uz/credit/avtokredit-na-elektromobil",
         "ipoteka_tijorat": "https://tengebank.uz/credit/ipoteka-na-novoe-jilyo",
         "mikroqarz_onlayn": "https://tengebank.uz/credit/mikrozajm-onlajn",
+        "mikroqarz": "https://tengebank.uz/credit/pervyj-shag-k-biznesu",
     }
     CATEGORY_HEADINGS = {
         "avtokredit": ("Ustama", "Qarz oluvchi"),
@@ -86,6 +87,7 @@ class TengeBankScraper(TextSectionScraper):
         "avtokredit_elektro": "Elektromobil uchun avtokredit",
         "ipoteka_tijorat": "Ipoteka krediti (yangi uy-joy)",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
+        "mikroqarz": "Biznesga birinchi qadam",
     }
     DOWN_PAYMENT_HEADINGS = {
         "avtokredit": ("Boshlang'ich to'lov", "Kеchiktirilgаn"),
@@ -113,6 +115,8 @@ class TengeBankScraper(TextSectionScraper):
 
                 if category == "mikroqarz_onlayn":
                     product = self._build_mikroqarz_onlayn_product(url, now, text)
+                elif category == "mikroqarz":
+                    product = self._build_mikroqarz_product(url, now, text)
                 elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 else:
@@ -180,6 +184,55 @@ class TengeBankScraper(TextSectionScraper):
             scraped_at=now,
             grace_period_months=None,
             payment_method=payment_method,
+        )
+
+    def _build_mikroqarz_product(self, url, now, text):
+        """"Biznesga birinchi qadam" — nomiga qaramay (biznes uchun
+        birinchi qadam), qarz oluvchiga qo'yiladigan talablar aniq
+        "jismoniy shaxslar-21 yoshdan 60 yoshgacha bo'lgan O'zR fuqarolari
+        ... boshqa norasmiy daromadlarga ega bo'lgan" deb yozilgan —
+        tadbirkorlik ro'yxatidan o'tish yoki O'zini o'zi band qilgan shaxs
+        guvohnomasi kabi talab yo'q, shu sabab shaxsiy/iste'mol maqsadida
+        ham olinishi mumkin (oflayn "mikroqarz" toifasiga kiradi, "Onlayn
+        mikroqarz"dan farqli, "oflayn" deb aniq yozilgan).
+
+        "Rasmiylashtirish usuli" dan "Kredit ta'minoti" gacha bo'lgan toza
+        label:qiymat bloki (sahifada ikkalasi ham bir marta uchraydi)
+        barcha kerakli maydonlarni beradi: Ustama (yillik 25%), Minimal/
+        Maksimal miqdor (1-30 mln so'm), Muddat (36 oygacha). Boshlang'ich
+        badal, imtiyozli davr va to'lov usuli haqida sahifada umuman gap
+        yo'q — barchasi tabiiy ravishda None qoladi.
+
+        Ta'minot faqat "Uchinchi shaxslarning kafilligi" (kafillik, mulk
+        garovi emas) — umumiy has_collateral_requirement "garov" so'zini
+        topa olmagani uchun to'g'ri ravishda False qaytaradi (Ipak Yo'li
+        Bank'ning "Kafillik asosida mikroqarz"idagi bilan bir xil
+        konvensiya)."""
+        block = extract_section(text, "Rasmiylashtirish usuli", "Kredit ta")
+        rates = extract_percentages(block)
+        amount = extract_amount_som(block)
+
+        term_match = re.search(r"Muddat\s*\n\s*(\d+)\s*oygacha", block)
+        term = int(term_match.group(1)) if term_match else None
+
+        if not rates or term is None or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="mikroqarz",
+            product_name=self.PRODUCT_NAMES["mikroqarz"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=term,
+            term_max_months=term,
+            amount_max_som=amount,
+            requires_collateral=False,
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method=None,
         )
 
     def _build_mikroqarz_onlayn_product(self, url, now, text):

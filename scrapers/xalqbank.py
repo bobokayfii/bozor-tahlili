@@ -5,6 +5,7 @@ from scrapers.utils import (
     extract_amount_som,
     extract_grace_period_months,
     extract_payment_method,
+    extract_percentages,
     extract_section,
 )
 
@@ -88,6 +89,7 @@ class XalqBankScraper(TextSectionScraper):
     url = "https://xb.uz/page/kreditlar"
     CATEGORY_URLS = {
         "avtokredit": "https://xb.uz/page/onlayn-avtokredit",
+        "mikroqarz": "https://xb.uz/page/biznesga-komak-mikrokrediti",
         "mikroqarz_onlayn": "https://xb.uz/page/onlayn-mikroqarz",
         "istemol_krediti": "https://xb.uz/page/physical-credit-consumption",
         "ipoteka_tijorat": "https://xb.uz/page/qulay-ipoteka-krediti",
@@ -102,6 +104,7 @@ class XalqBankScraper(TextSectionScraper):
     }
     PRODUCT_NAMES = {
         "avtokredit": "Onlayn-Avtokredit",
+        "mikroqarz": "\"Biznesga ko'mak\" mikrokrediti",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
         "istemol_krediti": "Iste'mol krediti",
         "ipoteka_tijorat": '"Qulay" ipoteka krediti',
@@ -130,6 +133,8 @@ class XalqBankScraper(TextSectionScraper):
             return self._build_istemol_krediti_product(source_url, scraped_at, full_text or section)
         if category in ("ipoteka_tijorat", "ipoteka_davlat"):
             return self._build_ipoteka_product(category, source_url, scraped_at, full_text or section)
+        if category == "mikroqarz":
+            return self._build_mikroqarz_product(source_url, scraped_at, full_text or section)
 
         section = section.replace("ООО", "000")
         if category == "avtokredit" and down_payment_pct is None and full_text is not None:
@@ -148,6 +153,68 @@ class XalqBankScraper(TextSectionScraper):
             down_payment_pct=down_payment_pct,
             grace_period_months=grace_period_months,
             **kwargs,
+        )
+
+    def _build_mikroqarz_product(self, url, now, text):
+        """""Biznesga ko'mak" mikrokrediti" — nomiga qaramay, maqsad
+        bandida aniq "Tadbirkorlikni rivojlantirish uchun. Shaxsiy
+        ehtiyojlarni qondirish uchun (aniq maqsadsiz)" deb yozilgan — biznes
+        ro'yxatidan o'tish yoki tadbirkor guvohnomasi talab qilinmaydi, shu
+        sabab shaxsiy maqsadda ham olinishi mumkin (oflayn "mikroqarz"
+        toifasiga kiradi, "Onlayn mikroqarz"dan farqli).
+
+        Sahifada bir xil "Muhim shartlar" -> "Kredit muddati/summasi/
+        imtiyozli davri/foizi" ro'yxati IKKI marta (sahifa boshida qisqa
+        vidjet, pastda "Muhim shartlar" nomli raqamlangan ro'yxat) va
+        kalkulyator vidjetida yana bir necha marta takrorlanadi — faqat
+        "Muhim shartlar" (sahifada bir marta uchraydi) dan birinchi
+        "Kerakli hujjatlar" gacha bo'lgan tor blok ishlatiladi:
+        - "Kreditning amal qilish muddati: 36 oygacha"
+        - "O'zini o'zi band qilgan shaxslar uchun: 30 mln so'mgacha.
+          Rasmiy daromadga ega shaxslar uchun: 50 mln so'mgacha" (ikkalasi
+          orasidan kattasi — 50 mln — amount_max_som sifatida olinadi)
+        - "Kreditning imtiyozli davri: Mavjud emas" (haqiqiy "yo'q" — 0 oy)
+        - "Yillik kredit foizi: 27%"
+
+        To'lov usuli "Kredit shartlari" bo'limida FAQAT "annuitet usulda
+        amalga oshiriladi" deb yozilgan — kalkulyator vidjetidagi umumiy
+        "Annuitet / Differensial" almashtiruvchi tugmasi (ikkalasini ham
+        tanlash mumkin variant sifatida) bilan aralashib ketmasligi uchun
+        payment_method shu tor "Kredit shartlari" -> "Kredit ta'minoti"
+        oralig'idan olinadi, butun sahifa matnidan emas.
+
+        Ta'minot faqat "Jismoniy shaxsning kafilligi" (kafillik, mulk
+        garovi emas) — has_collateral_requirement "garov" so'zini topa
+        olmagani uchun to'g'ri ravishda False qaytaradi."""
+        block = extract_section(text, "Muhim shartlar", "Kerakli hujjatlar")
+        rates = extract_percentages(block)
+        amount = extract_amount_som(block)
+        grace_period_months = extract_grace_period_months(block)
+
+        term_match = re.search(r"muddati:\s*(\d+)\s*oygacha", block)
+        term = int(term_match.group(1)) if term_match else None
+
+        payment_method_section = extract_section(text, "Kredit shartlari", "Kredit ta")
+        payment_method = extract_payment_method(payment_method_section)
+
+        if not rates or term is None or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="mikroqarz",
+            product_name=self.PRODUCT_NAMES["mikroqarz"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=term,
+            term_max_months=term,
+            amount_max_som=amount,
+            requires_collateral=False,
+            down_payment_pct=None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
         )
 
     def _build_istemol_krediti_product(self, url, now, text):

@@ -30,6 +30,9 @@ FIXTURE_BY_URL = {
     IpakYuliBankScraper.CATEGORY_URLS["istemol_krediti"]: (FIXTURES_DIR / "ipak_istemol_krediti.html").read_text(
         encoding="utf-8"
     ),
+    IpakYuliBankScraper.CATEGORY_URLS["ipoteka_davlat"]: (FIXTURES_DIR / "ipak_ipoteka_davlat.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -143,6 +146,29 @@ def test_ipakyuli_ipoteka_tijorat_parses_correctly():
     assert tijorat.grace_period_months is None
     assert tijorat.payment_method == "Annuitet, Differensial"
     assert tijorat.requires_collateral is True
+
+
+def test_ipakyuli_ipoteka_davlat_parses_correctly():
+    """"Yangi qurilgan uylarga ipoteka" — Prezident farmoni (PF-70) asosidagi
+    umumdavlat dasturi, "Ipoteka-24" (o'z mablag'i, ipoteka_tijorat)dan
+    farqli, o'ziga xos qat'iy ko'rsatkichlari (Toshkent/hudud bo'yicha
+    480/380 mln chegara, 20 yil) orqali aniqlangan. Toza statistik kartochka
+    faqat quyi stavka chegarasini ("16,5% dan boshlab") beradi; to'liq
+    oraliq (16,5%-18%) "Moslashuvchan shartlar" bo'limidan olinadi."""
+    with patch("scrapers.ipakyuli.fetch_html", side_effect=_fake_fetch):
+        products = IpakYuliBankScraper().run()
+
+    davlat = next(p for p in products if p.category == "ipoteka_davlat")
+    assert davlat.product_name == "Yangi qurilgan uylarga ipoteka"
+    assert davlat.rate_min == 16.5
+    assert davlat.rate_max == 18.0
+    assert davlat.term_min_months == 240
+    assert davlat.term_max_months == 240
+    assert davlat.amount_max_som == 480_000_000
+    assert davlat.down_payment_pct == 15.0
+    assert davlat.grace_period_months == 6
+    assert davlat.payment_method == "Annuitet, Differensial"
+    assert davlat.requires_collateral is True
 
 
 def test_ipakyuli_mikroqarz_parses_correctly():
