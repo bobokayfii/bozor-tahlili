@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { triggerScrapeRefresh } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
+import { RefreshIcon } from './icons'
 
 type StatusMessage = { kind: 'success' | 'warning' | 'error'; text: string } | null
 
@@ -37,6 +38,7 @@ export function RefreshDataButton() {
         onClick={() => setIsConfirmOpen(true)}
         disabled={isSubmitting}
       >
+        <RefreshIcon />
         {t('refreshButton')}
       </button>
 

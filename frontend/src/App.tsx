@@ -4,6 +4,8 @@ import { ProductTable } from './components/ProductTable'
 import { MarketPulse } from './components/MarketPulse'
 import { ExportMenu } from './components/ExportMenu'
 import { RefreshDataButton } from './components/RefreshDataButton'
+import { LanguageDropdown } from './components/LanguageDropdown'
+import { CompareIcon } from './components/icons'
 import { CompareBar } from './components/CompareBar'
 import { CompareModal } from './components/CompareModal'
 import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
@@ -27,28 +29,6 @@ function formatUpdatedAt(iso: string, lang: Lang): string {
   return `${day}, ${time}`
 }
 
-function LanguageToggle() {
-  const { lang, setLang } = useLanguage()
-  return (
-    <div className="lang-toggle" role="group" aria-label="Til / Язык">
-      <button
-        type="button"
-        className={lang === 'uz' ? 'lang-toggle-btn active' : 'lang-toggle-btn'}
-        onClick={() => setLang('uz')}
-      >
-        UZ
-      </button>
-      <button
-        type="button"
-        className={lang === 'ru' ? 'lang-toggle-btn active' : 'lang-toggle-btn'}
-        onClick={() => setLang('ru')}
-      >
-        RU
-      </button>
-    </div>
-  )
-}
-
 export function App() {
   const { lang, t } = useLanguage()
   const [categories, setCategories] = useState<Category[]>([])
@@ -59,6 +39,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
   const [compareKeys, setCompareKeys] = useState<Set<string>>(new Set())
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false)
+  const [isCompareModeActive, setIsCompareModeActive] = useState(false)
 
   useEffect(() => {
     fetchCategories()
@@ -140,6 +121,16 @@ export function App() {
     setIsCompareModalOpen(false)
   }
 
+  function handleToggleCompareMode() {
+    setIsCompareModeActive((prev) => {
+      const next = !prev
+      if (!next) {
+        handleClearCompare()
+      }
+      return next
+    })
+  }
+
   return (
     <div className="app-shell">
       <header className="app-topbar">
@@ -149,8 +140,24 @@ export function App() {
         </div>
         <div className="app-topbar-actions">
           <RefreshDataButton />
+          <button
+            type="button"
+            className={
+              isCompareModeActive ? 'compare-mode-btn compare-mode-btn-active' : 'compare-mode-btn'
+            }
+            aria-pressed={isCompareModeActive}
+            onClick={handleToggleCompareMode}
+          >
+            <CompareIcon />
+            {t('compareModeButton')}
+            {isCompareModeActive && (
+              <span className="compare-mode-btn-close" aria-hidden="true">
+                ×
+              </span>
+            )}
+          </button>
           <ExportMenu category={activeCategory} />
-          <LanguageToggle />
+          <LanguageDropdown />
         </div>
       </header>
       <div className="app-body">
@@ -176,6 +183,7 @@ export function App() {
             schema={activeCategoryData?.schema}
             category={activeCategory ?? undefined}
             unavailableBanks={unavailableBanks}
+            compareModeActive={isCompareModeActive}
             compareKeys={compareKeys}
             onToggleCompare={handleToggleCompare}
             maxCompare={MAX_COMPARE}

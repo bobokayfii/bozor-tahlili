@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getExportAllExcelUrl, getExportExcelUrl } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
+import { DownloadIcon } from './icons'
 
 interface ExportMenuProps {
   category: string | null
@@ -32,6 +33,7 @@ export function ExportMenu({ category }: ExportMenuProps) {
   return (
     <div className="export-menu" ref={containerRef}>
       <button type="button" className="export-btn" onClick={() => setIsOpen((prev) => !prev)}>
+        <DownloadIcon />
         {t('exportButton')}
         <span className={isOpen ? 'export-btn-caret export-btn-caret-open' : 'export-btn-caret'} aria-hidden="true">
           ▾
