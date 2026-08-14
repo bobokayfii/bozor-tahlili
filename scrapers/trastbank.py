@@ -6,6 +6,7 @@ from scrapers.utils import (
     extract_amount_som,
     extract_grace_period_months,
     extract_payment_method,
+    extract_percentages,
     extract_section,
     extract_term_months,
     fetch_html,
@@ -19,6 +20,17 @@ from scrapers.utils import (
 # (ipoteka_davlat) ham TrastBank'ning bir xil sahifa shablonini ishlatishi
 # mumkinligi sababli qayta ishlatish uchun modul darajasida saqlanadi.
 _FOIZ_RE = re.compile(r"(\d{1,2}(?:[.,]\d{1,2})?)\s*foiz")
+
+# "Avtokredit" sahifasi (https://trustbank.uz/uz/private/crediting/auto/)
+# TO'RTTA mijoz-toifasini ketma-ket beradi (doimiy daromadli / o'zini-o'zi
+# band qilgan / ta'lim-sog'liqni saqlash xodimlari / ish haqi loyihasi
+# xodimlari), har biri o'z ichida IKKI holat uchun (foydalanilmagan avto:
+# 25% badal / foydalanishda bo'lgan avto: 40% badal) alohida stavka beradi.
+# Badal foizlari (25%/40%) doim shu ikki qat'iy qiymat, haqiqiy stavkalar
+# esa doim boshqa son (21-23,9% oralig'ida) — shu farq orqali ajratiladi,
+# aks holda ikkalasi ham "%" bilan yozilgani uchun standart
+# extract_percentages ularni ajrata olmas edi.
+_TRAST_AUTO_DOWN_VALUES = (25.0, 40.0)
 
 # "Sharq bahori ipoteka krediti" sahifasi (Task 3, ipoteka_davlat) muddatni
 # "240 oydan ko'p bo'lmagan muddatga" shaklida beradi — standart
@@ -245,11 +257,38 @@ class TrastBankScraper(TextSectionScraper):
     banklardagi ipoteka_tijorat/ipoteka_davlat konvensiyasi bilan bir xil,
     masalan scrapers/sqb.py, scrapers/ofb.py, scrapers/aab.py), sahifaning
     "Ta'minot" bandida ham aynan "Kredit hisobiga sotib olinayotgan uy-joy
-    (kvartira)" deyilgan bo'lsa-da, "garov" so'zining o'zi ishlatilmagan."""
+    (kvartira)" deyilgan bo'lsa-da, "garov" so'zining o'zi ishlatilmagan.
+
+    avtokredit / avtokredit_ikkilamchi ("Avtokredit",
+    https://trustbank.uz/uz/private/crediting/auto/) — bitta sahifa
+    "Jismoniy shaxslarga birlamchi va ikkilamchi bozordan avtotransport
+    vositalarini xarid qilish uchun ... avtokredit taqdim etiladi" deb ikkala
+    bozorni ham ANIQ qamrab oladi (alohida sahifalar emas), shu sabab bir xil
+    ma'lumot ikkala kategoriyaga ham xaritalanadi. To'rtta mijoz-toifasi
+    (doimiy daromadli / o'zini-o'zi band / ta'lim-sog'liq xodimlari / ish
+    haqi loyihasi xodimlari), har biri ichida foydalanilmagan (25% badal) va
+    foydalanishda bo'lgan (40% badal) avto uchun alohida stavka —
+    _TRAST_AUTO_DOWN_VALUES orqali badal foizlari (doim 25/40) haqiqiy
+    stavkalardan (21-23,9% oralig'i, hech qachon 25/40ga teng emas)
+    ajratiladi. Muddat barcha toifalarda bir xil "60 oygacha". Sahifada
+    "annuitet"/"differen" so'zlari umuman yo'q (payment_method=None), "garov"
+    so'zi ham yo'q, lekin "Ta'minot turi: Avtotransport vositasi" va "Kredit
+    hisobiga sotib olinayotgan avtomobil ... sug'urta polisi" iborasi 7
+    marta uchraydi — mashinaning o'zi garov, shu sabab FORCE_COLLATERAL
+    orqali aniq True belgilangan (generic has_collateral_requirement "garov"
+    so'zini tanimagani uchun False qaytaradi, tekshirilgan).
+
+    Sahifada aniq maksimal kredit summasi umuman ko'rsatilmagan (faqat
+    kalkulyatordagi bo'sh "Kredit summasi" kiritish maydoni bor, haqiqiy son
+    emas) — foydalanuvchining aniq ko'rsatmasiga ko'ra (saytda raqam
+    bo'lmasa pptx'dan olish mumkin), mustaqil tasdiqlangan pptx manbasidan
+    (2 000 mln so'm) olinadi, special_terms orqali hujjatlashtirilgan."""
 
     bank_name = "TrastBank"
     url = "https://trustbank.uz/uz/private/crediting/microloans/"
     CATEGORY_URLS = {
+        "avtokredit": "https://trustbank.uz/uz/private/crediting/auto/",
+        "avtokredit_ikkilamchi": "https://trustbank.uz/uz/private/crediting/auto/",
         "mikroqarz": "https://trustbank.uz/uz/private/crediting/microloans/",
         "ipoteka_tijorat": (
             "https://trustbank.uz/uz/private/crediting/"
@@ -264,6 +303,8 @@ class TrastBankScraper(TextSectionScraper):
         "mikroqarz": ("Mikroqarzning imtiyozli davri", "Doimiy daromadga ega bo"),
     }
     PRODUCT_NAMES = {
+        "avtokredit": "Avtokredit",
+        "avtokredit_ikkilamchi": "Avtokredit",
         "mikroqarz": "Mikroqarz",
         # Sahifa <title>'i, H1 sarlavhasi va breadcrumb'i (qisqartirilgan
         # holda) bilan mos — jonli sahifadan tasdiqlangan. Boshqa
@@ -277,6 +318,8 @@ class TrastBankScraper(TextSectionScraper):
         "ipoteka_davlat": "Sharq bahori ipoteka krediti",
     }
     FORCE_COLLATERAL = {
+        "avtokredit": True,
+        "avtokredit_ikkilamchi": True,
         "mikroqarz": True,
         "ipoteka_tijorat": True,
         "ipoteka_davlat": True,
@@ -307,7 +350,9 @@ class TrastBankScraper(TextSectionScraper):
                 html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
                 text = html_to_text(html)
 
-                if category == "ipoteka_tijorat":
+                if category in ("avtokredit", "avtokredit_ikkilamchi"):
+                    product = self._build_avtokredit_product(category, url, now, text)
+                elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "ipoteka_davlat":
                     product = self._build_ipoteka_davlat_product(url, now, text)
@@ -334,6 +379,39 @@ class TrastBankScraper(TextSectionScraper):
             if product is not None:
                 products.append(product)
         return products
+
+    def _build_avtokredit_product(self, category: str, url: str, now: datetime, text: str) -> Product | None:
+        """Yuqoridagi klass docstring'idagi izohga qarang — badal foizlari
+        (25%/40%) va haqiqiy stavkalar (21-23,9%) bir xil "%" formatida
+        yozilgani uchun _TRAST_AUTO_DOWN_VALUES orqali ajratiladi. Maksimal
+        summa saytda umuman yo'q — foydalanuvchining aniq ko'rsatmasiga
+        ko'ra pptx manbasidan (2 000 mln so'm) olinadi."""
+        section = extract_section(text, "Doimiy daromadga ega mijozlar", "Talab etiladigan hujjatlar")
+        all_percentages = extract_percentages(section)
+        rates = [v for v in all_percentages if v not in _TRAST_AUTO_DOWN_VALUES]
+        down_payments = [v for v in all_percentages if v in _TRAST_AUTO_DOWN_VALUES]
+        terms = extract_term_months(section)
+
+        if not rates or not terms:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=2_000_000_000,
+            requires_collateral=self.FORCE_COLLATERAL[category],
+            down_payment_pct=min(down_payments) if down_payments else None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method=None,
+            special_terms="Maksimal summa pptx manbasidan — saytda ko'rsatilmagan",
+        )
 
     def _build_ipoteka_tijorat_product(self, url: str, now: datetime, text: str) -> Product | None:
         """Yuqoridagi klass docstring'idagi izohga qarang — so'z shaklidagi

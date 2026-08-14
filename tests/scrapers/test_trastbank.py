@@ -6,6 +6,9 @@ from scrapers.trastbank import TrastBankScraper
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 FIXTURE_BY_URL = {
+    TrastBankScraper.CATEGORY_URLS["avtokredit"]: (FIXTURES_DIR / "trastbank_avtokredit.html").read_text(
+        encoding="utf-8"
+    ),
     TrastBankScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "trastbank_mikroqarz.html").read_text(
         encoding="utf-8"
     ),
@@ -26,6 +29,50 @@ def _products_by_category():
     with patch("scrapers.trastbank.fetch_html", side_effect=_fake_fetch):
         products = TrastBankScraper().run()
     return {product.category: product for product in products}
+
+
+def test_trastbank_avtokredit_and_ikkilamchi_share_one_page_covering_both_markets():
+    """The "Avtokredit" page (https://trustbank.uz/uz/private/crediting/auto/)
+    explicitly states it covers "birlamchi va ikkilamchi bozordan" (both
+    primary and secondary market) car purchases in one place, unlike most
+    other banks that split them into separate pages — so both categories
+    map to the same URL and the same extracted figures. Four customer-segment
+    tables each publish two rates (25% down for an unused car, 40% down for
+    a used one) — down-payment percentages (25/40) are distinguished from
+    real rate percentages (21-23.9%, never equal to 25 or 40) via
+    _TRAST_AUTO_DOWN_VALUES rather than a heading-based section split, since
+    all eight numbers sit under one shared "Foiz stavkasi" column header
+    with no distinguishing text between them."""
+    products = _products_by_category()
+
+    for category in ("avtokredit", "avtokredit_ikkilamchi"):
+        product = products[category]
+        assert product.bank == "TrastBank"
+        assert product.product_name == "Avtokredit"
+        assert product.rate_min == 21.0
+        assert product.rate_max == 23.9
+        assert product.term_min_months == 60
+        assert product.term_max_months == 60
+        assert product.down_payment_pct == 25.0
+        assert product.requires_collateral is True
+        assert product.grace_period_months is None
+        assert product.payment_method is None
+        assert product.source_url == TrastBankScraper.CATEGORY_URLS["avtokredit"]
+
+
+def test_trastbank_avtokredit_amount_falls_back_to_pptx_since_site_publishes_none():
+    """The page never states a maximum loan amount anywhere — the calculator
+    only has a blank "Kredit summasi" input field, not a real figure. Per
+    this project's PPTX-fallback rule (existence confirmed live, only the
+    numeric amount is missing), the max amount is pulled from the
+    independently-verified competitor PPTX (2 000 mln so'm) and the
+    fallback is documented via special_terms."""
+    products = _products_by_category()
+
+    for category in ("avtokredit", "avtokredit_ikkilamchi"):
+        product = products[category]
+        assert product.amount_max_som == 2_000_000_000
+        assert "pptx" in (product.special_terms or "").lower()
 
 
 def test_trastbank_mikroqarz_combines_three_customer_segments_into_one_range():
@@ -199,10 +246,13 @@ def test_trastbank_ipoteka_davlat_force_collateral_is_true():
     assert products["ipoteka_davlat"].requires_collateral is True
 
 
-def test_trastbank_scraper_fetches_all_three_category_pages():
+def test_trastbank_scraper_fetches_all_category_pages():
+    """avtokredit and avtokredit_ikkilamchi share one URL, so the number of
+    fetch_html calls (5, one per CATEGORY_URLS entry) exceeds the number of
+    distinct URLs actually requested (4)."""
     with patch("scrapers.trastbank.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         TrastBankScraper().run()
 
     fetched_urls = {call.args[0] for call in mock_fetch.call_args_list}
     assert fetched_urls == set(TrastBankScraper.CATEGORY_URLS.values())
-    assert mock_fetch.call_count == 3
+    assert mock_fetch.call_count == 5
