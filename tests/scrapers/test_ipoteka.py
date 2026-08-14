@@ -226,6 +226,33 @@ def test_ipoteka_avtokredit_separates_down_payment_from_rate_range():
     assert avtokredit.requires_collateral is True
 
 
+def test_ipoteka_avtokredit_falls_back_to_a_flat_rate_when_no_range_is_published():
+    """2026-08-14'da jonli saytda tasdiqlandi: "Foiz stavkasi yillik" bo'limi
+    endi oraliq ("0-18%") emas, balki yagona qat'iy stavka ("21%") beradi —
+    _RATE_RANGE_RE hech qachon mos kelmay, rates bo'sh qolib, butun mahsulot
+    yo'qolib ketardi (bu aynan Railow'dagi jonli backend'da kuzatilgan real
+    xato edi, Cobalt Special sahifasi butunlay avtokredit ro'yxatidan tushib
+    qolgan). extract_percentages fallback orqali yagona qiymat ham to'g'ri
+    o'qiladi (rate_min == rate_max == 21.0)."""
+    flat_rate_html = (FIXTURES_DIR / "ipoteka_avtokredit_flat_rate.html").read_text(encoding="utf-8")
+
+    def _fetch_with_flat_rate_avtokredit(url, *args, **kwargs):
+        if url == IpotekaBankScraper.CATEGORY_URLS["avtokredit"]:
+            return flat_rate_html
+        return FIXTURE_BY_URL[url]
+
+    with patch("scrapers.ipoteka.fetch_html", side_effect=_fetch_with_flat_rate_avtokredit):
+        products = IpotekaBankScraper().run()
+
+    avtokredit = next(p for p in products if p.category == "avtokredit")
+    assert avtokredit.rate_min == 21.0
+    assert avtokredit.rate_max == 21.0
+    assert avtokredit.term_min_months == 60
+    assert avtokredit.term_max_months == 60
+    assert avtokredit.amount_max_som == 480_000_000
+    assert avtokredit.down_payment_pct == 30.0
+
+
 def test_ipoteka_mikroqarz_onlayn_parses_correctly():
     """Page <title> and body both say "Onlayn Mikroqarz", delivered via the
     Ipoteka Mobile app to the customer's current account — this belongs

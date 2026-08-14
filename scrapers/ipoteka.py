@@ -180,13 +180,18 @@ class IpotekaBankScraper(TextSectionScraper):
         down_payment_rates = extract_percentages(down_payment_section)
         down_payment_pct = min(down_payment_rates) if down_payment_rates else None
 
+        # Sahifa avval "21-24%" kabi oraliq ko'rsatgan (shu sabab
+        # _RATE_RANGE_RE mavjud), lekin 2026-08-14'da tekshirilganda sayt
+        # yagona qat'iy stavkaga ("21%") o'zgarganini aniqladik — bu holda
+        # _RATE_RANGE_RE hech qachon mos kelmaydi va rates bo'sh qolib,
+        # butun mahsulot yo'qolib ketardi. extract_percentages umumiy
+        # holatni ham qamrab oladi (bitta qiymat -> rate_min == rate_max).
         rate_section = extract_section(text, "Foiz stavkasi yillik", "Muddati")
         rate_match = _RATE_RANGE_RE.search(rate_section)
-        rates = (
-            [float(rate_match.group(1).replace(",", ".")), float(rate_match.group(2).replace(",", "."))]
-            if rate_match
-            else []
-        )
+        if rate_match:
+            rates = [float(rate_match.group(1).replace(",", ".")), float(rate_match.group(2).replace(",", "."))]
+        else:
+            rates = extract_percentages(rate_section)
 
         term_section = extract_section(text, "Muddati", "Talablar")
         terms = extract_term_months(term_section)
