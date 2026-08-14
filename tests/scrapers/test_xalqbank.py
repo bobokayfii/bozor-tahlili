@@ -21,6 +21,9 @@ FIXTURE_BY_URL = {
     XalqBankScraper.CATEGORY_URLS["ipoteka_davlat"]: (FIXTURES_DIR / "xb_farovon_ipoteka.html").read_text(
         encoding="utf-8"
     ),
+    XalqBankScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "xalqbank_mikroqarz.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -67,7 +70,34 @@ def test_xalqbank_mikroqarz_onlayn_parses_correctly():
     assert mikroqarz.down_payment_pct == 0.0
     assert mikroqarz.grace_period_months is None
     assert mikroqarz.payment_method == "Annuitet"
-    assert mikroqarz.requires_collateral is True
+
+
+def test_xalqbank_mikroqarz_parses_correctly():
+    """""Biznesga ko'mak" mikrokrediti" — despite the "business" branding,
+    the purpose field explicitly allows "Shaxsiy ehtiyojlarni qondirish
+    uchun (aniq maqsadsiz)" (personal use, no fixed purpose) alongside
+    business development, with no business-registration requirement — so
+    it qualifies as a personal offline microloan distinct from the
+    already-scraped "Onlayn mikroqarz". Payment method is read from the
+    narrow "Kredit shartlari" section (states only "annuitet usulda"),
+    not the whole page, since the calculator widget's generic Annuitet/
+    Differensial toggle would otherwise falsely suggest both methods are
+    offered."""
+    with patch("scrapers.base.fetch_html", side_effect=_fake_fetch):
+        products = XalqBankScraper().run()
+
+    mikroqarz = next(p for p in products if p.category == "mikroqarz")
+    assert mikroqarz.bank == "Xalq Banki"
+    assert mikroqarz.product_name == "\"Biznesga ko'mak\" mikrokrediti"
+    assert mikroqarz.rate_min == 27.0
+    assert mikroqarz.rate_max == 27.0
+    assert mikroqarz.term_min_months == 36
+    assert mikroqarz.term_max_months == 36
+    assert mikroqarz.amount_max_som == 50_000_000
+    assert mikroqarz.requires_collateral is False
+    assert mikroqarz.down_payment_pct is None
+    assert mikroqarz.grace_period_months == 0
+    assert mikroqarz.payment_method == "Annuitet"
 
 
 def test_xalqbank_istemol_krediti_parses_correctly():

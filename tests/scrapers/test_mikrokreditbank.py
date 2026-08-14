@@ -33,6 +33,9 @@ FIXTURE_BY_URL = {
     MikrokreditBankScraper.CATEGORY_URLS["istemol_krediti"]: (FIXTURES_DIR / "mk_istemol_krediti.html").read_text(
         encoding="utf-8"
     ),
+    MikrokreditBankScraper.CATEGORY_URLS["ipoteka_tijorat"]: (
+        FIXTURES_DIR / "mikrokreditbank_ipoteka_tijorat.html"
+    ).read_text(encoding="utf-8"),
 }
 
 
@@ -40,11 +43,11 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_mikrokreditbank_scraper_parses_all_ten_categories():
+def test_mikrokreditbank_scraper_parses_all_eleven_categories():
     with patch("scrapers.mikrokreditbank.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = MikrokreditBankScraper().run()
 
-    assert mock_fetch.call_count == 10
+    assert mock_fetch.call_count == 11
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
@@ -57,8 +60,36 @@ def test_mikrokreditbank_scraper_parses_all_ten_categories():
         "kredit_karta",
         "istemol_krediti",
         "ipoteka_davlat",
+        "ipoteka_tijorat",
     }
     assert all(p.bank == "Mikrokreditbank" for p in products)
+
+
+def test_mikrokreditbank_ipoteka_tijorat_parses_correctly():
+    """"Universal ipoteka" ("Ikkilamchi bozor uchun ipoteka krediti",
+    mortgage-loan-secondary-market/) — bankning o'z mablag'lari hisobidan,
+    "ipoteka_davlat"dagi "Moliya vazirligi mablag'lari" bilan moliyalashadigan
+    "Imkoniyat ipotekasi krediti"dan farqli tijorat mahsuloti. Yuqoridagi
+    toza statistik kartochka (qiymat-keyin-yorliq, kichik harfli "kredit
+    miqdori"/"yillik stavka"/"kredit muddati") pastroqdagi katta harfli
+    "Kredit shartlari" jadvalidan (bir xil yorliqlar 6+ marta takrorlanadi)
+    ustuvor ishlatiladi, chunki kichik harfli versiyalar sahifada faqat bir
+    marta uchraydi."""
+    with patch("scrapers.mikrokreditbank.fetch_html", side_effect=_fake_fetch):
+        products = MikrokreditBankScraper().run()
+
+    tijorat = next(p for p in products if p.category == "ipoteka_tijorat")
+    assert tijorat.bank == "Mikrokreditbank"
+    assert tijorat.product_name == "Universal ipoteka"
+    assert tijorat.rate_min == 24.0
+    assert tijorat.rate_max == 26.0
+    assert tijorat.term_min_months == 240
+    assert tijorat.term_max_months == 240
+    assert tijorat.amount_max_som == 1_648_000_000
+    assert tijorat.down_payment_pct == 25.0
+    assert tijorat.grace_period_months == 0
+    assert tijorat.payment_method == "Annuitet, Differensial"
+    assert tijorat.requires_collateral is True
 
 
 def test_mikrokreditbank_mikroqarz_onlayn_uses_pptx_sourced_figures():

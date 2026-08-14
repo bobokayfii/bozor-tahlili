@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from scrapers.base import Product, TextSectionScraper
 from scrapers.utils import (
     extract_amount_som,
+    extract_grace_period_months,
     extract_payment_method,
     extract_percentages,
     extract_section,
@@ -68,6 +69,7 @@ class IpakYuliBankScraper(TextSectionScraper):
         ),
         "avtokredit_brend_birlamchi": "https://ipakyulibank.uz/physical/kreditlar/avtokreditlar/volkswagen-avtokredit",
         "ipoteka_tijorat": "https://ipakyulibank.uz/physical/kreditlar/ipoteka/ipoteka-24",
+        "ipoteka_davlat": "https://ipakyulibank.uz/physical/kreditlar/ipoteka/yangi-qurilgan-uylarga-ipoteka",
         "mikroqarz": "https://ipakyulibank.uz/physical/kreditlar/mikroqarzlar/mikroqarz",
         "mikroqarz_onlayn": "https://ipakyulibank.uz/physical/kreditlar/mikroqarzlar",
         "kredit_karta": "https://ipakyulibank.uz/physical/kartalar/imkoniyatlar-kredit-kartasi",
@@ -81,6 +83,7 @@ class IpakYuliBankScraper(TextSectionScraper):
         "avtokredit": True,
         "avtokredit_ikkilamchi": True,
         "avtokredit_brend_ikkilamchi": True,
+        "ipoteka_davlat": True,
         "mikroqarz": False,
         # Kartochkaning o'zida so'zma-so'z "Garovsiz va kafilsiz tezkor
         # xaridlar uchun tezkor pul" deb yozilgan.
@@ -92,6 +95,7 @@ class IpakYuliBankScraper(TextSectionScraper):
         "avtokredit_brend_ikkilamchi": "Ikkilamchi bozor uchun avtomobil krediti",
         "avtokredit_brend_birlamchi": "Volkswagen uchun avtokredit",
         "ipoteka_tijorat": "Ipoteka-24",
+        "ipoteka_davlat": "Yangi qurilgan uylarga ipoteka",
         "mikroqarz": "Kafillik asosida mikroqarz",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
     }
@@ -112,6 +116,8 @@ class IpakYuliBankScraper(TextSectionScraper):
                     product = self._build_avtokredit_brend_birlamchi_product(url, now, text)
                 elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
+                elif category == "ipoteka_davlat":
+                    product = self._build_ipoteka_davlat_product(url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
                 elif category == "mikroqarz_onlayn":
@@ -309,6 +315,69 @@ class IpakYuliBankScraper(TextSectionScraper):
             source_url=url,
             scraped_at=now,
             grace_period_months=None,
+            payment_method=payment_method,
+        )
+
+    def _build_ipoteka_davlat_product(self, url, now, text):
+        """"Yangi qurilgan uylarga ipoteka" — Prezident farmoni (PF-70)
+        asosidagi umumdavlat dasturi bo'yicha standartlashtirilgan
+        ko'rsatkichlar (Toshkent/hudud bo'yicha bir xil 480/380 mln
+        chegara, boshqa banklardagi bir xil dastur bilan taqqoslaganda ham
+        tasdiqlangan) — "Ipoteka-24"dan farqli, sahifada davlat dasturi
+        ekani so'zma-so'z aytilmagan, lekin uning o'ziga xos qat'iy
+        ko'rsatkichlari (480/380 mln, 20 yil, standart stavka oralig'i)
+        orqali aniqlangan.
+
+        "Moslashuvchan shartlar" bo'limi (sahifada bir marta uchraydi)
+        to'liq stavka oralig'ini beradi: "Rasmiy daromad bilan: 17-17,5% —
+        Toshkentda, 16,5% — hududlarda" va "Norasmiy daromad bilan: 17%
+        dan 18% gacha" — min=16,5%, max=18%. Yuqoridagi toza statistik
+        kartochka ("16,5% dan boshlab") faqat quyi chegarani beradi, shu
+        sabab bu batafsil bo'lim ustuvor ishlatiladi. Boshlang'ich badal
+        (15%) shu bo'limdagi "Qulaylik" ostki bo'limida keladi, shu sabab
+        rate_section "Qulaylik"dan OLDIN to'xtatiladi (aks holda 15% ham
+        stavka sifatida noto'g'ri hisoblanardi).
+
+        Kredit summasi ikki hudud uchun alohida beriladi (Toshkent 480 mln,
+        hududlar 380 mln) — extract_amount_som ikkalasidan kattasini
+        (480 mln) tanlaydi. Imtiyozli davr "6 oygacha" aniq yozilgan.
+
+        Ta'minot: FAQ'da "Yo'q, xarid qilingan ko'chmas mulkning o'zi garov
+        bo'ladi" deb aniq aytilgan — boshqa banklardagi ipoteka konvensiyasi
+        bilan bir xil, FORCE_COLLATERAL orqali True belgilangan."""
+        block = extract_section(text, "Moslashuvchan shartlar", "Afzalliklar")
+
+        rate_section = extract_section(block, "Foiz stavkasi", "Qulaylik")
+        rates = extract_percentages(rate_section)
+
+        amount_section = extract_section(block, "Kredit summasi", "Imtiyozli davr")
+        amount = extract_amount_som(amount_section)
+
+        grace_period_months = extract_grace_period_months(block)
+
+        down_section = extract_section(block, "Boshlang‘ich to‘lov", "Kredit muddati")
+        down_rates = extract_percentages(down_section)
+        down_payment_pct = min(down_rates) if down_rates else None
+
+        payment_method = extract_payment_method(text)
+
+        if not rates or amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="ipoteka_davlat",
+            product_name=self.PRODUCT_NAMES["ipoteka_davlat"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=240,
+            term_max_months=240,
+            amount_max_som=amount,
+            requires_collateral=self.FORCE_COLLATERAL["ipoteka_davlat"],
+            down_payment_pct=down_payment_pct,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
             payment_method=payment_method,
         )
 

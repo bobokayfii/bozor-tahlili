@@ -21,6 +21,9 @@ FIXTURE_BY_URL = {
     TengeBankScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (
         FIXTURES_DIR / "tenge_mikroqarz_onlayn.html"
     ).read_text(encoding="utf-8"),
+    TengeBankScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "tenge_mikroqarz.html").read_text(
+        encoding="utf-8"
+    ),
 }
 
 
@@ -145,3 +148,28 @@ def test_tenge_mikroqarz_onlayn_parses_correctly():
     assert mikroqarz.requires_collateral is False
     assert mikroqarz.grace_period_months is None
     assert mikroqarz.payment_method == "Annuitet"
+
+
+def test_tenge_mikroqarz_parses_correctly():
+    """"Biznesga birinchi qadam" — despite the "business" branding, the
+    borrower requirements state plain "jismoniy shaxslar" (individuals)
+    with no business-registration or self-employment-certificate
+    requirement, so it qualifies as a personal/retail offline microloan
+    distinct from the already-scraped "Onlayn mikroqarz". Security is a
+    third-party guarantee only (no property collateral), matching the
+    same convention as Ipak Yo'li Bank's guarantee-based mikroqarz."""
+    with patch("scrapers.tenge.fetch_html", side_effect=_fake_fetch):
+        products = TengeBankScraper().run()
+
+    mikroqarz = next(p for p in products if p.category == "mikroqarz")
+    assert mikroqarz.bank == "Tenge Bank"
+    assert mikroqarz.product_name == "Biznesga birinchi qadam"
+    assert mikroqarz.rate_min == 25.0
+    assert mikroqarz.rate_max == 25.0
+    assert mikroqarz.term_min_months == 36
+    assert mikroqarz.term_max_months == 36
+    assert mikroqarz.amount_max_som == 30_000_000
+    assert mikroqarz.requires_collateral is False
+    assert mikroqarz.down_payment_pct is None
+    assert mikroqarz.grace_period_months is None
+    assert mikroqarz.payment_method is None
