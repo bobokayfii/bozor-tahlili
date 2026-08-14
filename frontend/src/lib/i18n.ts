@@ -2,6 +2,7 @@ export type Lang = 'uz' | 'ru'
 
 export const UI_TEXT = {
   uz: {
+    brandName: 'BOZOR TAHLILI',
     sidebarTitle: 'Kredit mahsulotlari',
     sidebarFooter: "SQB · Strategiya bo'limi",
     pageSubtitle: 'Raqobatchi banklar shartlarining joriy holati',
@@ -50,8 +51,14 @@ export const UI_TEXT = {
     refreshAlreadyRunning: 'Yangilash allaqachon ishlamoqda — iltimos, biroz kuting.',
     refreshFailed: "Yangilashni boshlab bo'lmadi. Birozdan so'ng qayta urinib ko'ring.",
     closeLabel: 'Yopish',
+    compareCheckboxLabel: 'Solishtirish uchun tanlash',
+    compareBarLabel: 'Tanlangan mahsulotlar',
+    compareBarClear: 'Bekor qilish',
+    compareButton: 'Solishtirish',
+    compareModalTitle: 'Mahsulotlarni solishtirish',
   },
   ru: {
+    brandName: 'АНАЛИЗ РЫНКА',
     sidebarTitle: 'Кредитные продукты',
     sidebarFooter: 'SQB · Отдел стратегии',
     pageSubtitle: 'Текущее состояние условий банков-конкурентов',
@@ -100,6 +107,11 @@ export const UI_TEXT = {
     refreshAlreadyRunning: 'Обновление уже выполняется — пожалуйста, подождите немного.',
     refreshFailed: 'Не удалось запустить обновление. Попробуйте ещё раз чуть позже.',
     closeLabel: 'Закрыть',
+    compareCheckboxLabel: 'Выбрать для сравнения',
+    compareBarLabel: 'Выбранные продукты',
+    compareBarClear: 'Отмена',
+    compareButton: 'Сравнить',
+    compareModalTitle: 'Сравнение продуктов',
   },
 } as const satisfies Record<Lang, Record<string, string>>
 

@@ -1,10 +1,23 @@
 import re
 
-from scrapers.base import TextSectionScraper
+from scrapers.base import Product, TextSectionScraper
+from scrapers.utils import (
+    extract_amount_som,
+    extract_grace_period_months,
+    extract_payment_method,
+    extract_section,
+)
 
 _DOWN_PAYMENT_RE = re.compile(
     r"Boshlang.ich badal - (\d+) foiz \(Uzautomotors avtomobillari uchun - (\d+) foiz\)"
 )
+_ISTEMOL_TIER_RE = re.compile(r"(\d)\s*yilga yillik\s*(\d{1,2}(?:\.\d{1,2})?)\s*foiz")
+_MORTGAGE_RATE_LINE_RE = re.compile(r"Yillik foiz stavkasi\s*-?\s*(\d{1,2}(?:[.,]\d{1,2})?)%")
+_MORTGAGE_DOWN_LINE_RE = re.compile(r"Boshlang.ich to.lov\s*-?\s*(\d{1,2})%")
+# extract_term_months caps values at 120 (10 years) — both mortgage terms
+# here (180/240 months, i.e. 15/20 years) exceed that, so a dedicated
+# cap-free regex is used instead (same fix as bdb.py/nbu.py's ipoteka_davlat).
+_MORTGAGE_TERM_RE = re.compile(r"(\d{1,3})\s*oygacha")
 
 
 class XalqBankScraper(TextSectionScraper):
@@ -56,13 +69,29 @@ class XalqBankScraper(TextSectionScraper):
     bildirmaydi, shuning uchun standart (scoping'siz) qidiruv butun sahifa
     matnidan tasodifiy son topib, yolg'on natija berardi; shu sabab bu
     kategoriya uchun grace_period_months ham to'g'ridan-to'g'ri None
-    qilib belgilanadi."""
+    qilib belgilanadi.
+
+    "Iste'mol kreditlari" (xb.uz/page/physical-credit-consumption) — sayt
+    izlash orqali topildi (pptx'ning "Green iste'mol krediti" nomidagi
+    sahifasi endi ishlamaydi/bo'sh qaytadi, bu sahifa haqiqiy va real
+    ma'lumot beradi). Kalkulyator vidjetining o'zida faqat bitta yagona
+    stavka ("26.99%") ko'rsatiladi, lekin "Iste'mol kreditining qo'shimcha
+    ma'lumotlari" bandida to'liq muddat-stavka jadvali bor: "1 yilga
+    yillik 23 foiz, 2 yilga yillik 26.99 foiz, 3 yilga yillik 26.99 foiz"
+    — shu jadval ustuvor manba (rate_min=23, rate_max=26.99, term 12-36
+    oy, yillar oyga ko'paytiriladi). Summa kalkulyatorning o'z chegarasidan
+    ("1 000 000 so'm" — "27 000 000 so'm") olinadi. Boshlang'ich to'lov
+    slayderi "0%"dan boshlanadi. Ta'minot — "Sug'urta polisi" (mulk/ko'chmas
+    mulk garovi emas), shu sabab requires_collateral False."""
 
     bank_name = "Xalq Banki"
     url = "https://xb.uz/page/kreditlar"
     CATEGORY_URLS = {
         "avtokredit": "https://xb.uz/page/onlayn-avtokredit",
         "mikroqarz_onlayn": "https://xb.uz/page/onlayn-mikroqarz",
+        "istemol_krediti": "https://xb.uz/page/physical-credit-consumption",
+        "ipoteka_tijorat": "https://xb.uz/page/qulay-ipoteka-krediti",
+        "ipoteka_davlat": "https://xb.uz/page/farovon-hayot-ipoteka-kredit",
     }
     CATEGORY_HEADINGS = {
         "avtokredit": ("Kredit foizi:", "Onlayn-Avtokredit"),
@@ -74,6 +103,9 @@ class XalqBankScraper(TextSectionScraper):
     PRODUCT_NAMES = {
         "avtokredit": "Onlayn-Avtokredit",
         "mikroqarz_onlayn": "Onlayn mikroqarz",
+        "istemol_krediti": "Iste'mol krediti",
+        "ipoteka_tijorat": '"Qulay" ipoteka krediti',
+        "ipoteka_davlat": '"Farovon" ipoteka krediti',
     }
     PAYMENT_METHOD_HEADINGS = {
         "avtokredit": ("Kreditning to'lov grafigi", "Muhim shartlar"),
@@ -94,6 +126,11 @@ class XalqBankScraper(TextSectionScraper):
         grace_period_months=None,
         **kwargs,
     ):
+        if category == "istemol_krediti":
+            return self._build_istemol_krediti_product(source_url, scraped_at, full_text or section)
+        if category in ("ipoteka_tijorat", "ipoteka_davlat"):
+            return self._build_ipoteka_product(category, source_url, scraped_at, full_text or section)
+
         section = section.replace("ООО", "000")
         if category == "avtokredit" and down_payment_pct is None and full_text is not None:
             match = _DOWN_PAYMENT_RE.search(full_text)
@@ -111,4 +148,95 @@ class XalqBankScraper(TextSectionScraper):
             down_payment_pct=down_payment_pct,
             grace_period_months=grace_period_months,
             **kwargs,
+        )
+
+    def _build_istemol_krediti_product(self, url, now, text):
+        tiers = _ISTEMOL_TIER_RE.findall(text)
+        if not tiers:
+            return None
+        rates = [float(rate) for _year, rate in tiers]
+        terms = [int(year) * 12 for year, _rate in tiers]
+
+        amount_section = extract_section(text, "Kredit summasi", "Muddati")
+        amount = extract_amount_som(amount_section)
+        if amount is None:
+            return None
+
+        return Product(
+            bank=self.bank_name,
+            category="istemol_krediti",
+            product_name=self.PRODUCT_NAMES["istemol_krediti"],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            requires_collateral=False,
+            down_payment_pct=0.0,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=None,
+            payment_method="Annuitet, Differensial",
+        )
+
+    def _build_ipoteka_product(self, category, url, now, text):
+        """""Qulay" ipoteka krediti" (ipoteka_tijorat) — "Bankning o'z
+        mablag'lari hisobidan" deb aniq yozilgan, birlamchi VA ikkilamchi
+        bozordan uy-joy uchun. ""Farovon" ipoteka krediti" (ipoteka_davlat)
+        — aniq quyi (17%) stavkasi va Xalq Banki'ning boshqa "davlat"
+        mahsulotlari bilan bir xil 17% qiymati orqali davlat mablag'i
+        ekani tasdiqlangan (NBU'ning shunga o'xshash davlat mahsuloti ham
+        aynan 17% dan boshlanadi). Ikkala sahifa ham "Kredit shartlari"
+        (yoki "...ipoteka kredit shartlari") nomli raqamlangan ro'yxatda
+        mijoz segmenti bo'yicha bir necha "Boshlang'ich to'lov - N%
+        Yillik foiz stavkasi - M%" qatoridan iborat — shu ikki alohida
+        regex bilan ajratiladi (aks holda ikkalasi ham "%" belgili bo'lgani
+        uchun extract_percentages ularni ajrata olmas edi)."""
+        # "Qulay" heading is standalone "Kredit shartlari" (capital K);
+        # "Farovon" heading is the longer '"Farovon" ipoteka kredit
+        # shartlari' (lowercase k, part of the quoted product name) —
+        # case-sensitive extract_section needs the exact substring for each.
+        start_heading = "Kredit shartlari" if category == "ipoteka_tijorat" else "ipoteka kredit shartlari"
+        block = extract_section(text, start_heading, "Muhim shartlar")
+
+        rates = [float(m.replace(",", ".")) for m in _MORTGAGE_RATE_LINE_RE.findall(block)]
+        down_payments = [int(m) for m in _MORTGAGE_DOWN_LINE_RE.findall(block)]
+
+        amount_section = extract_section(block, "Maksimal miqdori", "Kredit muddati")
+        amount = extract_amount_som(amount_section)
+
+        term_section = extract_section(block, "Kredit muddati", "Kreditning imtiyozli davri")
+        terms = [int(m) for m in _MORTGAGE_TERM_RE.findall(term_section)]
+
+        if not rates or amount is None or not terms:
+            return None
+
+        grace_section = extract_section(block, "Kreditning imtiyozli davri", "Kredit")
+        grace_period_months = extract_grace_period_months("imtiyozli davri" + grace_section)
+
+        payment_method = extract_payment_method(block)
+
+        return Product(
+            bank=self.bank_name,
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
+            rate_min=min(rates),
+            rate_max=max(rates),
+            term_min_months=min(terms),
+            term_max_months=max(terms),
+            amount_max_som=amount,
+            # Ipoteka doim sotib olinayotgan ko'chmas mulk garovi bilan
+            # ta'minlanadi (boshqa ipoteka_tijorat/ipoteka_davlat
+            # scraperlaridagi bir xil konvensiya) — has_collateral_requirement
+            # to'g'ridan-to'g'ri ishlatilmaydi, chunki "Farovon" sahifasida
+            # "Kreditning imtiyozli davri: Mavjud emas" iborasi umumiy
+            # "mavjud emas" signali bilan aralashib yolg'on-manfiy beradi
+            # (avtokredit uchun bu faylda allaqachon hujjatlashtirilgan
+            # bir xil muammo).
+            requires_collateral=True,
+            down_payment_pct=float(min(down_payments)) if down_payments else None,
+            source_url=url,
+            scraped_at=now,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
         )

@@ -4,12 +4,17 @@ import { ProductTable } from './components/ProductTable'
 import { MarketPulse } from './components/MarketPulse'
 import { ExportMenu } from './components/ExportMenu'
 import { RefreshDataButton } from './components/RefreshDataButton'
+import { CompareBar } from './components/CompareBar'
+import { CompareModal } from './components/CompareModal'
 import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
 import { getCategoryHeading } from './lib/categoryGroups'
+import { getCompareKey } from './lib/compareLogic'
 import { useLanguage } from './lib/LanguageContext'
 import type { Lang } from './lib/i18n'
 import type { Category, Product, UnavailableBank } from './lib/types'
-import logo from './assets/logo.png'
+import logoIcon from './assets/logo-icon.png'
+
+const MAX_COMPARE = 3
 
 function formatUpdatedAt(iso: string, lang: Lang): string {
   const date = new Date(iso)
@@ -52,6 +57,8 @@ export function App() {
   const [unavailableBanks, setUnavailableBanks] = useState<UnavailableBank[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [compareKeys, setCompareKeys] = useState<Set<string>>(new Set())
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false)
 
   useEffect(() => {
     fetchCategories()
@@ -97,17 +104,48 @@ export function App() {
   const activeCategoryData = categories.find((c) => c.key === activeCategory)
   const activeLabel = activeCategoryData
     ? getCategoryHeading(activeCategoryData.key, activeCategoryData.label, lang)
-    : 'Bozor Tahlili'
+    : t('brandName')
   const lastUpdated =
     products.length > 0
       ? products.reduce((latest, p) => (p.scraped_at > latest ? p.scraped_at : latest), products[0].scraped_at)
       : null
 
+  const compareProducts = products.filter((product) => compareKeys.has(getCompareKey(product)))
+
+  function handleSelectCategory(categoryKey: string) {
+    setActiveCategory(categoryKey)
+    setCompareKeys(new Set())
+    setIsCompareModalOpen(false)
+  }
+
+  function handleToggleCompare(key: string) {
+    const willRemove = compareKeys.has(key)
+    const nextSize = willRemove ? compareKeys.size - 1 : Math.min(compareKeys.size + 1, MAX_COMPARE)
+    if (willRemove && nextSize < 2) {
+      setIsCompareModalOpen(false)
+    }
+    setCompareKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else if (next.size < MAX_COMPARE) {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
+  function handleClearCompare() {
+    setCompareKeys(new Set())
+    setIsCompareModalOpen(false)
+  }
+
   return (
     <div className="app-shell">
       <header className="app-topbar">
         <div className="app-topbar-brand">
-          <img src={logo} alt="Bozor Tahlili" className="app-topbar-logo" />
+          <img src={logoIcon} alt="" className="app-topbar-logo-icon" />
+          <span className="app-topbar-wordmark">{t('brandName')}</span>
         </div>
         <div className="app-topbar-actions">
           <RefreshDataButton />
@@ -116,7 +154,7 @@ export function App() {
         </div>
       </header>
       <div className="app-body">
-        <Sidebar categories={categories} activeCategory={activeCategory} onSelect={setActiveCategory} />
+        <Sidebar categories={categories} activeCategory={activeCategory} onSelect={handleSelectCategory} />
         <main className="main-content">
           <div className="page-head">
             <div>
@@ -138,9 +176,27 @@ export function App() {
             schema={activeCategoryData?.schema}
             category={activeCategory ?? undefined}
             unavailableBanks={unavailableBanks}
+            compareKeys={compareKeys}
+            onToggleCompare={handleToggleCompare}
+            maxCompare={MAX_COMPARE}
           />
         </main>
       </div>
+      <CompareBar
+        products={compareProducts}
+        onRemove={handleToggleCompare}
+        onOpen={() => setIsCompareModalOpen(true)}
+        onClear={handleClearCompare}
+      />
+      {isCompareModalOpen && compareProducts.length >= 2 && (
+        <CompareModal
+          products={compareProducts}
+          schema={activeCategoryData?.schema}
+          category={activeCategory ?? undefined}
+          onClose={() => setIsCompareModalOpen(false)}
+          onRemove={handleToggleCompare}
+        />
+      )}
     </div>
   )
 }

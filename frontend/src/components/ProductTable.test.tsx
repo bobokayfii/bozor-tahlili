@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { ProductTable } from './ProductTable'
 import { LanguageProvider } from '../lib/LanguageContext'
@@ -177,5 +178,43 @@ describe('ProductTable', () => {
     expect(screen.getByText('12–60 мес.')).toBeInTheDocument()
     expect(screen.getByText('Продукт недоступен')).toBeInTheDocument()
     window.localStorage.removeItem('bozor-tahlili-lang')
+  })
+
+  it('calls onToggleCompare with the compare key when a row checkbox is clicked', async () => {
+    const user = userEvent.setup()
+    const onToggleCompare = vi.fn()
+    renderWithLanguage(
+      <ProductTable products={[sampleProduct]} onToggleCompare={onToggleCompare} compareKeys={new Set()} />,
+    )
+    await user.click(screen.getByRole('checkbox'))
+    expect(onToggleCompare).toHaveBeenCalledWith('SQB::SQB Avtokredit')
+  })
+
+  it('checks the checkbox for a product whose key is already in compareKeys', () => {
+    renderWithLanguage(
+      <ProductTable products={[sampleProduct]} compareKeys={new Set(['SQB::SQB Avtokredit'])} />,
+    )
+    expect(screen.getByRole('checkbox')).toBeChecked()
+  })
+
+  it('disables unchecked checkboxes once maxCompare is reached, but keeps the checked one enabled', () => {
+    renderWithLanguage(
+      <ProductTable
+        products={[sampleProduct, cheaperProduct]}
+        compareKeys={new Set(['SQB::SQB Avtokredit'])}
+        maxCompare={1}
+      />,
+    )
+    const checkboxes = screen.getAllByRole('checkbox')
+    const checked = checkboxes.find((box) => (box as HTMLInputElement).checked)
+    const unchecked = checkboxes.find((box) => !(box as HTMLInputElement).checked)
+    expect(checked).toBeEnabled()
+    expect(unchecked).toBeDisabled()
+  })
+
+  it('does not render a checkbox for unavailable bank rows', () => {
+    const unavailableBanks: UnavailableBank[] = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
+    renderWithLanguage(<ProductTable products={[sampleProduct]} unavailableBanks={unavailableBanks} />)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
   })
 })

@@ -18,6 +18,9 @@ FIXTURE_BY_URL = {
     MikrokreditBankScraper.CATEGORY_URLS["avtokredit_brend_ikkilamchi"]: (
         FIXTURES_DIR / "mk_avtokredit_ikkilamchi.html"
     ).read_text(encoding="utf-8"),
+    MikrokreditBankScraper.CATEGORY_URLS["avtokredit_elektro"]: (
+        FIXTURES_DIR / "mkb_avtokredit_leapmotor.html"
+    ).read_text(encoding="utf-8"),
     MikrokreditBankScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "mk_mikroqarz.html").read_text(
         encoding="utf-8"
     ),
@@ -37,23 +40,67 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_mikrokreditbank_scraper_parses_all_eight_categories():
+def test_mikrokreditbank_scraper_parses_all_ten_categories():
     with patch("scrapers.mikrokreditbank.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = MikrokreditBankScraper().run()
 
-    assert mock_fetch.call_count == 8
+    assert mock_fetch.call_count == 10
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
         "avtokredit_ikkilamchi",
         "avtokredit_brend_birlamchi",
         "avtokredit_brend_ikkilamchi",
+        "avtokredit_elektro",
         "mikroqarz",
+        "mikroqarz_onlayn",
         "kredit_karta",
         "istemol_krediti",
         "ipoteka_davlat",
     }
     assert all(p.bank == "Mikrokreditbank" for p in products)
+
+
+def test_mikrokreditbank_mikroqarz_onlayn_uses_pptx_sourced_figures():
+    """"Onlayn Mikroqarz 'Ommabop'" kartochkasi Mavrid ilovasini yuklab
+    olishni taklif qiladi, lekin hech qanday stavka/muddat/summa
+    ko'rsatmaydi — foydalanuvchining aniq ko'rsatmasiga ko'ra, sayt raqam
+    bermagan hollarda mustaqil tasdiqlangan pptx manbasidan olinadi
+    (26-29%, 24 oygacha, 50 mln so'm)."""
+    with patch("scrapers.mikrokreditbank.fetch_html", side_effect=_fake_fetch):
+        products = MikrokreditBankScraper().run()
+
+    onlayn = next(p for p in products if p.category == "mikroqarz_onlayn")
+    assert onlayn.bank == "Mikrokreditbank"
+    assert onlayn.product_name == 'Onlayn Mikroqarz "Ommabop"'
+    assert onlayn.rate_min == 26.0
+    assert onlayn.rate_max == 29.0
+    assert onlayn.term_max_months == 24
+    assert onlayn.amount_max_som == 50_000_000
+    assert onlayn.requires_collateral is False
+
+
+def test_mikrokreditbank_avtokredit_elektro_parses_correctly():
+    """"Avtokredit Leapmotor" — Leapmotor (xitoylik elektromobil brendi)
+    avtomobilini birlamchi bozordan xarid qilish uchun. ADM GLOBAL
+    sahifasidagi bilan bir xil jadval shabloni: "LEAPMOTOR" sarlavhasi
+    ostida boshlang'ich badal ulushi (25%-60%) x muddat (12-60 oy) bo'yicha
+    guruhlangan bitta narx jadvali (0,0%-16,0%)."""
+    with patch("scrapers.mikrokreditbank.fetch_html", side_effect=_fake_fetch):
+        products = MikrokreditBankScraper().run()
+
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    assert elektro.bank == "Mikrokreditbank"
+    assert elektro.product_name == "Avtokredit Leapmotor"
+    assert elektro.rate_min == 0.0
+    assert elektro.rate_max == 16.0
+    assert elektro.term_min_months == 12
+    assert elektro.term_max_months == 60
+    assert elektro.amount_max_som == 824_000_000
+    assert elektro.down_payment_pct == 25.0
+    assert elektro.grace_period_months == 0
+    assert elektro.payment_method == "Annuitet, Differensial"
+    assert elektro.requires_collateral is True
 
 
 def test_mikrokreditbank_avtokredit_brend_ikkilamchi_parses_correctly():

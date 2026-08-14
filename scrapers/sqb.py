@@ -53,9 +53,22 @@ class SQBScraper(TextSectionScraper):
     url = "https://sqb.uz/uz/individuals/credits/"
     CATEGORY_URLS = {
         "avtokredit": "https://sqb.uz/uz/individuals/autoloans/avtokredit-imkon-uz/",
+        # Sahifada "kredit birlamchi bozordan yangi avtomobil sotib olish
+        # uchun ajratiladi" deyilgan — brend/yoqilg'i turi cheklovi yo'q,
+        # istalgan (shu jumladan elektromobil) yangi avtomobilga beriladi —
+        # shu sabab bir xil sahifa "avtokredit_elektro" toifasiga ham
+        # xaritalanadi.
+        "avtokredit_elektro": "https://sqb.uz/uz/individuals/autoloans/avtokredit-imkon-uz/",
+        "avtokredit_ikkilamchi": "https://sqb.uz/uz/individuals/credits/ikkilamchi-bozordan-avtokredit-uz/",
+        # Sahifada brend cheklovi umuman yo'q (istalgan avtomobil markasi/
+        # modeli qabul qilinadi) — shu sabab bir xil sahifa "avtokredit_
+        # brend_ikkilamchi" toifasiga ham xaritalanadi (HamkorBank/Ipoteka
+        # Bank/NBU'dagi bir xil naqsh).
+        "avtokredit_brend_ikkilamchi": "https://sqb.uz/uz/individuals/credits/ikkilamchi-bozordan-avtokredit-uz/",
         "ipoteka_tijorat": "https://sqb.uz/uz/individuals/ipoteka/ishonchli-ipoteka-uz/",
         "ipoteka_davlat": "https://sqb.uz/uz/individuals/ipoteka/exclusive-ipoteka-uz/",
         "mikroqarz": "https://sqb.uz/uz/individuals/credits/mikrokredit-uz/",
+        "mikroqarz_onlayn": "https://sqb.uz/uz/individuals/credits/sqb-mobile-ilovasida-mikroqarz-uz/",
         "kredit_karta": "https://sqb.uz/uz/individuals/credits/credit-card-new-uz/",
         "istemol_krediti": "https://sqb.uz/uz/individuals/credits/consumer-credit-new-uz/",
     }
@@ -70,12 +83,17 @@ class SQBScraper(TextSectionScraper):
     }
     PRODUCT_NAMES = {
         "avtokredit": "«Avto imkon» avtokrediti",
+        "avtokredit_elektro": "«Avto imkon» avtokrediti",
+        "avtokredit_ikkilamchi": "«Ikkilamchi bozordan avtotransport» krediti",
+        "avtokredit_brend_ikkilamchi": "«Ikkilamchi bozordan avtotransport» krediti",
         "ipoteka_tijorat": "Ishonchli ipoteka krediti",
         "ipoteka_davlat": "Exclusive ipoteka",
         "mikroqarz": "Mikrokredit",
+        "mikroqarz_onlayn": "SQB Mobile ilovasida mikroqarz",
     }
     FORCE_COLLATERAL = {
         "avtokredit": True,
+        "avtokredit_elektro": True,
         # Ipoteka doim sotib olinayotgan ko'chmas mulk garovi bilan
         # ta'minlanadi; sahifadagi umumiy garov tekshiruvi boshqa
         # aloqasiz "garovsiz" iborasi tufayli yolg'on-manfiy berishi
@@ -84,6 +102,17 @@ class SQBScraper(TextSectionScraper):
         # Xuddi shu sababga ko'ra — ipoteka doim ko'chmas mulk garovi bilan
         # ta'minlanadi.
         "ipoteka_davlat": True,
+        # Sahifadagi "Kredit ta'minoti" bandida so'zma-so'z "garov" emas,
+        # "kredit hisobiga sotib olinadigan avtotransport vositasi" deb
+        # yozilgan — umumiy has_collateral_requirement buni ko'rmaydi,
+        # avtokredit kategoriyasidagi bilan bir xil sababga ko'ra aniq
+        # True belgilangan.
+        "avtokredit_ikkilamchi": True,
+        "avtokredit_brend_ikkilamchi": True,
+        # "Mikroqarz ta'minoti" bandida so'zma-so'z "kredit qaytmaslik
+        # xatari sug'urta polisi" deb yozilgan — mulk/avtomobil garovi
+        # emas, faqat sug'urta polisi bilan ta'minlanadi.
+        "mikroqarz_onlayn": False,
     }
 
     def run(self):
@@ -94,14 +123,18 @@ class SQBScraper(TextSectionScraper):
                 html = fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT)
                 text = html_to_text(html)
 
-                if category == "avtokredit":
-                    product = self._build_avtokredit_product(url, now, text)
+                if category in ("avtokredit", "avtokredit_elektro"):
+                    product = self._build_avtokredit_product(category, url, now, text)
+                elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
+                    product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
                 elif category == "ipoteka_tijorat":
                     product = self._build_ipoteka_tijorat_product(url, now, text)
                 elif category == "ipoteka_davlat":
                     product = self._build_ipoteka_davlat_product(url, now, text)
                 elif category == "mikroqarz":
                     product = self._build_mikroqarz_product(url, now, text)
+                elif category == "mikroqarz_onlayn":
+                    product = self._build_mikroqarz_onlayn_product(url, now, text)
                 else:
                     heading_pair = self.CATEGORY_HEADINGS.get(category)
                     section = extract_section(text, *heading_pair) if heading_pair is not None else text
@@ -113,7 +146,13 @@ class SQBScraper(TextSectionScraper):
                 products.append(product)
         return products
 
-    def _build_avtokredit_product(self, url, now, text):
+    def _build_avtokredit_product(self, category, url, now, text):
+        """avtokredit ("«Avto imkon» avtokrediti") sahifasida "kredit
+        birlamchi bozordan yangi avtomobil sotib olish uchun ajratiladi"
+        deyilgan — brend yoki yoqilg'i turi bo'yicha hech qanday cheklov
+        yo'q, shu sabab bir xil sahifa/qiymatlar "avtokredit_elektro"
+        toifasiga ham xaritalanadi (bir xil URL, shu metod ikkalasi uchun
+        ham chaqiriladi, faqat `category` parametri farq qiladi)."""
         rate_section = extract_section(text, "Foiz stavkalari", "Qo'shimcha shartlar")
         term_amount_section = extract_section(text, "Kredit muddati:", "badal")
         section = f"{rate_section}\n{term_amount_section}"
@@ -129,7 +168,70 @@ class SQBScraper(TextSectionScraper):
         grace_period_months = extract_grace_period_months("Imtiyozli davr:" + grace_section)
 
         return self._build_product(
-            "avtokredit",
+            category,
+            section,
+            url,
+            now,
+            full_text=text,
+            down_payment_pct=down_payment_pct,
+            grace_period_months=grace_period_months,
+            payment_method=payment_method,
+        )
+
+    def _build_avtokredit_ikkilamchi_product(self, category, url, now, text):
+        """"«Ikkilamchi bozordan avtotransport» krediti" — hero-kartochkada
+        ("Kredit summasi" -> "400 mln so'mgacha", "Kredit foiz stavkasi" ->
+        "25 % dan", "Kredit muddati" -> "60 oygacha") faqat eng yaxshi
+        (min stavka/max muddat) qiymatlar ko'rsatiladi; pastroqdagi
+        "Kredit shartlari" bo'limida esa mijoz toifasi bo'yicha to'liq
+        jadval bor (rasmiy daromadli mijozlar: 27%/36oy, 28%/48oy, 29%/60oy;
+        ish haqi loyihasi ishtirokchilari: 25%/36oy, 26%/48oy, 27%/60oy) —
+        shu to'liq jadval ishlatiladi (rate_max=29% hero-kartochkada
+        ko'rsatilmagan qiymat).
+
+        Bo'lim ("Kredit shartlari" -> "Hujjatlar") avval bitta blok
+        sifatida ajratib olinadi, chunki "Kredit foiz stavkasi" sarlavhasi
+        sahifada yana bir marta (yuqoridagi hero-kartochkada) uchraydi —
+        shu blok ichida esa faqat bitta marta. Stavka/muddat jadvali
+        alohida tor oraliqdan ("Kredit foiz stavkasi" -> "band qilgan",
+        ya'ni keyingi "O'zini o'zi band qilgan..." bo'limigacha) olinadi —
+        aks holda "Imtiyozli davr: 3 oy" ham muddat sifatida hisoblanib,
+        term_min'ni yolg'on ravishda 3 oyga tushirib yuborardi.
+
+        "Kredit miqdori" bo'limida IKKITA raqam bor: avtomobilning o'zi
+        uchun (400 mln) va unga bog'liq tovar/xizmat uchun (40 mln) —
+        extract_amount_som ikkalasidan kattasini (400 mln) oladi.
+
+        Sahifada "Kredit ta'minoti" bandida so'zma-so'z "garov" so'zi
+        ishlatilmagan (aksincha, "kredit hisobiga sotib olinadigan
+        avtotransport vositasi" deb tavsiflangan) — shu sabab
+        requires_collateral FORCE_COLLATERAL orqali aniq True
+        belgilangan (avtokredit kategoriyasidagi bilan bir xil).
+
+        Sahifada brend cheklovi umuman yo'q ("Ishlatilgan avtomobillar
+        sotiladigan har qanday joydan" — bozor, egasidan, onlayn
+        maydonchadan) — shu sabab bitta haqiqiy sahifa "avtokredit_brend_
+        ikkilamchi" toifasiga ham xaritalanadi (bir xil URL, shu metod
+        ikkalasi uchun ham chaqiriladi, faqat `category` parametri farq
+        qiladi)."""
+        block = extract_section(text, "Kredit shartlari", "Hujjatlar")
+
+        amount_section = extract_section(block, "Kredit miqdori:", "Minimal boshlang")
+        rate_section = extract_section(block, "Kredit foiz stavkasi", "band qilgan")
+        section = f"{rate_section}\n{amount_section}"
+
+        down_payment_section = extract_section(block, "Minimal boshlang", "To'lov grafigi")
+        down_payment_rates = extract_percentages(down_payment_section)
+        down_payment_pct = min(down_payment_rates) if down_payment_rates else None
+
+        payment_method_section = extract_section(block, "To'lov grafigi:", "Imtiyozli davr")
+        payment_method = extract_payment_method(payment_method_section)
+
+        grace_section = extract_section(block, "Imtiyozli davr:", "Kredit ta")
+        grace_period_months = extract_grace_period_months("Imtiyozli davr:" + grace_section)
+
+        return self._build_product(
+            category,
             section,
             url,
             now,
@@ -305,4 +407,32 @@ class SQBScraper(TextSectionScraper):
             scraped_at=now,
             grace_period_months=None,
             payment_method=payment_method,
+        )
+
+    def _build_mikroqarz_onlayn_product(self, url, now, text):
+        """"SQB Mobile ilovasida mikroqarz" — hero-kartochkada faqat eng
+        yaxshi qiymatlar ("24% dan boshlab", "48 oygacha") ko'rsatiladi;
+        pastroqdagi "Batafsil shartlar" bo'limida esa mijoz toifasi/muddat
+        bo'yicha to'liq 6 qatorli jadval bor (24%/6oy, 25%/9oy, 26%/12oy,
+        27%/24oy, 28%/36oy, 29%/48oy) — shu to'liq jadval ishlatiladi
+        (rate_max=29% hero-kartochkada ko'rsatilmagan qiymat, xuddi
+        avtokredit_ikkilamchi'dagi bilan bir xil naqsh).
+
+        "Mikroqarz miqdori: 2 mln so'mdan 100 mln so'mgacha" alohida,
+        bitta joyda ko'rsatiladi (jadval qatorlarida takrorlanmaydi).
+
+        "Mikroqarz ta'minoti" bandida so'zma-so'z "kredit qaytmaslik xatari
+        sug'urta polisi" deb yozilgan — mulk/avtomobil garovi emas, faqat
+        sug'urta polisi bilan ta'minlanadi, shu sabab FORCE_COLLATERAL
+        orqali aniq False belgilangan."""
+        amount_section = extract_section(text, "Mikroqarz miqdori:", "Mikroqarz muddati:")
+        rate_section = extract_section(text, "SQB Mobile ilovasida rasmiylashtirishda", "Hujjatlar")
+        section = f"{rate_section}\n{amount_section}"
+
+        return self._build_product(
+            "mikroqarz_onlayn",
+            section,
+            url,
+            now,
+            full_text=text,
         )

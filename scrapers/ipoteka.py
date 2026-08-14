@@ -17,6 +17,7 @@ from scrapers.utils import (
 _RATE_RANGE_RE = re.compile(r"(\d+(?:,\d+)?)\s*-\s*(\d+(?:,\d+)?)%")
 _MORTGAGE_RATE_RE = re.compile(r"yillik\s*(\d{1,2}(?:[.,]\d{1,2})?)%")
 _MORTGAGE_TERM_YEAR_RE = re.compile(r"(\d{1,2})\s*yilgacha")
+_R1_TERM_RANGE_RE = re.compile(r"Kredit muddati\s+(\d+)\s*oydan\s+(\d+)\s*yilgacha")
 
 
 class IpotekaBankScraper(TextSectionScraper):
@@ -232,7 +233,15 @@ class IpotekaBankScraper(TextSectionScraper):
         stavkasi" faqat bitta marta uchraydi), so'ng barcha qo'shimcha
         maydonlar (boshlang'ich to'lov, stavka, muddat) shu tor blok
         ICHIDA qidiriladi — aks holda noto'g'ri (bo'sh) vidjet qiymatiga
-        tushib qolinardi."""
+        tushib qolinardi.
+
+        "Muddati" widjeti faqat yuqori chegarani beradi ("5 yilgacha", pastki
+        chegarasiz) — bu holda extract_term_months uni yagona 60 oylik
+        qiymat deb oladi (12-60 emas, 60-60). Sahifaning tavsif qismida esa
+        aniq "Kredit muddati 12 oydan 5 yilgacha" jumlasi bor — shu sabab
+        to'liq oraliq ushbu jumladan (_R1_TERM_RANGE_RE) olinadi, widjet
+        qiymati esa faqat bu jumla topilmagan holatlar uchun zaxira
+        sifatida qoladi."""
         block = extract_section(text, "Miqdori", "Talablar")
         amount_section = extract_section(block, "", "Boshlang")
         amount = extract_amount_som(amount_section)
@@ -244,8 +253,12 @@ class IpotekaBankScraper(TextSectionScraper):
         rate_section = extract_section(block, "Foiz stavkasi", "Muddati")
         rates = extract_percentages(rate_section)
 
-        term_section = extract_section(block, "Muddati", None)
-        terms = extract_term_months(term_section)
+        term_range_match = _R1_TERM_RANGE_RE.search(text)
+        if term_range_match:
+            terms = [int(term_range_match.group(1)), int(term_range_match.group(2)) * 12]
+        else:
+            term_section = extract_section(block, "Muddati", None)
+            terms = extract_term_months(term_section)
 
         grace_section = extract_section(text, "imtiyozli davri", "To‘lovlarning davriyligi")
         grace_period_months = extract_grace_period_months("imtiyozli davri" + grace_section)

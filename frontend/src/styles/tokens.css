@@ -336,15 +336,28 @@ button {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 18px 28px 18px 12px;
   border-right: 1px solid var(--line);
 }
 
-.app-topbar-logo {
-  width: 100%;
-  height: auto;
-  max-width: 190px;
+.app-topbar-logo-icon {
+  height: 32px;
+  width: auto;
+  flex-shrink: 0;
   object-fit: contain;
+}
+
+/* Logotipdagi rasmga "yozib qo'yilgan" so'z o'rniga (tarjima qilib
+   bo'lmaydi) — belgi (icon) rasm sifatida, nom esa oddiy matn sifatida
+   alohida chiqariladi, shunda til almashtirgichda ("BOZOR TAHLILI" /
+   "АНАЛИЗ РЫНКА") to'g'ri tarjima qilinadi. */
+.app-topbar-wordmark {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--house);
+  white-space: nowrap;
 }
 
 .app-body {
@@ -990,6 +1003,240 @@ button {
   margin-bottom: 18px;
 }
 
+/* ---------- Compare mode ---------- */
+
+.compare-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--house);
+  cursor: pointer;
+}
+
+.compare-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.compare-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px 10px 16px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 12px 32px rgba(20, 22, 31, 0.18);
+  animation: content-in 220ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.compare-bar-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.compare-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 10px;
+  border-radius: 999px;
+  background: var(--paper-sunk);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.compare-chip-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.compare-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.compare-chip-remove:hover {
+  color: var(--negative);
+}
+
+.compare-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+
+.compare-bar-clear {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.compare-bar-clear:hover {
+  color: var(--ink);
+}
+
+.compare-bar-open {
+  white-space: nowrap;
+}
+
+.compare-bar-open:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compare-modal-card {
+  max-width: 960px;
+}
+
+.compare-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.compare-modal-close {
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.compare-modal-close:hover {
+  color: var(--ink);
+}
+
+.compare-table-wrap {
+  margin-top: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.compare-row {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.compare-row:first-child {
+  border-top: none;
+}
+
+.compare-row-head {
+  align-items: flex-start;
+  background: var(--paper-sunk);
+  padding: 16px;
+}
+
+.compare-attr-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.compare-col-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.compare-col-remove {
+  position: absolute;
+  top: -6px;
+  right: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.compare-col-remove:hover {
+  color: var(--negative);
+}
+
+.compare-col-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.compare-col-bank {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+
+.compare-col-product {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.compare-cell {
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-cell-best {
+  color: var(--good);
+  position: relative;
+}
+
+.compare-cell-best::before {
+  content: '';
+  position: absolute;
+  inset: -6px -8px;
+  border-radius: 6px;
+  background: var(--good-soft);
+  z-index: -1;
+}
+
 @media (max-width: 760px) {
   .app-body {
     flex-direction: column;
@@ -1049,12 +1296,21 @@ button {
   .market-pulse-meta {
     justify-content: flex-start;
   }
+
+  .compare-bar {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    transform: none;
+    flex-wrap: wrap;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .main-content,
   .sidebar-submenu,
   .market-pulse,
+  .compare-bar,
   .skeleton {
     animation: none;
   }

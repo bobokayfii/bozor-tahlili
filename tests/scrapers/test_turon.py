@@ -9,11 +9,20 @@ FIXTURE_BY_URL = {
     TuronBankScraper.CATEGORY_URLS["avtokredit"]: (FIXTURES_DIR / "turon_avtokredit.html").read_text(
         encoding="utf-8"
     ),
+    TuronBankScraper.CATEGORY_URLS["avtokredit_ikkilamchi"]: (
+        FIXTURES_DIR / "turon_avtokredit_ikkilamchi.html"
+    ).read_text(encoding="utf-8"),
     TuronBankScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
+        FIXTURES_DIR / "turon_avtokredit_brend_birlamchi.html"
+    ).read_text(encoding="utf-8"),
+    TuronBankScraper.CATEGORY_URLS["avtokredit_elektro"]: (
         FIXTURES_DIR / "turon_avtokredit_brend_birlamchi.html"
     ).read_text(encoding="utf-8"),
     TuronBankScraper.CATEGORY_URLS["ipoteka_tijorat"]: (
         FIXTURES_DIR / "turon_ipoteka_tijorat.html"
+    ).read_text(encoding="utf-8"),
+    TuronBankScraper.CATEGORY_URLS["ipoteka_davlat"]: (
+        FIXTURES_DIR / "turon_yangi_hayot_ipoteka.html"
     ).read_text(encoding="utf-8"),
     TuronBankScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "turon_mikroqarz.html").read_text(
         encoding="utf-8"
@@ -45,6 +54,36 @@ def test_turon_avtokredit_parses_correctly():
     assert avtokredit.payment_method == "Annuitet"
 
 
+def test_turon_avtokredit_ikkilamchi_parses_correctly():
+    """Avtokredit "Imkoniyat 2.0" — bitta sahifada birlamchi VA ikkilamchi
+    bozor shartlari aralash beriladi ("avtokredit" toifasi allaqachon
+    "UzAuto Motors" sahifasidan olinadi, shu sabab bu yerdan faqat
+    IKKILAMCHI qism olinadi): "Ikkilamchi bozor uchun - 48 oygacha"
+    (muddat), "Ikkilamchi bozor uchun - 50%" (boshlang'ich badal, oddiy
+    probel bilan), "Ikkilamchi bozor\xa0uchun: 25%" (stavka, DIQQAT —
+    "bozor" va "uchun" orasida uzilmaydigan probel \xa0, oddiy probel
+    emas — shu sabab stavka uchun alohida regex kerak, muddat/badal
+    uchun esa "Green Avto" sahifasidagi umumiy regexlar qayta
+    ishlatiladi). Summa rasmiy ro'yxatda "BHMning 2000 barobaridan
+    oshmagan" deb berilgan — bank hisoblagan "Zarur summa" kalkulyator
+    slayderining so'm ekvivalenti ("824 million so'mgacha") ishlatiladi."""
+    with patch("scrapers.turon.fetch_html", side_effect=_fake_fetch):
+        products = TuronBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    assert ikkilamchi.bank == "Turonbank"
+    assert ikkilamchi.product_name == 'Avtokredit "Imkoniyat 2.0"'
+    assert ikkilamchi.rate_min == 25.0
+    assert ikkilamchi.rate_max == 25.0
+    assert ikkilamchi.term_min_months == 48
+    assert ikkilamchi.term_max_months == 48
+    assert ikkilamchi.amount_max_som == 824_000_000
+    assert ikkilamchi.down_payment_pct == 50.0
+    assert ikkilamchi.grace_period_months == 0
+    assert ikkilamchi.payment_method == "Annuitet"
+    assert ikkilamchi.requires_collateral is True
+
+
 def test_turon_avtokredit_brend_birlamchi_parses_correctly():
     """"Green Avto" Avtokrediti — chetdan import qilingan avtomobillar
     uchun; sahifada birlamchi VA ikkilamchi bozor shartlari aralash
@@ -71,6 +110,26 @@ def test_turon_avtokredit_brend_birlamchi_parses_correctly():
     assert brend.grace_period_months == 0
     assert brend.payment_method == "Annuitet, Differensial"
     assert brend.requires_collateral is True
+
+
+def test_turon_avtokredit_elektro_matches_brend_birlamchi():
+    """"Green Avto" sahifasining "Kredit maqsadi" bandida "birlamchi
+    bozordan (yoqilg'i turi benzin, dizel, elektromobil hamda gibrid)"
+    deyilgan — birlamchi jadval barcha yoqilg'i turlarini bitta stavka
+    bilan qamrab oladi, alohida elektro-xos jadval yo'q — shu sabab bir
+    xil sahifa/qiymatlar "avtokredit_elektro" toifasiga ham xaritalanadi."""
+    with patch("scrapers.turon.fetch_html", side_effect=_fake_fetch):
+        products = TuronBankScraper().run()
+
+    brend = next(p for p in products if p.category == "avtokredit_brend_birlamchi")
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    assert elektro.product_name == brend.product_name
+    assert elektro.rate_min == brend.rate_min
+    assert elektro.rate_max == brend.rate_max
+    assert elektro.term_min_months == brend.term_min_months
+    assert elektro.term_max_months == brend.term_max_months
+    assert elektro.amount_max_som == brend.amount_max_som
+    assert elektro.requires_collateral is True
 
 
 def test_turon_avtokredit_brend_ikkilamchi_parses_correctly():
@@ -122,6 +181,33 @@ def test_turon_ipoteka_tijorat_parses_correctly():
     assert tijorat.grace_period_months == 0
     assert tijorat.payment_method == "Annuitet, Differensial"
     assert tijorat.requires_collateral is True
+
+
+def test_turon_ipoteka_davlat_parses_correctly():
+    """""Yangi hayot" ipoteka krediti — "Iqtisodiyot va moliya vazirligi
+    hamda bankning o'z mablag'lari hisobidan" deb aniq yozilgan (davlat
+    mablag'i ishtiroki bor). Davlat qismi uchun o'zgaruvchan stavka
+    ("Markaziy bank asosiy stavkasi + 4%") sonli qiymatga aylantirilmaydi
+    — o'rniga sahifa yuqorisidagi qisqacha xulosa kartochkasining yagona
+    aniq stavkasi ("18% dan") ishlatiladi. Qiymat o'z yorlig'idan OLDIN
+    keladi ("18% dan\\n...\\nFoiz stavkasi"), sahifa pastida boshqa
+    mahsulotlarning bir xil yorliqlari takrorlanganligi uchun faqat
+    BIRINCHI uchrashuv olinadi."""
+    with patch("scrapers.turon.fetch_html", side_effect=_fake_fetch):
+        products = TuronBankScraper().run()
+
+    davlat = next(p for p in products if p.category == "ipoteka_davlat")
+    assert davlat.bank == "Turonbank"
+    assert davlat.product_name == '"Yangi hayot" ipoteka krediti'
+    assert davlat.rate_min == 18.0
+    assert davlat.rate_max == 18.0
+    assert davlat.term_min_months == 240
+    assert davlat.term_max_months == 240
+    assert davlat.amount_max_som == 1_380_000_000
+    assert davlat.down_payment_pct == 15.0
+    assert davlat.grace_period_months == 0
+    assert davlat.payment_method == "Annuitet, Differensial"
+    assert davlat.requires_collateral is True
 
 
 def test_turon_mikroqarz_parses_correctly():

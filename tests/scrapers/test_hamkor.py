@@ -43,17 +43,18 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_hamkor_scraper_parses_all_ten_categories():
+def test_hamkor_scraper_parses_all_eleven_categories():
     with patch("scrapers.hamkor.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = HamkorBankScraper().run()
 
-    assert mock_fetch.call_count == 10
+    assert mock_fetch.call_count == 11
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
         "avtokredit_ikkilamchi",
         "avtokredit_brend_birlamchi",
         "avtokredit_brend_ikkilamchi",
+        "avtokredit_elektro",
         "ipoteka_tijorat",
         "ipoteka_davlat",
         "mikroqarz",
@@ -62,6 +63,24 @@ def test_hamkor_scraper_parses_all_ten_categories():
         "istemol_krediti",
     }
     assert all(p.bank == "HamkorBank" for p in products)
+
+
+def test_hamkor_avtokredit_elektro_matches_autolight():
+    """"Auto light avtokrediti" brend cheklovisiz — shu sabab bir xil
+    sahifa "avtokredit_elektro" toifasiga ham xaritalanadi (bir xil URL,
+    bir xil qiymatlar)."""
+    with patch("scrapers.hamkor.fetch_html", side_effect=_fake_fetch):
+        products = HamkorBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    assert elektro.product_name == ikkilamchi.product_name
+    assert elektro.rate_min == ikkilamchi.rate_min
+    assert elektro.rate_max == ikkilamchi.rate_max
+    assert elektro.term_min_months == ikkilamchi.term_min_months
+    assert elektro.term_max_months == ikkilamchi.term_max_months
+    assert elektro.amount_max_som == ikkilamchi.amount_max_som
+    assert elektro.requires_collateral is True
 
 
 def test_hamkor_avtokredit_brend_ikkilamchi_parses_correctly():

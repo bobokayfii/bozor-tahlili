@@ -2,6 +2,7 @@ import type { Product, UnavailableBank } from '../lib/types'
 import { isHouseBank } from '../lib/bank'
 import { getBankLogo } from '../lib/bankLogos'
 import { getProductColumns } from '../lib/productColumns'
+import { getCompareKey } from '../lib/compareLogic'
 import { useLanguage } from '../lib/LanguageContext'
 import { translate, type Lang } from '../lib/i18n'
 
@@ -11,6 +12,9 @@ interface ProductTableProps {
   schema?: string
   category?: string
   unavailableBanks?: UnavailableBank[]
+  compareKeys?: Set<string>
+  onToggleCompare?: (key: string) => void
+  maxCompare?: number
 }
 
 // Backend hozircha faqat o'zbekcha sabab matnini qaytaradi
@@ -44,7 +48,7 @@ function formatTerm(product: Product, lang: Lang): string {
 // butun sahifa, gorizontal tashqariga chiqib ketadi (mobil overflow xatosi).
 function gridTemplateColumns(extraColumnCount: number): string {
   const extraTracks = Array(extraColumnCount).fill('minmax(0, 1fr)').join(' ')
-  return `32px minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 0.85fr) minmax(0, 0.6fr) ${extraTracks}`.trim()
+  return `24px 32px minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 0.85fr) minmax(0, 0.6fr) ${extraTracks}`.trim()
 }
 
 function SkeletonRows({ schema, category }: { schema?: string; category?: string }) {
@@ -55,6 +59,7 @@ function SkeletonRows({ schema, category }: { schema?: string; category?: string
   return (
     <div className="rate-board" aria-busy="true" aria-label={t('loadingLabel')}>
       <div className="rate-board-head" style={gridStyle}>
+        <span aria-hidden="true" />
         <span>{t('tableRank')}</span>
         <span>{t('tableBank')}</span>
         <span className="rate-head-product">{t('tableProduct')}</span>
@@ -68,6 +73,7 @@ function SkeletonRows({ schema, category }: { schema?: string; category?: string
       </div>
       {[0, 1, 2].map((row) => (
         <div className="rate-row rate-row-skeleton" key={row} style={gridStyle}>
+          <span aria-hidden="true" />
           <span className="skeleton skeleton-rank" />
           <span className="skeleton skeleton-bank" />
           <span className="skeleton skeleton-product" />
@@ -88,6 +94,9 @@ export function ProductTable({
   schema,
   category,
   unavailableBanks = [],
+  compareKeys = new Set(),
+  onToggleCompare = () => {},
+  maxCompare = 3,
 }: ProductTableProps) {
   const { lang, t } = useLanguage()
   const columns = getProductColumns(schema, category, lang)
@@ -108,6 +117,7 @@ export function ProductTable({
   return (
     <div className="rate-board">
       <div className="rate-board-head" style={gridStyle}>
+        <span aria-hidden="true" />
         <span>{t('tableRank')}</span>
         <span>{t('tableBank')}</span>
         <span className="rate-head-product">{t('tableProduct')}</span>
@@ -128,8 +138,20 @@ export function ProductTable({
           .filter(Boolean)
           .join(' ')
 
+        const key = getCompareKey(product)
+        const isSelected = compareKeys.has(key)
+        const isCheckboxDisabled = !isSelected && compareKeys.size >= maxCompare
+
         return (
           <div className={rowClass} key={`${product.bank}-${product.product_name}-${index}`} style={gridStyle}>
+            <input
+              type="checkbox"
+              className="compare-checkbox"
+              checked={isSelected}
+              disabled={isCheckboxDisabled}
+              aria-label={t('compareCheckboxLabel')}
+              onChange={() => onToggleCompare(key)}
+            />
             <span className="rate-rank">{String(index + 1).padStart(2, '0')}</span>
             <span className="rate-bank">
               {getBankLogo(product.bank) && (
@@ -163,6 +185,7 @@ export function ProductTable({
       })}
       {unavailableBanks.map((item) => (
         <div className="rate-row rate-row-unavailable" key={item.bank} style={gridStyle}>
+          <span aria-hidden="true" />
           <span className="rate-rank" aria-hidden="true">
             —
           </span>
@@ -170,7 +193,7 @@ export function ProductTable({
             {getBankLogo(item.bank) && <img src={getBankLogo(item.bank)} alt="" className="rate-bank-logo" />}
             <span className="rate-bank-name">{item.bank}</span>
           </span>
-          <span className="rate-unavailable-reason" style={{ gridColumn: '3 / -1' }}>
+          <span className="rate-unavailable-reason" style={{ gridColumn: '4 / -1' }}>
             {translateReason(item.reason, lang)}
           </span>
         </div>

@@ -21,6 +21,9 @@ FIXTURE_BY_URL = {
     IpakYuliBankScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "ipak_mikroqarz.html").read_text(
         encoding="utf-8"
     ),
+    IpakYuliBankScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (
+        FIXTURES_DIR / "ipakyuli_mikroqarz_onlayn.html"
+    ).read_text(encoding="utf-8"),
     IpakYuliBankScraper.CATEGORY_URLS["kredit_karta"]: (FIXTURES_DIR / "ipak_kredit_karta.html").read_text(
         encoding="utf-8"
     ),
@@ -74,6 +77,24 @@ def test_ipakyuli_avtokredit_ikkilamchi_parses_correctly():
     assert ikkilamchi.grace_period_months is None
     assert ikkilamchi.payment_method is None
     assert ikkilamchi.requires_collateral is True
+
+
+def test_ipakyuli_avtokredit_brend_ikkilamchi_matches_generic_ikkilamchi():
+    """"Ikkilamchi bozor uchun avtomobil krediti" brend cheklovisiz —
+    shu sabab bir xil sahifa "avtokredit_brend_ikkilamchi" toifasiga ham
+    xaritalanadi (bir xil URL, bir xil qiymatlar)."""
+    with patch("scrapers.ipakyuli.fetch_html", side_effect=_fake_fetch):
+        products = IpakYuliBankScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
 
 
 def test_ipakyuli_avtokredit_brend_birlamchi_parses_correctly():
@@ -143,6 +164,27 @@ def test_ipakyuli_mikroqarz_parses_correctly():
     # "Kafillik asosidagi mikroqarz" explicitly does not require property
     # collateral (guarantor/insurance-policy based instead).
     assert mikroqarz.requires_collateral is False
+
+
+def test_ipakyuli_mikroqarz_onlayn_parses_correctly():
+    """"Onlayn mikroqarz" is a separate card on the "mikroqarzlar" hub
+    page (distinct from the offline "Kafillik asosidagi mikroqarz" detail
+    page) — rate/term/amount all live directly in the hub card text, no
+    further detail page needed. The card explicitly states collateral
+    isn't required ("Garovsiz va kafilsiz")."""
+    with patch("scrapers.ipakyuli.fetch_html", side_effect=_fake_fetch):
+        products = IpakYuliBankScraper().run()
+
+    onlayn = next(p for p in products if p.category == "mikroqarz_onlayn")
+    assert onlayn.product_name == "Onlayn mikroqarz"
+    assert onlayn.rate_min == 30.9
+    assert onlayn.rate_max == 30.9
+    assert onlayn.term_min_months == 36
+    assert onlayn.term_max_months == 36
+    assert onlayn.amount_max_som == 100_000_000
+    assert onlayn.grace_period_months is None
+    assert onlayn.payment_method is None
+    assert onlayn.requires_collateral is False
 
 
 def test_ipakyuli_kredit_karta_and_istemol_krediti_yield_no_product():

@@ -9,6 +9,12 @@ FIXTURE_BY_URL = {
     TBCBankScraper.CATEGORY_URLS["avtokredit_brend_birlamchi"]: (
         FIXTURES_DIR / "tbc_avtokredit.html"
     ).read_text(encoding="utf-8"),
+    TBCBankScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (
+        FIXTURES_DIR / "tbc_mikroqarz_onlayn.html"
+    ).read_text(encoding="utf-8"),
+    TBCBankScraper.CATEGORY_URLS["kredit_karta"]: (
+        FIXTURES_DIR / "tbc_kredit_karta.html"
+    ).read_text(encoding="utf-8"),
 }
 
 
@@ -47,10 +53,8 @@ def test_tbc_avtokredit_brend_birlamchi_parses_correctly():
     with patch("scrapers.tbc.fetch_html", side_effect=_fake_fetch):
         products = TBCBankScraper().run()
 
-    assert len(products) == 1
-    product = products[0]
+    product = next(p for p in products if p.category == "avtokredit_brend_birlamchi")
     assert product.bank == "TBC Bank"
-    assert product.category == "avtokredit_brend_birlamchi"
     assert product.product_name == "TBC Avtokredit"
     assert product.rate_min == 0.0
     assert product.rate_max == 29.5
@@ -61,3 +65,51 @@ def test_tbc_avtokredit_brend_birlamchi_parses_correctly():
     assert product.grace_period_months is None
     assert product.payment_method is None
     assert product.requires_collateral is True
+
+
+def test_tbc_mikroqarz_onlayn_parses_correctly():
+    """"TBC mikroqarz" — mahsulot faqat TBC Bank Uzbekistan ilovasi orqali
+    onlayn rasmiylashtiriladi, filialga borish shart emas. Aniq raqamlar
+    "TBC mikroqarz qanday ishlaydi" FAQ javobidan olinadi: "3 oydan 36
+    oygacha" muddat, "yiliga 29% dan 48% gacha" stavka. Bu FAQ javobi tor
+    bo'lim sifatida ajratiladi, chunki sahifada boshqa joyda ("Oshirilgan
+    foiz ... kuniga 0,5%" kechiktirilgan to'lov jarimasi) aloqasiz "%" bor
+    — butun sahifa matni ishlatilsa rate_min noto'g'ri 0,5%ga tushib
+    qolardi. Maksimal summa alohida bandda ("Uydan turib 100 000 000
+    so'mgacha kredit") aniq so'm bilan berilgan. "Garovsiz va kafillarsiz"
+    ibora ikki marta aniq yozilgan — requires_collateral False."""
+    with patch("scrapers.tbc.fetch_html", side_effect=_fake_fetch):
+        products = TBCBankScraper().run()
+
+    onlayn = next(p for p in products if p.category == "mikroqarz_onlayn")
+    assert onlayn.bank == "TBC Bank"
+    assert onlayn.product_name == "TBC mikroqarz"
+    assert onlayn.rate_min == 29.0
+    assert onlayn.rate_max == 48.0
+    assert onlayn.term_min_months == 3
+    assert onlayn.term_max_months == 36
+    assert onlayn.amount_max_som == 100_000_000
+    assert onlayn.down_payment_pct is None
+    assert onlayn.grace_period_months is None
+    assert onlayn.payment_method is None
+    assert onlayn.requires_collateral is False
+
+
+def test_tbc_kredit_karta_uses_pptx_sourced_figures():
+    """"TBC Osmon" kredit kartasi sahifasida haqiqiy foiz stavkasi umuman
+    ko'rsatilmagan ("Bu foiz stavkasini TBC UZ ilovasining ... 'Shartlar'
+    bo'limida bilib olishingiz mumkin" deyilgan) — foydalanuvchining aniq
+    ko'rsatmasiga ko'ra, sayt raqam bermagan hollarda mustaqil
+    tasdiqlangan pptx manbasidan olinadi (0-50%, 50 mln so'm limit,
+    "Аннуитетный, дифференциальный" to'lov usuli)."""
+    with patch("scrapers.tbc.fetch_html", side_effect=_fake_fetch):
+        products = TBCBankScraper().run()
+
+    karta = next(p for p in products if p.category == "kredit_karta")
+    assert karta.bank == "TBC Bank"
+    assert karta.product_name == '"TBC Osmon" kredit kartasi'
+    assert karta.rate_min == 0.0
+    assert karta.rate_max == 50.0
+    assert karta.amount_max_som == 50_000_000
+    assert karta.payment_method == "Annuitet, Differensial"
+    assert karta.requires_collateral is False

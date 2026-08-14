@@ -7,6 +7,9 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 FIXTURE_BY_URL = {
     SQBScraper.CATEGORY_URLS["avtokredit"]: (FIXTURES_DIR / "sqb_avtokredit.html").read_text(encoding="utf-8"),
+    SQBScraper.CATEGORY_URLS["avtokredit_ikkilamchi"]: (FIXTURES_DIR / "sqb_avtokredit_ikkilamchi.html").read_text(
+        encoding="utf-8"
+    ),
     SQBScraper.CATEGORY_URLS["ipoteka_tijorat"]: (FIXTURES_DIR / "sqb_ipoteka_tijorat.html").read_text(
         encoding="utf-8"
     ),
@@ -14,6 +17,9 @@ FIXTURE_BY_URL = {
         encoding="utf-8"
     ),
     SQBScraper.CATEGORY_URLS["mikroqarz"]: (FIXTURES_DIR / "sqb_mikroqarz.html").read_text(encoding="utf-8"),
+    SQBScraper.CATEGORY_URLS["mikroqarz_onlayn"]: (FIXTURES_DIR / "sqb_mikroqarz_onlayn.html").read_text(
+        encoding="utf-8"
+    ),
     SQBScraper.CATEGORY_URLS["kredit_karta"]: (FIXTURES_DIR / "sqb_kredit_karta.html").read_text(encoding="utf-8"),
     SQBScraper.CATEGORY_URLS["istemol_krediti"]: (FIXTURES_DIR / "sqb_istemol_krediti.html").read_text(
         encoding="utf-8"
@@ -25,21 +31,62 @@ def _fake_fetch(url, *args, **kwargs):
     return FIXTURE_BY_URL[url]
 
 
-def test_sqb_scraper_parses_all_six_categories():
+def test_sqb_scraper_parses_all_ten_categories():
     with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = SQBScraper().run()
 
-    assert mock_fetch.call_count == 6
+    assert mock_fetch.call_count == 10
     categories = {p.category for p in products}
     assert categories == {
         "avtokredit",
+        "avtokredit_elektro",
+        "avtokredit_ikkilamchi",
+        "avtokredit_brend_ikkilamchi",
         "ipoteka_tijorat",
         "ipoteka_davlat",
         "mikroqarz",
+        "mikroqarz_onlayn",
         "kredit_karta",
         "istemol_krediti",
     }
     assert all(p.bank == "SQB" for p in products)
+
+
+def test_sqb_avtokredit_elektro_matches_generic_avtokredit():
+    """"«Avto imkon» avtokrediti" sahifasida "kredit birlamchi bozordan
+    yangi avtomobil sotib olish uchun ajratiladi" deyilgan — brend/yoqilg'i
+    turi cheklovi yo'q, shu sabab bir xil sahifa "avtokredit_elektro"
+    toifasiga ham xaritalanadi (bir xil URL, bir xil qiymatlar)."""
+    with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch):
+        products = SQBScraper().run()
+
+    avtokredit = next(p for p in products if p.category == "avtokredit")
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    assert elektro.product_name == avtokredit.product_name
+    assert elektro.rate_min == avtokredit.rate_min
+    assert elektro.rate_max == avtokredit.rate_max
+    assert elektro.term_min_months == avtokredit.term_min_months
+    assert elektro.term_max_months == avtokredit.term_max_months
+    assert elektro.amount_max_som == avtokredit.amount_max_som
+    assert elektro.requires_collateral is True
+
+
+def test_sqb_avtokredit_brend_ikkilamchi_matches_generic_ikkilamchi():
+    """"Ikkilamchi bozordan avtotransport" krediti brend cheklovisiz —
+    shu sabab bir xil sahifa "avtokredit_brend_ikkilamchi" toifasiga ham
+    xaritalanadi (bir xil URL, bir xil qiymatlar)."""
+    with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch):
+        products = SQBScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    brend_ikkilamchi = next(p for p in products if p.category == "avtokredit_brend_ikkilamchi")
+    assert brend_ikkilamchi.product_name == ikkilamchi.product_name
+    assert brend_ikkilamchi.rate_min == ikkilamchi.rate_min
+    assert brend_ikkilamchi.rate_max == ikkilamchi.rate_max
+    assert brend_ikkilamchi.term_min_months == ikkilamchi.term_min_months
+    assert brend_ikkilamchi.term_max_months == ikkilamchi.term_max_months
+    assert brend_ikkilamchi.amount_max_som == ikkilamchi.amount_max_som
+    assert brend_ikkilamchi.requires_collateral is True
 
 
 def test_sqb_ipoteka_davlat_parses_correctly():
@@ -138,6 +185,57 @@ def test_sqb_avtokredit_ignores_unrelated_page_percentages():
     assert avtokredit.grace_period_months == 3
     assert avtokredit.payment_method == "Annuitet, Differensial"
     assert avtokredit.requires_collateral is True
+
+
+def test_sqb_avtokredit_ikkilamchi_parses_correctly():
+    """"«Ikkilamchi bozordan avtotransport» krediti" — the hero card only
+    shows the best rate/longest term ("25% dan", "60 oygacha"), but the
+    detailed "Kredit shartlari" table breaks the rate down by customer
+    tier (official-income: 27%/36mo, 28%/48mo, 29%/60mo; salary-project:
+    25%/36mo, 26%/48mo, 27%/60mo) — the full table is used, so rate_max
+    (29%) is a value the hero card never shows. "Kredit miqdori" lists two
+    figures (400 mln for the vehicle itself, 40 mln for related goods/
+    services) — the larger one wins. The rate/term table must be scoped
+    narrowly (stops before the next section) so "Imtiyozli davr: 3 oy"
+    doesn't leak into term_min_months."""
+    with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch):
+        products = SQBScraper().run()
+
+    ikkilamchi = next(p for p in products if p.category == "avtokredit_ikkilamchi")
+    assert ikkilamchi.product_name == "«Ikkilamchi bozordan avtotransport» krediti"
+    assert ikkilamchi.rate_min == 25.0
+    assert ikkilamchi.rate_max == 29.0
+    assert ikkilamchi.term_min_months == 36
+    assert ikkilamchi.term_max_months == 60
+    assert ikkilamchi.amount_max_som == 400_000_000
+    assert ikkilamchi.down_payment_pct == 50.0
+    assert ikkilamchi.grace_period_months == 3
+    assert ikkilamchi.payment_method == "Annuitet, Differensial"
+    assert ikkilamchi.requires_collateral is True
+
+
+def test_sqb_mikroqarz_onlayn_parses_correctly():
+    """"SQB Mobile ilovasida mikroqarz" — the hero card only shows the
+    best rate/shortest term ("24% dan boshlab", "48 oygacha"), but the
+    "Batafsil shartlar" section has a full 6-row tier table (24%/6mo,
+    25%/9mo, 26%/12mo, 27%/24mo, 28%/36mo, 29%/48mo) — the full table is
+    used, so rate_max (29%) is a value the hero card never shows.
+    "Mikroqarz ta'minoti" states only an insurance policy is required
+    (not property collateral), so requires_collateral is False."""
+    with patch("scrapers.sqb.fetch_html", side_effect=_fake_fetch):
+        products = SQBScraper().run()
+
+    onlayn = next(p for p in products if p.category == "mikroqarz_onlayn")
+    assert onlayn.product_name == "SQB Mobile ilovasida mikroqarz"
+    assert onlayn.rate_min == 24.0
+    assert onlayn.rate_max == 29.0
+    assert onlayn.term_min_months == 6
+    assert onlayn.term_max_months == 48
+    assert onlayn.amount_max_som == 100_000_000
+    assert onlayn.down_payment_pct is None
+    assert onlayn.grace_period_months is None
+    assert onlayn.payment_method is None
+    assert onlayn.requires_collateral is False
 
 
 def test_sqb_mikroqarz_parses_correctly():
