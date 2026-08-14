@@ -1,8 +1,10 @@
+import time
 from datetime import datetime, timezone
 from unittest.mock import patch
 
 from db.models import ProductRow, ScrapeRunRow
 from scrapers.base import BaseScraper, Product
+from scrapers import orchestrator
 from scrapers.orchestrator import run_all_scrapers
 
 
@@ -34,6 +36,24 @@ class FailingScraper(BaseScraper):
 
     def run(self) -> list[Product]:
         raise RuntimeError("sayt javob bermadi")
+
+
+class HangingScraper(BaseScraper):
+    """run() never returns within the test's patched timeout — simulates the
+    2026-08-14 live-Railway incident where one bank's scraper hung
+    indefinitely (network stall or pathological regex backtracking) and,
+    because run_all_scrapers awaited each scraper.run() sequentially with no
+    bound, blocked every subsequent bank in ALL_SCRAPERS forever."""
+
+    bank_name = "HangingBank"
+    url = "https://hanging.uz"
+
+    def parse(self, html: str) -> list[Product]:
+        return []
+
+    def run(self) -> list[Product]:
+        time.sleep(10)
+        return []
 
 
 class BadPersistenceScraper(BaseScraper):
@@ -91,6 +111,27 @@ def test_run_all_scrapers_continues_after_one_bank_fails(db_session):
     assert db_session.query(ProductRow).count() == 1
     statuses = {r.bank: r.status for r in db_session.query(ScrapeRunRow).all()}
     assert statuses == {"FailingBank": "failed", "WorkingBank": "success"}
+
+
+def test_run_all_scrapers_times_out_a_hanging_bank_without_blocking_others(db_session):
+    """A scraper that never returns must not stall the whole batch — this is
+    the exact failure mode observed live on 2026-08-14 (see HangingScraper
+    docstring). WorkingBank must still be scraped and persisted even though
+    HangingBank comes first in ALL_SCRAPERS and never completes."""
+    with (
+        patch("scrapers.orchestrator.ALL_SCRAPERS", [HangingScraper, WorkingScraper]),
+        patch.object(orchestrator, "SCRAPER_TIMEOUT_SECONDS", 0.1),
+    ):
+        run_all_scrapers(db_session)
+
+    products = db_session.query(ProductRow).all()
+    assert len(products) == 1
+    assert products[0].bank == "WorkingBank"
+
+    runs = {r.bank: r for r in db_session.query(ScrapeRunRow).all()}
+    assert runs["HangingBank"].status == "failed"
+    assert "timeout" in runs["HangingBank"].error_message.lower()
+    assert runs["WorkingBank"].status == "success"
 
 
 def test_run_all_scrapers_isolates_persistence_failure_from_other_banks(db_session):
