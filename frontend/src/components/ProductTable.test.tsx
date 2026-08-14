@@ -184,7 +184,12 @@ describe('ProductTable', () => {
     const user = userEvent.setup()
     const onToggleCompare = vi.fn()
     renderWithLanguage(
-      <ProductTable products={[sampleProduct]} onToggleCompare={onToggleCompare} compareKeys={new Set()} />,
+      <ProductTable
+        products={[sampleProduct]}
+        onToggleCompare={onToggleCompare}
+        compareKeys={new Set()}
+        compareModeActive
+      />,
     )
     await user.click(screen.getByRole('checkbox'))
     expect(onToggleCompare).toHaveBeenCalledWith('SQB::SQB Avtokredit')
@@ -192,7 +197,11 @@ describe('ProductTable', () => {
 
   it('checks the checkbox for a product whose key is already in compareKeys', () => {
     renderWithLanguage(
-      <ProductTable products={[sampleProduct]} compareKeys={new Set(['SQB::SQB Avtokredit'])} />,
+      <ProductTable
+        products={[sampleProduct]}
+        compareKeys={new Set(['SQB::SQB Avtokredit'])}
+        compareModeActive
+      />,
     )
     expect(screen.getByRole('checkbox')).toBeChecked()
   })
@@ -203,6 +212,7 @@ describe('ProductTable', () => {
         products={[sampleProduct, cheaperProduct]}
         compareKeys={new Set(['SQB::SQB Avtokredit'])}
         maxCompare={1}
+        compareModeActive
       />,
     )
     const checkboxes = screen.getAllByRole('checkbox')
@@ -214,7 +224,9 @@ describe('ProductTable', () => {
 
   it('does not render a checkbox for unavailable bank rows', () => {
     const unavailableBanks: UnavailableBank[] = [{ bank: 'TBC Bank', reason: 'Mahsulot mavjud emas' }]
-    renderWithLanguage(<ProductTable products={[sampleProduct]} unavailableBanks={unavailableBanks} />)
+    renderWithLanguage(
+      <ProductTable products={[sampleProduct]} unavailableBanks={unavailableBanks} compareModeActive />,
+    )
     expect(screen.getAllByRole('checkbox')).toHaveLength(1)
   })
 })

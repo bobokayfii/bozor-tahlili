@@ -6,6 +6,7 @@ import { formatAmount, formatPaymentMethod } from '../lib/productColumns'
 import { fetchProductExplanation } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
 import { translate, type Lang } from '../lib/i18n'
+import robotIcon from '../assets/icons/robot_icon_badge.png'
 
 interface MarketPulseProps {
   category: string | null
@@ -230,7 +231,9 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
         )}
 
         <div className="pulse-ai-note">
-          <span className="pulse-ai-badge">{t('pulseAiBadge')}</span>
+          <span className="pulse-ai-badge">
+            <img src={robotIcon} alt={t('pulseAiBadge')} className="pulse-ai-badge-icon" />
+          </span>
           {isAiLoading && <span className="pulse-ai-text pulse-ai-text-muted">{t('pulseAiLoading')}</span>}
           {!isAiLoading && aiError && <span className="pulse-ai-text pulse-ai-text-muted">{aiError}</span>}
           {!isAiLoading && !aiError && aiText && <span className="pulse-ai-text">{aiText}</span>}
