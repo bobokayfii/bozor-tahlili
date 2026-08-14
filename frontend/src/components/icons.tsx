@@ -16,24 +16,6 @@ export function RefreshIcon() {
   )
 }
 
-// Solishtirish rejimi checklist ("checkbox tanlash") bilan ishlaydi, shu
-// sabab mavhum "vs" belgisi o'rniga aynan shuni ifodalovchi — belgilangan
-// checkbox — ikonka tanlandi.
-export function CompareIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.4" />
-      <path
-        d="M5 8.2 7.1 10.3 11.2 5.8"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 export function DownloadIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">

@@ -91,6 +91,9 @@ class OFBScraper(TextSectionScraper):
         # toifasiga ham xaritalanadi.
         "avtokredit_brend_ikkilamchi": "https://ofb.uz/kreditlar/ikkilamchi-bozor-uchun-avtokredit",
         "avtokredit_elektro": "https://ofb.uz/kreditlar/avtokredit-byd",
+        # BYD ham elektromobil, ham aniq bitta brend — shu sabab bir xil
+        # sahifa "avtokredit_brend_birlamchi" toifasiga ham xaritalanadi.
+        "avtokredit_brend_birlamchi": "https://ofb.uz/kreditlar/avtokredit-byd",
         # "mikroqarz" va "mikroqarz_onlayn" ikkalasi ham shu hub/ro'yxat
         # sahifasidagi kartochkalardan summasi+stavkasini oladi — run()da bu
         # sahifa BITTA marta fetch qilinadi va ikkala kategoriyaga ham
@@ -109,6 +112,7 @@ class OFBScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": "Ikkilamchi bozor uchun avtokredit",
         "avtokredit_brend_ikkilamchi": "Ikkilamchi bozor uchun avtokredit",
         "avtokredit_elektro": "Avtokredit BYD",
+        "avtokredit_brend_birlamchi": "Avtokredit BYD",
         # Sahifa sarlavhasi (<title>) va "Foydali ipoteka" H1/breadcrumb
         # ikkalasi ham aynan shu shaklda, brifdagi taklif tasdiqlandi.
         "ipoteka_davlat": "Foydali ipoteka",
@@ -136,6 +140,7 @@ class OFBScraper(TextSectionScraper):
         "avtokredit_ikkilamchi": True,
         "avtokredit_brend_ikkilamchi": True,
         "avtokredit_elektro": True,
+        "avtokredit_brend_birlamchi": True,
         # Hub sahifasida ("mikroqarzlar") "Ishonch" kartochkasi uchun garov
         # haqida umuman gap yo'q (has_collateral_requirement standart
         # bo'yicha ham False qaytaradi). DIQQAT: mahsulotning o'z alohida
@@ -205,9 +210,9 @@ class OFBScraper(TextSectionScraper):
                 elif category in ("avtokredit_ikkilamchi", "avtokredit_brend_ikkilamchi"):
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
                     product = self._build_avtokredit_ikkilamchi_product(category, url, now, text)
-                elif category == "avtokredit_elektro":
+                elif category in ("avtokredit_elektro", "avtokredit_brend_birlamchi"):
                     text = html_to_text(fetch_html(url, extra_ca_cert=self.EXTRA_CA_CERT))
-                    product = self._build_avtokredit_elektro_product(url, now, text)
+                    product = self._build_avtokredit_elektro_product(category, url, now, text)
                 elif category == "mikroqarz":
                     if hub_text is None:
                         continue
@@ -348,11 +353,16 @@ class OFBScraper(TextSectionScraper):
             payment_method=None,
         )
 
-    def _build_avtokredit_elektro_product(self, url, now, text):
+    def _build_avtokredit_elektro_product(self, category, url, now, text):
         """"Avtokredit BYD" — "Oson avtokredit" bilan bir xil FAQ
         shabloniga ega, faqat raqamlar farq qiladi. Muddat "36 yoki 60
         oyga" shaklida ("oygacha"siz) beriladi — _TERM_PAIR_RE ikkala
         aniq qiymatni bitta moslikdan ("36" va "60" guruhlari) oladi.
+
+        BYD bir vaqtning o'zida ham elektromobil brendi, ham aniq bitta
+        brend (BYD) — shu sabab bir xil sahifa "avtokredit_brend_birlamchi"
+        toifasiga ham xaritalanadi (bir xil URL, shu metod ikkalasi uchun
+        ham chaqiriladi, faqat `category` parametri farq qiladi).
 
         Boshlang'ich badal sarlavhasi ("Boshlang‘ich badal avtomobil
         qiymatining kamida") to'g'ridan-to'g'ri Unicode chap qo'shtirnoq
@@ -391,14 +401,14 @@ class OFBScraper(TextSectionScraper):
 
         return Product(
             bank=self.bank_name,
-            category="avtokredit_elektro",
-            product_name=self.PRODUCT_NAMES["avtokredit_elektro"],
+            category=category,
+            product_name=self.PRODUCT_NAMES[category],
             rate_min=min(rates),
             rate_max=max(rates),
             term_min_months=min(terms),
             term_max_months=max(terms),
             amount_max_som=amount,
-            requires_collateral=self.FORCE_COLLATERAL["avtokredit_elektro"],
+            requires_collateral=self.FORCE_COLLATERAL[category],
             down_payment_pct=down_payment_pct,
             source_url=url,
             scraped_at=now,

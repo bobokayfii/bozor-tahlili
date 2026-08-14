@@ -36,16 +36,18 @@ def _fake_fetch(url, *args, **kwargs):
 def test_ofb_scraper_parses_all_categories():
     """mikroqarz and mikroqarz_onlayn share ONE fetch of the mikroqarzlar
     hub page (mikroqarz_onlayn also fetches its own onlayn-mikroqarz page
-    for the term); every other category has its own dedicated page and
-    does not participate in that sharing — so 8 categories produce 8
-    total fetch_html calls (not 9), confirming the hub page isn't fetched
-    twice."""
+    for the term); avtokredit_elektro and avtokredit_brend_birlamchi share
+    the same BYD page URL (BYD is both an EV brand and a specific brand)
+    but each is still fetched once via its own CATEGORY_URLS entry; every
+    other category has its own dedicated page and does not participate in
+    the mikroqarz hub sharing — so 9 categories produce 9 total fetch_html
+    calls, confirming the hub page isn't fetched twice."""
     with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch) as mock_fetch:
         products = OFBScraper().run()
 
-    assert mock_fetch.call_count == 8
-    # A bare total count can't distinguish "hub once + 7 others" from "hub
-    # twice + 6 others" — assert per-URL so the shared-fetch invariant the
+    assert mock_fetch.call_count == 9
+    # A bare total count can't distinguish "hub once + 8 others" from "hub
+    # twice + 7 others" — assert per-URL so the shared-fetch invariant the
     # docstring claims is actually checked, not just coincidentally implied.
     fetched_urls = [call.args[0] for call in mock_fetch.call_args_list]
     assert fetched_urls.count(OFBScraper.CATEGORY_URLS["mikroqarz"]) == 1
@@ -55,6 +57,7 @@ def test_ofb_scraper_parses_all_categories():
         "avtokredit_ikkilamchi",
         "avtokredit_brend_ikkilamchi",
         "avtokredit_elektro",
+        "avtokredit_brend_birlamchi",
         "mikroqarz",
         "mikroqarz_onlayn",
         "ipoteka_davlat",
@@ -153,6 +156,24 @@ def test_ofb_avtokredit_elektro_parses_dual_term_and_no_yillik_rate_table():
     assert elektro.requires_collateral is True
     assert elektro.grace_period_months == 0
     assert elektro.payment_method is None
+
+
+def test_ofb_avtokredit_byd_also_maps_to_brend_birlamchi():
+    """BYD is simultaneously an EV brand and a specific car brand, so the
+    same page/product must appear under both avtokredit_elektro and
+    avtokredit_brend_birlamchi rather than only one of the two."""
+    with patch("scrapers.ofb.fetch_html", side_effect=_fake_fetch):
+        products = OFBScraper().run()
+
+    elektro = next(p for p in products if p.category == "avtokredit_elektro")
+    brend = next(p for p in products if p.category == "avtokredit_brend_birlamchi")
+    assert brend.product_name == elektro.product_name
+    assert brend.rate_min == elektro.rate_min
+    assert brend.rate_max == elektro.rate_max
+    assert brend.term_min_months == elektro.term_min_months
+    assert brend.term_max_months == elektro.term_max_months
+    assert brend.amount_max_som == elektro.amount_max_som
+    assert brend.requires_collateral is True
 
 
 def test_ofb_mikroqarz_parses_ishonch_card_from_shared_hub_page():

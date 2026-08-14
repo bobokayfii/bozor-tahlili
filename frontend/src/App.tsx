@@ -5,18 +5,12 @@ import { MarketPulse } from './components/MarketPulse'
 import { ExportMenu } from './components/ExportMenu'
 import { RefreshDataButton } from './components/RefreshDataButton'
 import { LanguageDropdown } from './components/LanguageDropdown'
-import { CompareIcon } from './components/icons'
-import { CompareBar } from './components/CompareBar'
-import { CompareModal } from './components/CompareModal'
 import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
 import { getCategoryHeading } from './lib/categoryGroups'
-import { getCompareKey } from './lib/compareLogic'
 import { useLanguage } from './lib/LanguageContext'
 import type { Lang } from './lib/i18n'
 import type { Category, Product, UnavailableBank } from './lib/types'
 import logoIcon from './assets/logo-icon.png'
-
-const MAX_COMPARE = 3
 
 function formatUpdatedAt(iso: string, lang: Lang): string {
   const date = new Date(iso)
@@ -37,9 +31,6 @@ export function App() {
   const [unavailableBanks, setUnavailableBanks] = useState<UnavailableBank[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [compareKeys, setCompareKeys] = useState<Set<string>>(new Set())
-  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false)
-  const [isCompareModeActive, setIsCompareModeActive] = useState(false)
 
   useEffect(() => {
     fetchCategories()
@@ -91,44 +82,8 @@ export function App() {
       ? products.reduce((latest, p) => (p.scraped_at > latest ? p.scraped_at : latest), products[0].scraped_at)
       : null
 
-  const compareProducts = products.filter((product) => compareKeys.has(getCompareKey(product)))
-
   function handleSelectCategory(categoryKey: string) {
     setActiveCategory(categoryKey)
-    setCompareKeys(new Set())
-    setIsCompareModalOpen(false)
-  }
-
-  function handleToggleCompare(key: string) {
-    const willRemove = compareKeys.has(key)
-    const nextSize = willRemove ? compareKeys.size - 1 : Math.min(compareKeys.size + 1, MAX_COMPARE)
-    if (willRemove && nextSize < 2) {
-      setIsCompareModalOpen(false)
-    }
-    setCompareKeys((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else if (next.size < MAX_COMPARE) {
-        next.add(key)
-      }
-      return next
-    })
-  }
-
-  function handleClearCompare() {
-    setCompareKeys(new Set())
-    setIsCompareModalOpen(false)
-  }
-
-  function handleToggleCompareMode() {
-    setIsCompareModeActive((prev) => {
-      const next = !prev
-      if (!next) {
-        handleClearCompare()
-      }
-      return next
-    })
   }
 
   return (
@@ -140,22 +95,6 @@ export function App() {
         </div>
         <div className="app-topbar-actions">
           <RefreshDataButton />
-          <button
-            type="button"
-            className={
-              isCompareModeActive ? 'compare-mode-btn compare-mode-btn-active' : 'compare-mode-btn'
-            }
-            aria-pressed={isCompareModeActive}
-            onClick={handleToggleCompareMode}
-          >
-            <CompareIcon />
-            {t('compareModeButton')}
-            {isCompareModeActive && (
-              <span className="compare-mode-btn-close" aria-hidden="true">
-                ×
-              </span>
-            )}
-          </button>
           <ExportMenu category={activeCategory} />
           <LanguageDropdown />
         </div>
@@ -183,28 +122,9 @@ export function App() {
             schema={activeCategoryData?.schema}
             category={activeCategory ?? undefined}
             unavailableBanks={unavailableBanks}
-            compareModeActive={isCompareModeActive}
-            compareKeys={compareKeys}
-            onToggleCompare={handleToggleCompare}
-            maxCompare={MAX_COMPARE}
           />
         </main>
       </div>
-      <CompareBar
-        products={compareProducts}
-        onRemove={handleToggleCompare}
-        onOpen={() => setIsCompareModalOpen(true)}
-        onClear={handleClearCompare}
-      />
-      {isCompareModalOpen && compareProducts.length >= 2 && (
-        <CompareModal
-          products={compareProducts}
-          schema={activeCategoryData?.schema}
-          category={activeCategory ?? undefined}
-          onClose={() => setIsCompareModalOpen(false)}
-          onRemove={handleToggleCompare}
-        />
-      )}
     </div>
   )
 }
