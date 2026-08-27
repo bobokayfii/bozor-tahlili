@@ -79,3 +79,37 @@ def test_update_user_with_a_taken_username_returns_409(client):
 def test_admin_cannot_demote_themselves(client):
     response = client.patch("/admin/users/1", json={"role": "user"})
     assert response.status_code == 400
+
+
+def test_update_user_with_a_nonexistent_id_returns_404(client):
+    response = client.patch("/admin/users/9999", json={"role": "admin"})
+    assert response.status_code == 404
+
+
+def test_update_a_different_user_to_the_user_role_succeeds(client):
+    create_response = client.post("/admin/users", json={
+        "username": "jane", "password": "jane-password", "role": "admin",
+    })
+    user_id = create_response.json()["id"]
+
+    response = client.patch(f"/admin/users/{user_id}", json={"role": "user"})
+    assert response.status_code == 200
+    assert response.json()["role"] == "user"
+
+
+def test_admin_can_rename_themselves_without_touching_role(client):
+    response = client.patch("/admin/users/1", json={"username": "test-admin-renamed"})
+    assert response.status_code == 200
+    assert response.json()["username"] == "test-admin-renamed"
+
+
+def test_create_user_with_an_invalid_role_returns_422(client):
+    response = client.post("/admin/users", json={
+        "username": "x", "password": "pw", "role": "superadmin",
+    })
+    assert response.status_code == 422
+
+
+def test_update_user_with_an_invalid_role_returns_422(client):
+    response = client.patch("/admin/users/1", json={"role": "superadmin"})
+    assert response.status_code == 422
