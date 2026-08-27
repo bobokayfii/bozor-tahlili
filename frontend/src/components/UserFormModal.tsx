@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createUser, updateUser } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
@@ -18,6 +18,17 @@ export function UserFormModal({ user, onClose, onSaved }: UserFormModalProps) {
   const [role, setRole] = useState<UserRole>(user?.role ?? 'user')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()

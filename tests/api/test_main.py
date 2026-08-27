@@ -2,6 +2,8 @@ import threading
 from datetime import datetime, timezone
 from io import BytesIO
 
+import pytest
+from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 import api.main as api_main
@@ -320,9 +322,43 @@ def test_trigger_scrape_returns_409_when_a_scrape_is_already_running(client, mon
     release.set()
 
 
-def test_products_without_a_token_returns_401():
-    from fastapi.testclient import TestClient
-
+@pytest.mark.parametrize(
+    "method, path, kwargs",
+    [
+        ("get", "/products", {"params": {"category": "mikroqarz"}}),
+        ("get", "/categories", {}),
+        ("get", "/unavailable-banks", {"params": {"category": "avtokredit"}}),
+        (
+            "post",
+            "/recommend",
+            {"json": {
+                "category": "avtokredit",
+                "amount_som": 50_000_000,
+                "term_months": 12,
+                "collateral_ok": True,
+            }},
+        ),
+        (
+            "post",
+            "/explain-product",
+            {"json": {
+                "category": "mikroqarz",
+                "bank": "HamkorBank",
+                "product_name": "Hamkor Mikroqarz",
+                "rate_min": 10.0,
+                "rate_max": 15.0,
+                "term_min_months": 12,
+                "term_max_months": 36,
+                "amount_max_som": 100_000_000,
+                "requires_collateral": False,
+            }},
+        ),
+        ("get", "/export-excel", {"params": {"category": "avtokredit"}}),
+        ("get", "/export-excel-all", {}),
+        ("post", "/trigger-scrape", {}),
+    ],
+)
+def test_protected_endpoint_without_a_token_returns_401(method, path, kwargs):
     unauthenticated_client = TestClient(api_main.app)
-    response = unauthenticated_client.get("/products", params={"category": "mikroqarz"})
+    response = getattr(unauthenticated_client, method)(path, **kwargs)
     assert response.status_code == 401

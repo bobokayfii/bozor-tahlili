@@ -78,7 +78,7 @@ def test_bootstrap_creates_an_admin_when_the_users_table_is_empty(tmp_path, monk
     assert user.role == "admin"
 
 
-def test_bootstrap_does_nothing_when_env_vars_are_missing(tmp_path, monkeypatch):
+def test_bootstrap_does_nothing_when_env_vars_are_missing(tmp_path, monkeypatch, caplog):
     monkeypatch.delenv("ADMIN_USERNAME", raising=False)
     monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
     engine = get_engine(tmp_path / "bootstrap_test2.db")
@@ -86,10 +86,12 @@ def test_bootstrap_does_nothing_when_env_vars_are_missing(tmp_path, monkeypatch)
     session_factory = get_session_factory(engine)
     monkeypatch.setattr(api_main, "SessionLocal", session_factory)
 
-    api_main._bootstrap_admin_if_needed()
+    with caplog.at_level("WARNING"):
+        api_main._bootstrap_admin_if_needed()
 
     with session_factory() as session:
         assert session.execute(select(UserRow)).first() is None
+    assert "ADMIN_USERNAME/ADMIN_PASSWORD" in caplog.text
 
 
 def test_bootstrap_does_nothing_when_only_username_is_set(tmp_path, monkeypatch):

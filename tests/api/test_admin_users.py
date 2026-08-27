@@ -68,8 +68,8 @@ def test_update_user_without_a_password_keeps_the_old_password(client):
 
 
 def test_update_user_with_a_taken_username_returns_409(client):
-    client.post("/admin/users", json={"username": "jane", "password": "pw", "role": "user"})
-    create_response = client.post("/admin/users", json={"username": "bob", "password": "pw", "role": "user"})
+    client.post("/admin/users", json={"username": "jane", "password": "password1", "role": "user"})
+    create_response = client.post("/admin/users", json={"username": "bob", "password": "password1", "role": "user"})
     bob_id = create_response.json()["id"]
 
     response = client.patch(f"/admin/users/{bob_id}", json={"username": "jane"})
@@ -112,4 +112,11 @@ def test_create_user_with_an_invalid_role_returns_422(client):
 
 def test_update_user_with_an_invalid_role_returns_422(client):
     response = client.patch("/admin/users/1", json={"role": "superadmin"})
+    assert response.status_code == 422
+
+
+def test_create_user_with_a_too_short_password_returns_422(client):
+    response = client.post("/admin/users", json={
+        "username": "shortpw", "password": "short1", "role": "user",
+    })
     assert response.status_code == 422

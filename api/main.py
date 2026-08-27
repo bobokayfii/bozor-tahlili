@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from contextlib import asynccontextmanager
@@ -10,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from auth.dependencies import AuthenticatedUser, get_current_user, require_admin
@@ -23,6 +24,8 @@ from recommender.explain import FeaturedProduct, explain_featured_product, expla
 from recommender.scoring import Criteria, top_recommendations
 from scrapers.orchestrator import run_all_scrapers
 from unavailable_products import get_unavailable_banks
+
+logger = logging.getLogger(__name__)
 
 _engine = get_engine()
 init_db(_engine)
@@ -42,6 +45,9 @@ def _bootstrap_admin_if_needed() -> None:
         admin_username = os.environ.get("ADMIN_USERNAME")
         admin_password = os.environ.get("ADMIN_PASSWORD")
         if not admin_username or not admin_password:
+            logger.warning(
+                "Admin akkaunt topilmadi, ADMIN_USERNAME/ADMIN_PASSWORD env o'zgaruvchilarni sozlang"
+            )
             return
         session.add(UserRow(
             username=admin_username,
@@ -132,7 +138,7 @@ app.add_middleware(
     # qo'shiladi.
     allow_origin_regex=r"http://localhost:\d+",
     allow_origins=_extra_origins,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -392,13 +398,13 @@ def trigger_scrape(_: AuthenticatedUser = Depends(get_current_user)):
 
 class CreateUserRequest(BaseModel):
     username: str
-    password: str
+    password: str = Field(min_length=8)
     role: Literal["admin", "user"]
 
 
 class UpdateUserRequest(BaseModel):
     username: str | None = None
-    password: str | None = None
+    password: str | None = Field(default=None, min_length=8)
     role: Literal["admin", "user"] | None = None
 
 

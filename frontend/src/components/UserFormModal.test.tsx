@@ -66,4 +66,13 @@ describe('UserFormModal', () => {
 
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('closes when the Escape key is pressed', async () => {
+    const onClose = vi.fn()
+    renderWithLanguage(<UserFormModal user={null} onClose={onClose} onSaved={vi.fn()} />)
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalled()
+  })
 })
