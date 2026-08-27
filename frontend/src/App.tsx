@@ -8,6 +8,10 @@ import { LanguageDropdown } from './components/LanguageDropdown'
 import { fetchCategories, fetchProducts, fetchUnavailableBanks } from './lib/api'
 import { getCategoryHeading } from './lib/categoryGroups'
 import { useLanguage } from './lib/LanguageContext'
+import { useAuth } from './lib/AuthContext'
+import { LoginPage } from './components/LoginPage'
+import { AdminPanel } from './components/AdminPanel'
+import { DashboardIcon, LogoutIcon } from './components/icons'
 import type { Lang } from './lib/i18n'
 import type { Category, Product, UnavailableBank } from './lib/types'
 import logoIcon from './assets/logo-icon.png'
@@ -25,6 +29,8 @@ function formatUpdatedAt(iso: string, lang: Lang): string {
 
 export function App() {
   const { lang, t } = useLanguage()
+  const { user, isLoading: isAuthLoading, logout } = useAuth()
+  const [view, setView] = useState<'app' | 'admin'>('app')
   const [categories, setCategories] = useState<Category[]>([])
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [products, setProducts] = useState<Product[]>([])
@@ -33,6 +39,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!user) return
     fetchCategories()
       .then((data) => {
         setCategories(data)
@@ -43,10 +50,10 @@ export function App() {
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Kategoriyalarni yuklab bo'lmadi")
       })
-  }, [])
+  }, [user])
 
   useEffect(() => {
-    if (!activeCategory) return
+    if (!user || !activeCategory) return
     let ignore = false
 
     async function loadProducts() {
@@ -71,7 +78,7 @@ export function App() {
     return () => {
       ignore = true
     }
-  }, [activeCategory])
+  }, [user, activeCategory])
 
   const activeCategoryData = categories.find((c) => c.key === activeCategory)
   const activeLabel = activeCategoryData
@@ -86,6 +93,18 @@ export function App() {
     setActiveCategory(categoryKey)
   }
 
+  if (isAuthLoading) {
+    return <div className="auth-loading">{t('loadingLabel')}</div>
+  }
+
+  if (!user) {
+    return <LoginPage />
+  }
+
+  if (view === 'admin' && user.role === 'admin') {
+    return <AdminPanel onBack={() => setView('app')} />
+  }
+
   return (
     <div className="app-shell">
       <header className="app-topbar">
@@ -97,6 +116,19 @@ export function App() {
           <RefreshDataButton />
           <ExportMenu category={activeCategory} />
           <LanguageDropdown />
+          <div className="app-topbar-user">
+            {user.role === 'admin' && (
+              <button type="button" className="dashboard-btn" onClick={() => setView('admin')}>
+                <DashboardIcon />
+                {t('dashboardButton')}
+              </button>
+            )}
+            <span className="app-topbar-username">{user.username}</span>
+            <button type="button" className="logout-btn" onClick={logout}>
+              <LogoutIcon />
+              {t('logoutButton')}
+            </button>
+          </div>
         </div>
       </header>
       <div className="app-body">
