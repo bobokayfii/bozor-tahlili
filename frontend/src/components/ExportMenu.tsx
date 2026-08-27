@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getExportAllExcelUrl, getExportExcelUrl } from '../lib/api'
+import { downloadFile, getExportAllExcelUrl, getExportExcelUrl } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
 import { DownloadIcon } from './icons'
 
@@ -7,9 +7,6 @@ interface ExportMenuProps {
   category: string | null
 }
 
-// Oddiy <a href> yetarli: bu GET so'rovlar autentifikatsiyasiz, backend
-// Content-Disposition: attachment sarlavhasini qaytaradi, brauzer o'zi
-// yuklab olishni boshlaydi — fetch/blob orqali qo'lda yuklash shart emas.
 export function ExportMenu({ category }: ExportMenuProps) {
   const { lang, t } = useLanguage()
   const [isOpen, setIsOpen] = useState(false)
@@ -30,6 +27,16 @@ export function ExportMenu({ category }: ExportMenuProps) {
 
   if (!category) return null
 
+  async function handleExportCurrent() {
+    setIsOpen(false)
+    await downloadFile(getExportExcelUrl(category as string, lang), `${category}.xlsx`)
+  }
+
+  async function handleExportAll() {
+    setIsOpen(false)
+    await downloadFile(getExportAllExcelUrl(lang), 'bozor-tahlili-barcha-kategoriyalar.xlsx')
+  }
+
   return (
     <div className="export-menu" ref={containerRef}>
       <button type="button" className="export-btn" onClick={() => setIsOpen((prev) => !prev)}>
@@ -41,22 +48,12 @@ export function ExportMenu({ category }: ExportMenuProps) {
       </button>
       {isOpen && (
         <div className="export-menu-panel" role="menu">
-          <a
-            className="export-menu-item"
-            role="menuitem"
-            href={getExportExcelUrl(category, lang)}
-            onClick={() => setIsOpen(false)}
-          >
+          <button type="button" className="export-menu-item" role="menuitem" onClick={handleExportCurrent}>
             {t('exportCurrentPage')}
-          </a>
-          <a
-            className="export-menu-item"
-            role="menuitem"
-            href={getExportAllExcelUrl(lang)}
-            onClick={() => setIsOpen(false)}
-          >
+          </button>
+          <button type="button" className="export-menu-item" role="menuitem" onClick={handleExportAll}>
             {t('exportAllCategories')}
-          </a>
+          </button>
         </div>
       )}
     </div>

@@ -160,6 +160,11 @@ button {
   font-size: 13px;
   text-decoration: none;
   cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  width: 100%;
+  text-align: left;
 }
 
 .export-menu-item:hover {
