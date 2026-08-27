@@ -2,33 +2,10 @@ import threading
 from datetime import datetime, timezone
 from io import BytesIO
 
-import pytest
-from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 import api.main as api_main
-from db.database import get_engine, get_session_factory, init_db
 from db.models import ProductRow
-
-
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    engine = get_engine(tmp_path / "api_test.db")
-    init_db(engine)
-    session_factory = get_session_factory(engine)
-
-    with session_factory() as session:
-        session.add(ProductRow(
-            bank="SQB", category="mikroqarz", product_name="SQB Mikroqarz",
-            rate_min=28.0, rate_max=31.0, term_min_months=3, term_max_months=36,
-            amount_max_som=100_000_000, requires_collateral=False,
-            down_payment_pct=None, source_url="https://sqb.uz",
-            scraped_at=datetime.now(timezone.utc),
-        ))
-        session.commit()
-
-    monkeypatch.setattr(api_main, "SessionLocal", session_factory)
-    return TestClient(api_main.app)
 
 
 def test_list_products_returns_seeded_row(client):
@@ -341,3 +318,11 @@ def test_trigger_scrape_returns_409_when_a_scrape_is_already_running(client, mon
     assert second_response.status_code == 409
 
     release.set()
+
+
+def test_products_without_a_token_returns_401():
+    from fastapi.testclient import TestClient
+
+    unauthenticated_client = TestClient(api_main.app)
+    response = unauthenticated_client.get("/products", params={"category": "mikroqarz"})
+    assert response.status_code == 401

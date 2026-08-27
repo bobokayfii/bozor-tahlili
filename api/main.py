@@ -227,7 +227,7 @@ def _latest_per_bank_category_query():
 
 
 @app.get("/products")
-def list_products(category: str | None = None, bank: str | None = None):
+def list_products(category: str | None = None, bank: str | None = None, _: AuthenticatedUser = Depends(get_current_user)):
     with SessionLocal() as session:
         query = _latest_per_bank_category_query()
         if category:
@@ -239,17 +239,17 @@ def list_products(category: str | None = None, bank: str | None = None):
 
 
 @app.get("/categories")
-def list_categories():
+def list_categories(_: AuthenticatedUser = Depends(get_current_user)):
     return [{"key": c.key, "label": c.label_uz, "schema": c.schema} for c in CATEGORIES]
 
 
 @app.get("/unavailable-banks")
-def list_unavailable_banks(category: str):
+def list_unavailable_banks(category: str, _: AuthenticatedUser = Depends(get_current_user)):
     return [{"bank": item.bank, "reason": item.reason} for item in get_unavailable_banks(category)]
 
 
 @app.post("/recommend")
-def recommend(request: RecommendRequest):
+def recommend(request: RecommendRequest, _: AuthenticatedUser = Depends(get_current_user)):
     criteria = Criteria(
         category=request.category,
         amount_som=request.amount_som,
@@ -285,7 +285,7 @@ def recommend(request: RecommendRequest):
 
 
 @app.post("/explain-product")
-def explain_product(request: ExplainProductRequest):
+def explain_product(request: ExplainProductRequest, _: AuthenticatedUser = Depends(get_current_user)):
     """Frontend "Bozor pulsi" kartochkasi jadvaldagi eng past stavkali
     mahsulotni (mustaqil, oddiy hisob-kitob bilan) tanlaydi — bu endpoint
     esa /recommend'dagi kabi o'z ballash/saralashini ishlatmasdan, ANIQ
@@ -312,7 +312,7 @@ def explain_product(request: ExplainProductRequest):
 
 
 @app.get("/export-excel")
-def export_excel(category: str, language: str = "uz"):
+def export_excel(category: str, language: str = "uz", _: AuthenticatedUser = Depends(get_current_user)):
     """Joriy ochiq kategoriyani frontenddagi jadval bilan bir xil tartib
     va ustunlarda (rate_min bo'yicha saralangan) chiroyli formatlangan
     .xlsx faylga eksport qiladi — faqat shu kategoriya, butun sayt emas."""
@@ -342,7 +342,7 @@ def export_excel(category: str, language: str = "uz"):
 
 
 @app.get("/export-excel-all")
-def export_excel_all(language: str = "uz"):
+def export_excel_all(language: str = "uz", _: AuthenticatedUser = Depends(get_current_user)):
     """Barcha kategoriyalarni BITTA .xlsx faylida, har biri o'z nomi bilan
     alohida varaqda (sheet) eksport qiladi — hisobot uchun to'liq
     ma'lumotlar to'plami."""
@@ -370,7 +370,7 @@ def export_excel_all(language: str = "uz"):
 
 
 @app.post("/trigger-scrape")
-def trigger_scrape():
+def trigger_scrape(_: AuthenticatedUser = Depends(get_current_user)):
     """Buyurtmachi so'ragan "qo'lda yangilash" tugmasi uchun: barcha
     banklarni HOZIR qayta scrape qilishni boshlaydi. HTTP so'rovni
     bloklamaslik uchun run_all_scrapers alohida oqimda (thread) ishga
