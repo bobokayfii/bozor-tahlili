@@ -90,3 +90,57 @@ def test_bootstrap_does_nothing_when_env_vars_are_missing(tmp_path, monkeypatch)
 
     with session_factory() as session:
         assert session.execute(select(UserRow)).first() is None
+
+
+def test_bootstrap_does_nothing_when_only_username_is_set(tmp_path, monkeypatch):
+    monkeypatch.setenv("ADMIN_USERNAME", "bootstrap-admin")
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+    engine = get_engine(tmp_path / "bootstrap_test3.db")
+    init_db(engine)
+    session_factory = get_session_factory(engine)
+    monkeypatch.setattr(api_main, "SessionLocal", session_factory)
+
+    api_main._bootstrap_admin_if_needed()
+
+    with session_factory() as session:
+        assert session.execute(select(UserRow)).first() is None
+
+
+def test_bootstrap_does_nothing_when_only_password_is_set(tmp_path, monkeypatch):
+    monkeypatch.delenv("ADMIN_USERNAME", raising=False)
+    monkeypatch.setenv("ADMIN_PASSWORD", "bootstrap-password")
+    engine = get_engine(tmp_path / "bootstrap_test4.db")
+    init_db(engine)
+    session_factory = get_session_factory(engine)
+    monkeypatch.setattr(api_main, "SessionLocal", session_factory)
+
+    api_main._bootstrap_admin_if_needed()
+
+    with session_factory() as session:
+        assert session.execute(select(UserRow)).first() is None
+
+
+def test_bootstrap_does_not_create_a_second_admin_when_the_users_table_is_not_empty(tmp_path, monkeypatch):
+    monkeypatch.setenv("ADMIN_USERNAME", "bootstrap-admin")
+    monkeypatch.setenv("ADMIN_PASSWORD", "bootstrap-password")
+    engine = get_engine(tmp_path / "bootstrap_test5.db")
+    init_db(engine)
+    session_factory = get_session_factory(engine)
+
+    with session_factory() as session:
+        session.add(UserRow(
+            username="existing-admin",
+            password_hash=hash_password("existing-password"),
+            role="admin",
+            created_at=datetime.now(timezone.utc),
+        ))
+        session.commit()
+
+    monkeypatch.setattr(api_main, "SessionLocal", session_factory)
+
+    api_main._bootstrap_admin_if_needed()
+
+    with session_factory() as session:
+        users = session.execute(select(UserRow)).scalars().all()
+    assert len(users) == 1
+    assert users[0].username == "existing-admin"
