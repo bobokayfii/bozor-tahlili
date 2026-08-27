@@ -3,18 +3,20 @@ from __future__ import annotations
 import os
 import threading
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
+from auth.dependencies import AuthenticatedUser, get_current_user
+from auth.security import create_access_token, hash_password, verify_password
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
-from db.models import ProductRow
+from db.models import ProductRow, UserRow
 from export_excel import build_all_categories_workbook, build_category_workbook
 from recommender.explain import FeaturedProduct, explain_featured_product, explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
@@ -24,6 +26,30 @@ from unavailable_products import get_unavailable_banks
 _engine = get_engine()
 init_db(_engine)
 SessionLocal = get_session_factory(_engine)
+
+if not os.environ.get("AUTH_SECRET_KEY"):
+    raise RuntimeError("AUTH_SECRET_KEY environment o'zgaruvchisi talab qilinadi (JWT token imzolash uchun)")
+
+
+def _bootstrap_admin_if_needed() -> None:
+    """Users jadvali bo'sh bo'lsa (birinchi marta ishga tushirilganda) va
+    ADMIN_USERNAME/ADMIN_PASSWORD env o'zgaruvchilar berilgan bo'lsa,
+    tizimga kirish uchun birinchi admin akkauntni avtomatik yaratadi."""
+    with SessionLocal() as session:
+        if session.execute(select(UserRow)).first() is not None:
+            return
+        admin_username = os.environ.get("ADMIN_USERNAME")
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+        if not admin_username or not admin_password:
+            return
+        session.add(UserRow(
+            username=admin_username,
+            password_hash=hash_password(admin_password),
+            role="admin",
+            created_at=datetime.now(timezone.utc),
+        ))
+        session.commit()
+
 
 # Netlify'dagi frontend production domeni ALLOWED_ORIGINS orqali qo'shiladi
 # (vergul bilan ajratilgan, masalan "https://my-site.netlify.app"). Localhost
@@ -73,6 +99,7 @@ def _run_manual_scrape() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    _bootstrap_admin_if_needed()
     # BackgroundScheduler alohida process talab qilmaydi — shu bitta
     # uvicorn worker ichida fon oqimida ishlaydi, shuning uchun Railway'da
     # bitta "web" xizmati ham API'ni, ham davriy scraping'ni bajaradi (SQLite
@@ -107,6 +134,32 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    username: str
+    role: str
+
+
+@app.post("/auth/login", response_model=LoginResponse)
+def login(request: LoginRequest):
+    with SessionLocal() as session:
+        user = session.execute(select(UserRow).where(UserRow.username == request.username)).scalar_one_or_none()
+    if user is None or not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Login yoki parol noto'g'ri")
+    token = create_access_token(user_id=user.id, username=user.username, role=user.role)
+    return LoginResponse(access_token=token, username=user.username, role=user.role)
+
+
+@app.get("/auth/me")
+def get_me(current_user: AuthenticatedUser = Depends(get_current_user)):
+    return {"username": current_user.username, "role": current_user.role}
 
 
 class RecommendRequest(BaseModel):
