@@ -1324,3 +1324,116 @@ button {
     flex: 1 1 100%;
   }
 }
+
+.admin-panel {
+  padding: 32px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.admin-panel-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.admin-panel-back:hover {
+  color: var(--house);
+}
+
+.admin-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.admin-panel-title-row h1 {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--ink);
+}
+
+.admin-add-btn {
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--house);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-add-btn:hover {
+  background: #012544;
+}
+
+.admin-users-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.admin-users-table th,
+.admin-users-table td {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-users-table th {
+  background: var(--paper-sunk);
+  color: var(--ink-soft);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 11px;
+}
+
+.admin-role-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-role-badge-admin {
+  background: var(--house-soft);
+  color: var(--house);
+}
+
+.admin-role-badge-user {
+  background: var(--paper-sunk);
+  color: var(--ink-soft);
+}
+
+.admin-edit-btn {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-edit-btn:hover {
+  border-color: var(--house);
+  color: var(--house);
+}
