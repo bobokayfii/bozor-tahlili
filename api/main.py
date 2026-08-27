@@ -4,6 +4,7 @@ import os
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Literal
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, HTTPException
@@ -12,7 +13,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from auth.dependencies import AuthenticatedUser, get_current_user
+from auth.dependencies import AuthenticatedUser, get_current_user, require_admin
 from auth.security import create_access_token, hash_password, verify_password
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
@@ -387,3 +388,77 @@ def trigger_scrape(_: AuthenticatedUser = Depends(get_current_user)):
 
     threading.Thread(target=_run_manual_scrape, daemon=True).start()
     return {"status": "started"}
+
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    role: Literal["admin", "user"]
+
+
+class UpdateUserRequest(BaseModel):
+    username: str | None = None
+    password: str | None = None
+    role: Literal["admin", "user"] | None = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+    created_at: str
+
+
+@app.get("/admin/users", response_model=list[UserResponse])
+def list_users(_: AuthenticatedUser = Depends(require_admin)):
+    with SessionLocal() as session:
+        rows = session.execute(select(UserRow).order_by(UserRow.id)).scalars().all()
+        return [
+            UserResponse(id=row.id, username=row.username, role=row.role, created_at=row.created_at.isoformat())
+            for row in rows
+        ]
+
+
+@app.post("/admin/users", response_model=UserResponse, status_code=201)
+def create_user(request: CreateUserRequest, _: AuthenticatedUser = Depends(require_admin)):
+    with SessionLocal() as session:
+        existing = session.execute(select(UserRow).where(UserRow.username == request.username)).scalar_one_or_none()
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Bu login band")
+        new_user = UserRow(
+            username=request.username,
+            password_hash=hash_password(request.password),
+            role=request.role,
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+        return UserResponse(
+            id=new_user.id, username=new_user.username, role=new_user.role,
+            created_at=new_user.created_at.isoformat(),
+        )
+
+
+@app.patch("/admin/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, request: UpdateUserRequest, current_user: AuthenticatedUser = Depends(require_admin)):
+    if user_id == current_user.id and request.role == "user":
+        raise HTTPException(status_code=400, detail="O'z rolingizni o'zgartira olmaysiz")
+    with SessionLocal() as session:
+        user = session.get(UserRow, user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+        if request.username is not None and request.username != user.username:
+            existing = session.execute(
+                select(UserRow).where(UserRow.username == request.username)
+            ).scalar_one_or_none()
+            if existing is not None:
+                raise HTTPException(status_code=409, detail="Bu login band")
+            user.username = request.username
+        if request.password:
+            user.password_hash = hash_password(request.password)
+        if request.role is not None:
+            user.role = request.role
+        session.commit()
+        session.refresh(user)
+        return UserResponse(id=user.id, username=user.username, role=user.role, created_at=user.created_at.isoformat())
