@@ -4,11 +4,7 @@ import { useLanguage } from '../lib/LanguageContext'
 import { UserFormModal } from './UserFormModal'
 import type { AdminUser } from '../lib/types'
 
-interface AdminPanelProps {
-  onBack: () => void
-}
-
-export function AdminPanel({ onBack }: AdminPanelProps) {
+export function AdminPanel() {
   const { lang, t } = useLanguage()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -47,11 +43,11 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
 
   return (
     <div className="admin-panel">
-      <button type="button" className="admin-panel-back" onClick={onBack}>
-        ← {t('adminBackButton')}
-      </button>
-      <div className="admin-panel-title-row">
-        <h1>{t('adminPanelTitle')}</h1>
+      <div className="page-head">
+        <div>
+          <h1>{t('adminPanelTitle')}</h1>
+          <p className="page-subtitle">{t('adminPanelSubtitle')}</p>
+        </div>
         <button type="button" className="admin-add-btn" onClick={() => setEditingUser('new')}>
           {t('adminAddUserButton')}
         </button>
@@ -60,34 +56,37 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
       {error && <p className="error-state">{error}</p>}
 
       {!isLoading && (
-        <table className="admin-users-table">
-          <thead>
-            <tr>
-              <th>{t('adminUsernameLabel')}</th>
-              <th>{t('adminRoleLabel')}</th>
-              <th>{t('adminColCreatedAt')}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td>{user.username}</td>
-                <td>
-                  <span className={`admin-role-badge admin-role-badge-${user.role}`}>
-                    {user.role === 'admin' ? t('adminRoleAdmin') : t('adminRoleUser')}
-                  </span>
-                </td>
-                <td>{formatCreatedAt(user.created_at)}</td>
-                <td>
-                  <button type="button" className="admin-edit-btn" onClick={() => setEditingUser(user)}>
-                    {t('adminEditButton')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="admin-users-board rate-board">
+          <div className="rate-board-head">
+            <span>{t('tableRank')}</span>
+            <span>{t('adminUsernameLabel')}</span>
+            <span>{t('adminRoleLabel')}</span>
+            <span>{t('adminColCreatedAt')}</span>
+            <span />
+          </div>
+          {users.map((user, index) => (
+            <div className="rate-row" key={user.id}>
+              <span className="rate-rank">{String(index + 1).padStart(2, '0')}</span>
+              <span className="rate-bank">
+                <span className="admin-user-avatar" aria-hidden="true">
+                  {user.username.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="rate-bank-name">{user.username}</span>
+              </span>
+              <span>
+                <span className={`admin-role-badge admin-role-badge-${user.role}`}>
+                  {user.role === 'admin' ? t('adminRoleAdmin') : t('adminRoleUser')}
+                </span>
+              </span>
+              <span className="rate-term">{formatCreatedAt(user.created_at)}</span>
+              <span>
+                <button type="button" className="admin-edit-btn" onClick={() => setEditingUser(user)}>
+                  {t('adminEditButton')}
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
       )}
 
       {editingUser && (

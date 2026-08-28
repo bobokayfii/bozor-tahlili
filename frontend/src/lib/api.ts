@@ -91,6 +91,9 @@ export async function createUser(request: CreateUserRequest): Promise<AdminUser>
   if (response.status === 409) {
     throw new Error('USERNAME_TAKEN')
   }
+  if (response.status === 422) {
+    throw new Error('PASSWORD_TOO_SHORT')
+  }
   if (!response.ok) {
     throw new Error(`Userni qo'shib bo'lmadi: ${response.status}`)
   }
@@ -108,6 +111,9 @@ export async function updateUser(id: number, request: UpdateUserRequest): Promis
   }
   if (response.status === 400) {
     throw new Error('SELF_DEMOTE')
+  }
+  if (response.status === 422) {
+    throw new Error('PASSWORD_TOO_SHORT')
   }
   if (!response.ok) {
     throw new Error(`Userni yangilab bo'lmadi: ${response.status}`)

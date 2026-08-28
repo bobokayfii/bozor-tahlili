@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createUser, updateUser } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
+import { PasswordInput } from './PasswordInput'
 import type { AdminUser, UserRole } from '../lib/types'
 
 interface UserFormModalProps {
@@ -45,6 +46,8 @@ export function UserFormModal({ user, onClose, onSaved }: UserFormModalProps) {
         setError(t('adminUsernameTaken'))
       } else if (err instanceof Error && err.message === 'SELF_DEMOTE') {
         setError(t('adminSelfDemote'))
+      } else if (err instanceof Error && err.message === 'PASSWORD_TOO_SHORT') {
+        setError(t('adminPasswordTooShort'))
       } else {
         setError(t('adminSaveFailed'))
       }
@@ -80,14 +83,15 @@ export function UserFormModal({ user, onClose, onSaved }: UserFormModalProps) {
             <label htmlFor="user-form-password">
               {isEditing ? t('adminPasswordLabelOptional') : t('adminPasswordLabel')}
             </label>
-            <input
+            <PasswordInput
               id="user-form-password"
-              type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={setPassword}
               placeholder={isEditing ? t('adminPasswordPlaceholder') : undefined}
               required={!isEditing}
+              minLength={8}
             />
+            <p className="form-hint">{t('adminPasswordHint')}</p>
           </div>
           <div className="form-field">
             <label htmlFor="user-form-role">{t('adminRoleLabel')}</label>

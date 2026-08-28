@@ -49,8 +49,3 @@ const BANK_LOGOS: Record<string, string> = {
 export function getBankLogo(bank: string): string | undefined {
   return BANK_LOGOS[bank.trim().toLowerCase()]
 }
-
-export const BANK_LOGO_LIST: { key: string; src: string }[] = Object.entries(BANK_LOGOS).map(([key, src]) => ({
-  key,
-  src,
-}))

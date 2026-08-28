@@ -2,8 +2,9 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import { useLanguage } from '../lib/LanguageContext'
-import { BANK_LOGO_LIST } from '../lib/bankLogos'
-import logoIcon from '../assets/logo-icon.png'
+import { LanguageDropdown } from './LanguageDropdown'
+import { PasswordInput } from './PasswordInput'
+import sqbMark from '../assets/bank-logos/sqb.svg'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -28,25 +29,16 @@ export function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-showcase">
-        <div className="auth-showcase-brand">
-          <img src={logoIcon} alt="" className="auth-showcase-logo-icon" />
-          <span className="auth-showcase-wordmark">{t('brandName')}</span>
-        </div>
-        <p className="auth-showcase-tagline">{t('authTagline')}</p>
-        <div className="auth-showcase-logos">
-          {BANK_LOGO_LIST.map(({ key, src }, index) => (
-            <div key={key} className="auth-showcase-logo-chip" style={{ animationDelay: `${index * 40}ms` }}>
-              <img src={src} alt="" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="auth-form-panel">
-        <div className="auth-form-card">
+      <header className="auth-topbar">
+        <span className="auth-topbar-brand">{t('brandName')}</span>
+        <LanguageDropdown />
+      </header>
+      <main className="auth-center">
+        <div className="auth-card">
+          <img src={sqbMark} alt="SQB" className="auth-mark" />
+          <div className="auth-rule" aria-hidden="true" />
           <h1>{t('authTitle')}</h1>
-          <p className="auth-form-subtitle">{t('authSubtitle')}</p>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <div className="form-field">
               <label htmlFor="login-username">{t('authUsernameLabel')}</label>
               <input
@@ -55,27 +47,32 @@ export function LoginPage() {
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
+                autoFocus
                 required
               />
             </div>
             <div className="form-field">
               <label htmlFor="login-password">{t('authPasswordLabel')}</label>
-              <input
+              <PasswordInput
                 id="login-password"
-                type="password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={setPassword}
                 autoComplete="current-password"
                 required
               />
             </div>
-            {error && <p className="form-error">{error}</p>}
-            <button type="submit" className="auth-form-submit" disabled={isSubmitting}>
-              {t('authSubmitButton')}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+            <button type="submit" className="auth-submit" disabled={isSubmitting}>
+              {isSubmitting ? <span className="auth-spinner" aria-hidden="true" /> : t('authSubmitButton')}
             </button>
           </form>
+          <p className="auth-footer">{t('sidebarFooter')}</p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

@@ -232,6 +232,18 @@ describe('api client', () => {
     await expect(updateUser(1, { role: 'user' })).rejects.toThrow('SELF_DEMOTE')
   })
 
+  it('createUser throws PASSWORD_TOO_SHORT on a 422 response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422 }))
+    await expect(createUser({ username: 'jane', password: 'pw', role: 'user' })).rejects.toThrow(
+      'PASSWORD_TOO_SHORT',
+    )
+  })
+
+  it('updateUser throws PASSWORD_TOO_SHORT on a 422 response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422 }))
+    await expect(updateUser(1, { password: 'pw' })).rejects.toThrow('PASSWORD_TOO_SHORT')
+  })
+
   it('downloadFile throws when the response is not ok', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
     await expect(downloadFile('http://localhost:8000/export-excel', 'f.xlsx')).rejects.toThrow(

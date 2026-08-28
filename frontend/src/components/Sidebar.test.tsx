@@ -75,4 +75,42 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: 'Вторичный рынок' })).toBeInTheDocument()
     window.localStorage.removeItem('bozor-tahlili-lang')
   })
+
+  it('does not render the admin section when isAdmin is false', () => {
+    renderWithLanguage(<Sidebar categories={categories} activeCategory="kredit_karta" onSelect={() => {}} />)
+    expect(screen.queryByText('Boshqaruv')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Foydalanuvchilar' })).not.toBeInTheDocument()
+  })
+
+  it('renders the admin section when isAdmin is true', () => {
+    renderWithLanguage(
+      <Sidebar categories={categories} activeCategory="kredit_karta" onSelect={() => {}} isAdmin />,
+    )
+    expect(screen.getByText('Boshqaruv')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Foydalanuvchilar' })).toBeInTheDocument()
+  })
+
+  it('calls onSelectAdmin when the Foydalanuvchilar button is clicked', async () => {
+    const onSelectAdmin = vi.fn()
+    renderWithLanguage(
+      <Sidebar
+        categories={categories}
+        activeCategory="kredit_karta"
+        onSelect={() => {}}
+        isAdmin
+        onSelectAdmin={onSelectAdmin}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Foydalanuvchilar' }))
+
+    expect(onSelectAdmin).toHaveBeenCalledOnce()
+  })
+
+  it('marks the Foydalanuvchilar button active when isAdminView is true', () => {
+    renderWithLanguage(
+      <Sidebar categories={categories} activeCategory={null} onSelect={() => {}} isAdmin isAdminView />,
+    )
+    expect(screen.getByRole('button', { name: 'Foydalanuvchilar' })).toHaveClass('active')
+  })
 })

@@ -24,24 +24,15 @@ describe('AdminPanel', () => {
       { id: 1, username: 'admin1', role: 'admin', created_at: '2026-01-01T00:00:00Z' },
       { id: 2, username: 'jane', role: 'user', created_at: '2026-02-01T00:00:00Z' },
     ])
-    renderWithLanguage(<AdminPanel onBack={vi.fn()} />)
+    renderWithLanguage(<AdminPanel />)
 
     expect(await screen.findByText('admin1')).toBeInTheDocument()
     expect(screen.getByText('jane')).toBeInTheDocument()
   })
 
-  it('calls onBack when the back button is clicked', async () => {
-    mockedFetchUsers.mockResolvedValue([])
-    const onBack = vi.fn()
-    renderWithLanguage(<AdminPanel onBack={onBack} />)
-
-    await userEvent.click(screen.getByText(/Bosh sahifaga qaytish/))
-    expect(onBack).toHaveBeenCalled()
-  })
-
   it('opens the add-user modal when the add button is clicked', async () => {
     mockedFetchUsers.mockResolvedValue([])
-    renderWithLanguage(<AdminPanel onBack={vi.fn()} />)
+    renderWithLanguage(<AdminPanel />)
 
     await userEvent.click(await screen.findByText("Yangi user qo'shish"))
 
@@ -52,7 +43,7 @@ describe('AdminPanel', () => {
     mockedFetchUsers.mockResolvedValue([
       { id: 3, username: 'bob', role: 'user', created_at: '2026-01-01T00:00:00Z' },
     ])
-    renderWithLanguage(<AdminPanel onBack={vi.fn()} />)
+    renderWithLanguage(<AdminPanel />)
 
     await userEvent.click(await screen.findByText('Tahrirlash'))
 
