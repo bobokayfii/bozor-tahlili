@@ -389,7 +389,7 @@ def export_excel_all(language: str = "uz", _: AuthenticatedUser = Depends(get_cu
 
 
 @app.post("/trigger-scrape")
-def trigger_scrape(_: AuthenticatedUser = Depends(get_current_user)):
+def trigger_scrape(_: AuthenticatedUser = Depends(require_admin)):
     """Buyurtmachi so'ragan "qo'lda yangilash" tugmasi uchun: barcha
     banklarni HOZIR qayta scrape qilishni boshlaydi. HTTP so'rovni
     bloklamaslik uchun run_all_scrapers alohida oqimda (thread) ishga

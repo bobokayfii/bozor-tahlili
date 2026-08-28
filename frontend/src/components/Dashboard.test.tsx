@@ -65,4 +65,20 @@ describe('Dashboard', () => {
 
     expect(await screen.findByText('Foydalanuvchilarni boshqarish')).toBeInTheDocument()
   })
+
+  it('shows the refresh-data button for an admin', async () => {
+    mockedFetchCategories.mockResolvedValue(categories)
+    renderDashboard('admin')
+    await screen.findByText('Avtokredit')
+
+    expect(screen.getByRole('button', { name: "Ma'lumotlarni yangilash" })).toBeInTheDocument()
+  })
+
+  it('hides the refresh-data button for a regular user', async () => {
+    mockedFetchCategories.mockResolvedValue(categories)
+    renderDashboard('user')
+    await screen.findByText('Avtokredit')
+
+    expect(screen.queryByRole('button', { name: "Ma'lumotlarni yangilash" })).not.toBeInTheDocument()
+  })
 })
