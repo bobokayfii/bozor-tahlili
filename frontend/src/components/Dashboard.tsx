@@ -54,7 +54,7 @@ export function Dashboard({ user }: DashboardProps) {
         <div className="app-topbar-actions">
           {!isAdminView && (
             <>
-              <RefreshDataButton />
+              {user.role === 'admin' && <RefreshDataButton />}
               <ExportMenu category={activeCategoryKey} />
             </>
           )}

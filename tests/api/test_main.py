@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 import api.main as api_main
+from auth.security import create_access_token
 from db.models import ProductRow
 
 
@@ -331,6 +332,12 @@ def test_trigger_scrape_returns_409_when_a_scrape_is_already_running(client, mon
     assert second_response.status_code == 409
 
     release.set()
+
+
+def test_trigger_scrape_as_a_non_admin_returns_403(client):
+    non_admin_token = create_access_token(user_id=99, username="regular", role="user")
+    response = client.post("/trigger-scrape", headers={"Authorization": f"Bearer {non_admin_token}"})
+    assert response.status_code == 403
 
 
 @pytest.mark.parametrize(
