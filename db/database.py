@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from db.models import Base
@@ -14,10 +14,26 @@ _NEW_PRODUCT_COLUMNS = {
 }
 
 
+def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
+    # Default SQLite journaling takes an exclusive file lock for the whole
+    # duration of a write transaction, blocking every other reader/writer —
+    # including a login lookup — until it commits or the 5s default busy
+    # timeout expires and raises "database is locked". The scraper (run on
+    # every deploy and every SCRAPE_INTERVAL_HOURS) writes for a long time,
+    # so under WAL mode readers no longer block on it, and busy_timeout is
+    # raised as a safety net for the remaining brief writer-vs-writer case.
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=30000")
+    cursor.close()
+
+
 def get_engine(db_path: Path | None = None):
     path = db_path or DEFAULT_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    return create_engine(f"sqlite:///{path}")
+    engine = create_engine(f"sqlite:///{path}")
+    event.listen(engine, "connect", _set_sqlite_pragma)
+    return engine
 
 
 def _ensure_product_columns(engine) -> None:

@@ -4,7 +4,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useLanguage } from '../lib/LanguageContext'
 import { LanguageDropdown } from './LanguageDropdown'
 import { PasswordInput } from './PasswordInput'
-import sqbMark from '../assets/bank-logos/sqb.svg'
+import sqbMark from '../assets/bank-logos/sqb2.svg'
 
 export function LoginPage() {
   const { login } = useAuth()
