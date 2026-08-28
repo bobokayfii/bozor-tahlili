@@ -14,9 +14,11 @@ BDB, Trastbank, Davr Bank, OFB (Orient Finans Bank), Anorbank, Uzum Bank, AVO Ba
 ## 2. Qamrov
 
 **Kiradi (bu hujjat):**
-- 3 ta pilot bank uchun scraper: **Anorbank**, **Octobank**, **Asia Alliance Bank** (aab.uz)
+- 3 ta pilot bank uchun scraper: **Anorbank**, **Garant bank** (garantbank.uz), **Asia Alliance Bank** (aab.uz)
 - Har biri uchun fixture-asoslangan testlar
 - `registry.py`ga ro'yxatdan o'tkazish
+
+**Octobank haqida eslatma:** Dastlab pilotga Octobank kiritilgan edi, lekin tekshiruv shuni ko'rsatdiki, Octobankning barcha 3 ta retail kredit sahifasi (ikkala avtokredit va ipoteka) aniq summa chegarasini e'lon qilmaydi — "Cheklanmagan"/"Cheksiz kredit miqdori" reklama sifatida ishlatiladi, raqam yo'q. `Product.amount_max_som` maydoni majburiy (`int`, `None` bo'la olmaydi) bo'lgani uchun bunday sahifalar hozirgi arxitekturada har doim mahsulotsiz qoladi (Aloqabank avtokredit'dagi bilan bir xil holat). Foydalanuvchi bilan tasdiqlangan holda Octobank o'rniga **Garant bank** tanlandi — uning avtokredit va mikrozaym sahifalarida aniq summa (so'mda) mavjudligi tekshirildi.
 
 **Kirmaydi:**
 - Qolgan 15 ta bank (BDB, Trastbank, Davr Bank, OFB, AVO Bank, Garant bank, Poytaxt Bank, Universalbank, Apex Bank, Hayot Bank, Madad Invest Bank, KDB, Ziraat, Saderat) — keyingi bosqich(lar)ga qoldiriladi, bu hujjat ularni qamramaydi
@@ -30,9 +32,9 @@ Barcha uchala pilot bank server-rendered (JS bajarilishisiz to'liq HTML qaytarad
 
 | Bank | Tekshirilgan URL | Natija |
 |---|---|---|
-| Anorbank | `anorbank.uz/credits/` | 718 KB HTML, to'liq mahsulot ro'yxati matni bor |
-| Octobank | `octobank.uz/jismoniy-shaxslarga/kredity-i-mikrozaymy` | 128 KB HTML, to'liq mahsulot ro'yxati matni bor |
-| Asia Alliance Bank | `aab.uz/uz/` | 451 KB HTML, `/uz/private/crediting/` ostida ko'plab mahsulot sahifalari (overdraft, mikrozaym, avtokredit, ipoteka variantlari) |
+| Anorbank | `anorbank.uz/uz/credits/*` | Sayt navigatsiyasi `/uz/` ostida o'zbekcha, lekin CMS'dan olinadigan mahsulot matni (stavka/muddat/summa) baribir **ruscha (kirill)** — tekshirildi, hech qanday o'zbekcha-lotin muqobili yo'q |
+| Garant bank | `garantbank.uz/uz/avtokredit-Yengil`, `.../mikrozajm-onlajn` | To'liq o'zbekcha-lotin, aniq "Ko'rsatkich/Qiymati" jadvali, aniq summa (so'mda) mavjud |
+| Asia Alliance Bank | `aab.uz/uz/` | 451 KB HTML, `/uz/private/crediting/` ostida ko'plab mahsulot sahifalari (overdraft, mikrozaym, avtokredit, ipoteka variantlari), umumiy "Umumiy shartlar" shabloni bilan |
 
 Har uchala bankda ham har bir mahsulot turi (avtokredit, mikrozaym, ipoteka va h.k.) odatda **alohida sahifada** joylashgan — bosh "kredit" sahifasi faqat kartochkalar ro'yxati, batafsil stavka/muddat/summa jadvali har bir mahsulotning o'z sahifasida. Bu aynan Aloqabank/Asia Alliance kabi banklar uchun mavjud `CATEGORY_URLS` naqshiga mos keladi (bitta umumiy sahifa emas, kategoriya→URL xaritasi).
 
