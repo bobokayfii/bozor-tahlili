@@ -149,9 +149,12 @@ export function MarketPulse({ category, products }: MarketPulseProps) {
           <span className="pulse-ai-badge">
             <img src={robotIcon} alt={t('pulseAiBadge')} className="pulse-ai-badge-icon" />
           </span>
-          {isAiLoading && <span className="pulse-ai-text pulse-ai-text-muted">{t('pulseAiLoading')}</span>}
-          {!isAiLoading && aiError && <span className="pulse-ai-text pulse-ai-text-muted">{aiError}</span>}
-          {!isAiLoading && !aiError && aiText && <span className="pulse-ai-text">{aiText}</span>}
+          <div className="pulse-ai-body">
+            <span className="pulse-ai-label">{t('pulseAiLabel')}</span>
+            {isAiLoading && <span className="pulse-ai-text pulse-ai-text-muted">{t('pulseAiLoading')}</span>}
+            {!isAiLoading && aiError && <span className="pulse-ai-text pulse-ai-text-muted">{aiError}</span>}
+            {!isAiLoading && !aiError && aiText && <span className="pulse-ai-text">{aiText}</span>}
+          </div>
         </div>
       </div>
     </section>

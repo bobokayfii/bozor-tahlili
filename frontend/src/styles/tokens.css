@@ -931,17 +931,20 @@ button {
   color: var(--ink-faint);
 }
 
-/* AI izohi — endi "Bozor pulsi" kartochkasidagi AYNAN o'sha bank haqidagi
-   1-2 jumlali qisqa qayd, alohida katta quticha emas — shu bank bilan
-   vizual va mantiqiy bog'lab turish uchun featured karta ichida, kichik
-   nishoncha + inline matn sifatida chiqadi. */
+/* AI izohi — "Bozor pulsi" kartochkasidagi AYNAN o'sha bank haqidagi 1-2
+   jumlali qisqa qayd. AI tomonidan yaratilganini faqat shrift bilan emas
+   — rangli fon, ajratilgan nishon doirasi va "AI" yorlig'i bilan ham bir
+   qarashda bildirish uchun butun blok o'z rangli paneli sifatida ajratib
+   qo'yiladi (oddiy stat kartochkalaridan farqli o'laroq). */
 .pulse-ai-note {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 12px;
   margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--house-soft) 0%, var(--paper-card) 100%);
+  border: 1px solid rgba(28, 134, 214, 0.18);
 }
 
 .pulse-ai-badge {
@@ -949,61 +952,54 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 2px 6px rgba(12, 33, 55, 0.1);
 }
 
 .pulse-ai-badge-icon {
-  width: 46px;
+  width: 22px;
   height: auto;
   object-fit: contain;
+}
+
+.pulse-ai-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pulse-ai-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--house);
+}
+
+.pulse-ai-label::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--house);
+  flex-shrink: 0;
 }
 
 .pulse-ai-text {
   font-size: 12.5px;
   line-height: 1.55;
-  color: var(--ink-soft);
+  color: var(--ink);
 }
 
 .pulse-ai-text-muted {
   color: var(--ink-faint);
-}
-
-.market-pulse-insight {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
-  border-radius: var(--radius);
-  background: var(--paper-card);
-  border: 1px solid var(--line);
-}
-
-.market-pulse-insight-badge {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, var(--house-soft) 0%, var(--paper-sunk) 72%);
-  color: var(--house);
-  box-shadow:
-    inset 0 0 0 1px rgba(28, 134, 214, 0.14),
-    0 2px 6px rgba(20, 22, 31, 0.06);
-}
-
-.market-pulse-insight-badge svg {
-  width: 20px;
-  height: 20px;
-}
-
-.market-pulse-insight-text {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--ink-soft);
 }
 
 /* ---------- Rate board (the signature element) ---------- */

@@ -18,6 +18,17 @@ def test_list_products_returns_seeded_row(client):
     assert data[0]["bank"] == "SQB"
 
 
+def test_list_products_scraped_at_is_timezone_aware(client):
+    # A naive isoformat() string (no "Z"/offset) is parsed as LOCAL time by
+    # every browser's Date(), silently shifting the displayed "updated at"
+    # time by the viewer's UTC offset. scraped_at is always written as UTC
+    # (see scrapers/base.py), so the response must say so explicitly.
+    response = client.get("/products", params={"category": "mikroqarz"})
+    assert response.status_code == 200
+    scraped_at = response.json()[0]["scraped_at"]
+    assert scraped_at.endswith("+00:00") or scraped_at.endswith("Z")
+
+
 def test_list_products_returns_only_latest_scrape_per_bank_category(client):
     with api_main.SessionLocal() as session:
         session.add(ProductRow(
