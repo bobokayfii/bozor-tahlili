@@ -2,3 +2,12 @@
   base = "frontend"
   command = "npm run build"
   publish = "dist"
+
+# react-router-dom uses client-side routes (/login, /admin, /avtokredit, ...)
+# that don't exist as real files. Without this, Netlify's static server 404s
+# on a direct visit or refresh of any route but "/" - every path must fall
+# back to index.html so the SPA's own router can take over.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
