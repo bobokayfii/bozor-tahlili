@@ -48,7 +48,7 @@ describe('getProductColumns', () => {
   it('renders down payment percentage or a dash when absent', () => {
     const [downPayment] = getProductColumns('credit_down_payment')
     expect(downPayment.render(baseProduct)).toBe('30%')
-    expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('—')
+    expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('-')
   })
 
   it('renders grace period as Bor/Yo\'q, falling back to Yo\'q when unknown', () => {
@@ -71,7 +71,7 @@ describe('getProductColumns', () => {
     expect(specialTerms.render({ ...baseProduct, special_terms: 'Kredit yuklamasi hisobga olinadi' })).toBe(
       'Kredit yuklamasi hisobga olinadi',
     )
-    expect(specialTerms.render({ ...baseProduct, special_terms: null })).toBe('—')
+    expect(specialTerms.render({ ...baseProduct, special_terms: null })).toBe('-')
   })
 
   it('renders payment method, falling back to "Annuitet, Differensial" when absent', () => {
@@ -109,6 +109,6 @@ describe('getProductColumns', () => {
       'Аннуитет, Дифференцированный',
     )
     expect(paymentMethod.render({ ...baseProduct, payment_method: null })).toBe('Аннуитет, Дифференцированный')
-    expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('—')
+    expect(downPayment.render({ ...baseProduct, down_payment_pct: null })).toBe('-')
   })
 })

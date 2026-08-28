@@ -13,6 +13,19 @@ interface SidebarProps {
   onSelectAdmin?: () => void
 }
 
+// "SQB AI" always appears verbatim inside poweredByLabel (uz/ru), regardless
+// of word order, so it can be highlighted without a separate translation key.
+function poweredByParts(label: string) {
+  const [before, after] = label.split('SQB AI')
+  return (
+    <>
+      {before}
+      <strong>SQB AI</strong>
+      {after}
+    </>
+  )
+}
+
 function GroupIcon({ group }: { group: CategoryGroup }) {
   const maskImage = `url(${group.icon})`
   return (
@@ -159,7 +172,9 @@ export function Sidebar({
           </ul>
         </div>
       )}
-      <div className="sidebar-foot">{t('sidebarFooter')}</div>
+      <div className="sidebar-foot">
+        <span className="sidebar-powered-by">{poweredByParts(t('poweredByLabel'))}</span>
+      </div>
     </nav>
   )
 }

@@ -120,5 +120,5 @@ export function getCategoryHeading(categoryKey: string, fallbackLabel: string, l
   if (!group) return fallbackLabel
   const label = groupLabel(group, lang)
   const shortLabel = groupShortLabel(group, categoryKey, lang)
-  return shortLabel ? `${label} — ${shortLabel}` : label
+  return shortLabel ? `${label} - ${shortLabel}` : label
 }

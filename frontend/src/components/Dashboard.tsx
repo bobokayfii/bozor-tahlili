@@ -6,7 +6,7 @@ import { AdminPanel } from './AdminPanel'
 import { ExportMenu } from './ExportMenu'
 import { RefreshDataButton } from './RefreshDataButton'
 import { LanguageDropdown } from './LanguageDropdown'
-import { DashboardIcon, LogoutIcon } from './icons'
+import { LogoutIcon } from './icons'
 import { fetchCategories } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
 import { useAuth } from '../lib/AuthContext'
@@ -60,16 +60,9 @@ export function Dashboard({ user }: DashboardProps) {
           )}
           <LanguageDropdown />
           <div className="app-topbar-user">
-            {user.role === 'admin' && !isAdminView && (
-              <button type="button" className="dashboard-btn" onClick={handleSelectAdmin}>
-                <DashboardIcon />
-                {t('dashboardButton')}
-              </button>
-            )}
             <span className="app-topbar-username">{user.username}</span>
-            <button type="button" className="logout-btn" onClick={logout}>
+            <button type="button" className="app-topbar-logout-btn" onClick={logout} aria-label={t('logoutButton')}>
               <LogoutIcon />
-              {t('logoutButton')}
             </button>
           </div>
         </div>

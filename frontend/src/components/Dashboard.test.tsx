@@ -41,36 +41,10 @@ function renderDashboard(role: 'admin' | 'user', initialPath = '/') {
 }
 
 describe('Dashboard', () => {
-  it('does not show the Dashboard button for a regular user', async () => {
-    mockedFetchCategories.mockResolvedValue(categories)
-    renderDashboard('user')
-    expect(await screen.findByText('Avtokredit')).toBeInTheDocument()
-    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
-  })
-
-  it('shows the Dashboard button for an admin user', async () => {
-    mockedFetchCategories.mockResolvedValue(categories)
-    renderDashboard('admin')
-    expect(await screen.findByText('Avtokredit')).toBeInTheDocument()
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-  })
-
   it('redirects to the first category at the root path once categories load', async () => {
     mockedFetchCategories.mockResolvedValue(categories)
     renderDashboard('user', '/')
     expect(await screen.findByText('Avtokredit')).toBeInTheDocument()
-  })
-
-  it('navigates to the admin panel when the Dashboard button is clicked', async () => {
-    mockedFetchCategories.mockResolvedValue(categories)
-    mockedFetchUsers.mockResolvedValue([
-      { id: 1, username: 'admin', role: 'admin', created_at: '2026-01-01T00:00:00Z' },
-    ])
-    renderDashboard('admin')
-
-    await userEvent.click(await screen.findByText('Dashboard'))
-
-    expect(await screen.findByText('Foydalanuvchilarni boshqarish')).toBeInTheDocument()
   })
 
   it('redirects a non-admin user away from /admin back to the first category', async () => {

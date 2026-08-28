@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { MarketPulse } from './MarketPulse'
 import { ProductTable } from './ProductTable'
+import { ClockIcon } from './icons'
 import { fetchProducts, fetchUnavailableBanks } from '../lib/api'
 import { getCategoryHeading } from '../lib/categoryGroups'
 import { useLanguage } from '../lib/LanguageContext'
@@ -75,15 +76,15 @@ export function CategoryPage({ categories }: CategoryPageProps) {
           <h1>{activeLabel}</h1>
           <p className="page-subtitle">{t('pageSubtitle')}</p>
         </div>
+        {lastUpdated && (
+          <span className="page-updated">
+            <ClockIcon />
+            {t('pulseUpdated')}: {formatUpdatedAt(lastUpdated, lang)}
+          </span>
+        )}
       </div>
       {error && <p className="error-state">{error}</p>}
-      {!isLoading && (
-        <MarketPulse
-          category={categoryKey ?? null}
-          products={products}
-          updatedLabel={lastUpdated && formatUpdatedAt(lastUpdated, lang)}
-        />
-      )}
+      {!isLoading && <MarketPulse category={categoryKey ?? null} products={products} />}
       <ProductTable
         products={products}
         isLoading={isLoading}

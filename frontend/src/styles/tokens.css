@@ -1,21 +1,35 @@
 :root {
-  /* Surfaces — everything light */
+  /* Canvas — the page itself is a tinted cool-blue surface; every
+     interactive block (topbar, sidebar, tables, cards, modals) is an
+     explicit --paper/--paper-card white "panel" floating on it. This
+     layered look (and the palette below) is deliberately matched to
+     https://bis-proto.vercel.app/ per direct request — see the design
+     doc for the extracted reference values (page bg, ink, accent, font). */
+  --canvas: #e9eef5;
   --paper: #ffffff;
-  --paper-sunk: #f6f7fa;
-  --paper-card: #fbfbfd;
-  --ink: #14161f;
-  --ink-soft: #6b7080;
-  --ink-faint: #9ca0ae;
-  --line: #e7e8ee;
-  --line-strong: #d7d9e2;
+  --paper-sunk: #f3f5fa;
+  --paper-card: #fdfdfe;
+  --ink: #0c2137;
+  --ink-soft: #5a7590;
+  --ink-faint: #93a5b8;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
 
-  /* Signal colors — sourced from the SQB mark, each one carries a specific meaning, never decorative */
+  /* Signal colors — cheapest-rate red is unrelated to brand, kept as-is */
   --signal: #d70b0e;
   /* cheapest rate in view — reserved for that meaning only */
   --signal-soft: #fdecec;
-  --house: #00355f;
-  /* rows belonging to SQB (our bank) — also the site's primary brand color */
-  --house-soft: #e8eef3;
+  /* Primary accent — matches the reference site's CTA blue. Drives every
+     interactive surface (buttons, active states, focus, links) AND still
+     marks "this is SQB's own row" in the comparison tables — those two
+     meanings were already the same token before this palette, so nothing
+     new is being conflated here. */
+  --house: #1c86d6;
+  --house-soft: #e5f2fc;
+  /* The original SQB navy — kept only for the wordmark text, which reads as
+     the literal brand name and should stay tied to the bank's own color
+     rather than the newer interactive accent above. */
+  --brand-navy: #00355f;
   --negative: #c0392b;
   /* Status "good" — a low interest rate is GOOD NEWS for the borrower, so it
      is marked with a reserved green, never the alarm-red --signal (which
@@ -29,15 +43,24 @@
   --warning: #b7791f;
   --warning-soft: #fbf1de;
 
-  /* Brand — SQB navy, drives chrome: nav, buttons, focus */
-  --brand: #00355f;
+  /* Brand — single source of truth is --house; kept as its own token since
+     a few rules (focus ring, sidebar active accent) predate --house and
+     read more clearly under a "brand" name. */
+  --brand: var(--house);
 
-  --font: 'Inter', system-ui, sans-serif;
+  --font: 'Manrope', system-ui, sans-serif;
 
-  --radius: 10px;
+  --radius: 14px;
   /* Sidebar sticky-scroll pastki hisoblari shu qiymatga tayanadi — topbar
      balandligi o'zgarsa, shu yerni yangilang. */
   --topbar-height: 66px;
+
+  /* Motion — bitta izchil "his" uchun butun sayt bo'ylab shu ikkitasi
+     ishlatiladi: chiqish/kirish uchun ease-out, oddiy holat almashinuvi
+     uchun ease. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
 }
 
 * {
@@ -48,7 +71,7 @@ body {
   margin: 0;
   font-family: var(--font);
   color: var(--ink);
-  background: var(--paper);
+  background: var(--canvas);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -60,6 +83,46 @@ button {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Interaktiv "pill" tugmalar (refresh, export, til, chiqish, modal, admin
+   amallari) — bitta joyda umumiy hover/bosish fidbeki, aks holda rang
+   almashinuvi sakrab o'zgaradi va tugma "o'lik" ko'rinadi. */
+.export-btn,
+.refresh-btn,
+.lang-dropdown-btn,
+.app-topbar-logout-btn,
+.modal-btn,
+.admin-add-btn,
+.admin-edit-btn {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
+}
+
+.export-btn:hover,
+.refresh-btn:hover:not(:disabled),
+.lang-dropdown-btn:hover,
+.app-topbar-logout-btn:hover,
+.modal-btn:hover,
+.admin-add-btn:hover,
+.admin-edit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(12, 33, 55, 0.08);
+}
+
+.export-btn:active,
+.refresh-btn:active:not(:disabled),
+.lang-dropdown-btn:active,
+.app-topbar-logout-btn:active,
+.modal-btn:active,
+.admin-add-btn:active,
+.admin-edit-btn:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
 }
 
 .main-content {
@@ -96,6 +159,7 @@ button {
   z-index: 30;
   border-bottom: 1px solid var(--line);
   background: var(--paper);
+  box-shadow: 0 2px 12px rgba(12, 33, 55, 0.04);
 }
 
 .app-topbar-actions {
@@ -103,6 +167,40 @@ button {
   align-items: center;
   gap: 12px;
   margin-right: 24px;
+}
+
+.app-topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+.app-topbar-username {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.app-topbar-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.app-topbar-logout-btn:hover {
+  border-color: var(--negative);
+  color: var(--negative);
 }
 
 .export-menu {
@@ -151,6 +249,19 @@ button {
   box-shadow: 0 8px 24px rgba(20, 22, 31, 0.12);
   padding: 6px;
   z-index: 40;
+  transform-origin: top right;
+  animation: dropdown-in var(--duration-fast) var(--ease-out) backwards;
+}
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .export-menu-item {
@@ -165,6 +276,7 @@ button {
   font-family: var(--font);
   width: 100%;
   text-align: left;
+  transition: background-color var(--duration-fast) ease;
 }
 
 .export-menu-item:hover {
@@ -204,6 +316,7 @@ button {
   justify-content: center;
   z-index: 100;
   padding: 16px;
+  animation: overlay-in var(--duration-fast) ease backwards;
 }
 
 .modal-card {
@@ -213,6 +326,27 @@ button {
   border-radius: var(--radius);
   padding: 24px;
   box-shadow: 0 20px 48px rgba(20, 22, 31, 0.24);
+  animation: modal-in var(--duration-base) var(--ease-out) backwards;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .modal-title {
@@ -277,6 +411,18 @@ button {
   font-size: 13px;
   line-height: 1.5;
   box-shadow: 0 8px 24px rgba(20, 22, 31, 0.14);
+  animation: toast-in var(--duration-base) var(--ease-out) backwards;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .refresh-status-success {
@@ -346,6 +492,8 @@ button {
   box-shadow: 0 8px 24px rgba(20, 22, 31, 0.12);
   padding: 6px;
   z-index: 40;
+  transform-origin: top right;
+  animation: dropdown-in var(--duration-fast) var(--ease-out) backwards;
 }
 
 .lang-dropdown-item {
@@ -360,6 +508,7 @@ button {
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
 }
 
 .lang-flag-icon {
@@ -404,7 +553,7 @@ button {
   font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: var(--house);
+  color: var(--brand-navy);
   white-space: nowrap;
 }
 
@@ -424,10 +573,14 @@ button {
   top: var(--topbar-height);
   height: calc(100vh - var(--topbar-height));
   overflow-y: auto;
-  background: var(--paper-sunk);
+  background: var(--paper);
   border-right: 1px solid var(--line);
   color: var(--ink);
-  padding: 20px 0;
+  /* Pastda padding yo'q — .sidebar-foot o'z ichki padding'i (16px) bilan
+     pastki bo'shliqni o'zi boshqaradi; ikkalasi qo'shilib ketsa, matn
+     tepasidan (faqat sidebar-foot padding'i) va pastidan (bu + sidebar
+     padding'i) bo'shliq notekis bo'lib qolar edi. */
+  padding: 20px 0 0;
   display: flex;
   flex-direction: column;
 }
@@ -463,7 +616,7 @@ button {
   font-size: 13.5px;
   line-height: 1.35;
   cursor: pointer;
-  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 
 .sidebar-item:hover {
@@ -572,12 +725,23 @@ button {
 
 .sidebar-foot {
   margin-top: auto;
-  padding: 16px 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 22px;
   border-top: 1px solid var(--line);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+}
+
+.sidebar-powered-by {
+  font-size: 11px;
+  letter-spacing: 0.01em;
   color: var(--ink-faint);
+  text-align: center;
+}
+
+.sidebar-powered-by strong {
+  font-weight: 700;
+  color: var(--brand-navy);
 }
 
 /* ---------- Main content ---------- */
@@ -611,9 +775,25 @@ button {
   margin: 0;
 }
 
+.page-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
 /* ---------- Market pulse (dashboard signature element) ---------- */
 
 .market-pulse {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -623,7 +803,21 @@ button {
   background: var(--paper-card);
   border: 1px solid var(--line);
   color: var(--ink);
+  box-shadow: 0 1px 2px rgba(12, 33, 55, 0.04), 0 16px 32px -12px rgba(12, 33, 55, 0.14);
   animation: content-in 280ms ease backwards;
+}
+
+/* Bosh sahifadagi "hero" kartochka ekanini gradient chiziq bilan ajratib
+   turadi — boshqa oddiy kartochkalardan (masalan .pulse-stat) vizual
+   ustuvorligini ta'kidlaydi. */
+.market-pulse::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--house) 0%, #7cc3ef 100%);
 }
 
 .market-pulse-eyebrow {
@@ -632,17 +826,6 @@ button {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-faint);
-}
-
-.market-pulse-rank {
-  margin: 14px 0 0;
-  font-size: 12.5px;
-  color: var(--ink-soft);
-}
-
-.market-pulse-rank strong {
-  color: var(--ink);
-  font-weight: 700;
 }
 
 /* Eng zo'r taklif — bitta aniq mahsulotni bank logotipi, nomi va asosiy
@@ -702,14 +885,25 @@ button {
 .pulse-featured-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 22px;
+  gap: 10px;
   flex: 1;
 }
 
 .pulse-stat {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--paper-sunk);
+  border: 1px solid var(--line);
+  min-width: 96px;
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) ease;
+}
+
+.pulse-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(12, 33, 55, 0.08);
 }
 
 .pulse-stat-value {
@@ -718,6 +912,11 @@ button {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.pulse-stat-rate {
+  background: var(--good-soft);
+  border-color: transparent;
 }
 
 .pulse-stat-rate .pulse-stat-value {
@@ -750,13 +949,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, var(--house-soft) 0%, var(--paper-sunk) 72%);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 53, 95, 0.1),
-    0 2px 6px rgba(20, 22, 31, 0.06);
+  width: 46px;
+  height: 46px;
 }
 
 .pulse-ai-badge-icon {
@@ -776,55 +970,46 @@ button {
 }
 
 .market-pulse-insight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+}
+
+.market-pulse-insight-badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, var(--house-soft) 0%, var(--paper-sunk) 72%);
+  color: var(--house);
+  box-shadow:
+    inset 0 0 0 1px rgba(28, 134, 214, 0.14),
+    0 2px 6px rgba(20, 22, 31, 0.06);
+}
+
+.market-pulse-insight-badge svg {
+  width: 20px;
+  height: 20px;
+}
+
+.market-pulse-insight-text {
   margin: 0;
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--ink-soft);
 }
 
-.market-pulse-meta {
-  display: flex;
-  gap: 20px;
-}
-
-.meta-chip {
-  text-align: left;
-  padding-left: 0;
-  padding-right: 16px;
-  border-left: none;
-  border-right: 1px solid var(--line);
-}
-
-.meta-chip:last-child {
-  border-right: none;
-  padding-right: 0;
-}
-
-.meta-chip-value {
-  display: block;
-  font-weight: 700;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-  color: var(--ink);
-}
-
-.meta-chip-time {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.meta-chip-label {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-
 /* ---------- Rate board (the signature element) ---------- */
 
 .rate-board {
+  background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
@@ -973,7 +1158,17 @@ button {
   height: 100%;
   border-radius: 2px;
   background: var(--ink-faint);
-  transition: width 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  width: var(--fill, 0%);
+  animation: rate-bar-in 560ms var(--ease-out) backwards;
+}
+
+@keyframes rate-bar-in {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--fill, 0%);
+  }
 }
 
 .rate-row.is-best .rate-bar-fill {
@@ -1102,12 +1297,6 @@ button {
     padding: 22px 20px;
   }
 
-  .pulse-featured-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
   .pulse-featured-body {
     flex-direction: column;
     align-items: flex-start;
@@ -1116,25 +1305,19 @@ button {
   .pulse-featured-stats {
     row-gap: 14px;
   }
-
-  .market-pulse-meta {
-    justify-content: flex-start;
-  }
 }
 
+/* Butun sayt bo'ylab qo'shilgan har qanday animatsiya/transition shu yerda
+   bitta joyda o'chiriladi — yangi effekt qo'shilganda bu ro'yxatni
+   yangilashni unutish xavfi yo'q. */
 @media (prefers-reduced-motion: reduce) {
-  .main-content,
-  .sidebar-submenu,
-  .market-pulse,
-  .skeleton {
-    animation: none;
-  }
-
-  .rate-bar-fill,
-  .sidebar-item,
-  .sidebar-subitem,
-  .chevron {
-    transition: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -1153,7 +1336,7 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--paper);
+  background: var(--canvas);
 }
 
 .auth-topbar {
@@ -1171,7 +1354,7 @@ button {
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: var(--house);
+  color: var(--brand-navy);
 }
 
 .auth-center {
@@ -1247,20 +1430,6 @@ button {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .auth-mark,
-  .auth-rule,
-  .auth-card h1,
-  .auth-card form,
-  .auth-footer {
-    animation: none;
-    width: auto;
-  }
-  .auth-rule {
-    width: 48px;
-  }
-}
-
 .auth-submit {
   width: 100%;
   padding: 12px;
@@ -1300,12 +1469,6 @@ button {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .auth-spinner {
-    animation: none;
-  }
-}
-
 .form-field {
   display: flex;
   flex-direction: column;
@@ -1328,6 +1491,7 @@ button {
   font-family: var(--font);
   color: var(--ink);
   background: var(--paper);
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .form-field input:focus-visible,
@@ -1368,6 +1532,7 @@ button {
   border-radius: 6px;
   color: var(--ink-faint);
   cursor: pointer;
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .password-toggle-btn:hover {
@@ -1457,53 +1622,3 @@ button {
   color: var(--house);
 }
 
-.app-topbar-user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 10px;
-  border-left: 1px solid var(--line);
-}
-
-.app-topbar-username {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-
-.dashboard-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--house);
-  background: var(--house);
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.dashboard-btn:hover {
-  background: #012544;
-}
-
-.logout-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong);
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.logout-btn:hover {
-  border-color: var(--negative);
-  color: var(--negative);
-}
