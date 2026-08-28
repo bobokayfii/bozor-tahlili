@@ -1,9 +1,17 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { ExportMenu } from './ExportMenu'
 import { LanguageProvider } from '../lib/LanguageContext'
+import { downloadFile } from '../lib/api'
+
+vi.mock('../lib/api', async () => {
+  const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
+  return { ...actual, downloadFile: vi.fn() }
+})
+
+const mockedDownloadFile = vi.mocked(downloadFile)
 
 function renderWithLanguage(ui: ReactElement) {
   return render(<LanguageProvider>{ui}</LanguageProvider>)
@@ -21,22 +29,27 @@ describe('ExportMenu', () => {
     expect(screen.queryByText('Joriy sahifani yuklash')).not.toBeInTheDocument()
   })
 
-  it('opens the menu with both options, linking to the correct URLs', async () => {
+  it('downloads the current category as an authenticated file when clicked', async () => {
     renderWithLanguage(<ExportMenu category="avtokredit" />)
 
     await userEvent.click(screen.getByText("Excel'ga yuklash"))
+    await userEvent.click(screen.getByText('Joriy sahifani yuklash'))
 
-    const currentPageLink = screen.getByText('Joriy sahifani yuklash')
-    const allCategoriesLink = screen.getByText('Barcha kategoriyalarni yuklash')
-    expect(currentPageLink).toBeInTheDocument()
-    expect(allCategoriesLink).toBeInTheDocument()
-    expect(currentPageLink.closest('a')).toHaveAttribute(
-      'href',
+    expect(mockedDownloadFile).toHaveBeenCalledWith(
       'http://localhost:8000/export-excel?category=avtokredit&language=uz',
+      'avtokredit.xlsx',
     )
-    expect(allCategoriesLink.closest('a')).toHaveAttribute(
-      'href',
+  })
+
+  it('downloads all categories as an authenticated file when clicked', async () => {
+    renderWithLanguage(<ExportMenu category="avtokredit" />)
+
+    await userEvent.click(screen.getByText("Excel'ga yuklash"))
+    await userEvent.click(screen.getByText('Barcha kategoriyalarni yuklash'))
+
+    expect(mockedDownloadFile).toHaveBeenCalledWith(
       'http://localhost:8000/export-excel-all?language=uz',
+      'bozor-tahlili-barcha-kategoriyalar.xlsx',
     )
   })
 

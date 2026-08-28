@@ -59,7 +59,7 @@ describe('MarketPulse featured card + AI note', () => {
   it('features the same product the table would rank first (lowest rate_min)', () => {
     mockedFetchProductExplanation.mockResolvedValue({ explanation: 'NBU past stavka bilan ajralib turadi.' })
 
-    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} />)
 
     // NBU has the lowest rate_min (20.9 vs SQB's 24.9), so it must be featured —
     // matching ProductTable's own `sort((a, b) => a.rate_min - b.rate_min)`.
@@ -68,10 +68,20 @@ describe('MarketPulse featured card + AI note', () => {
     expect(screen.queryByText('SQB Mikroqarz')).not.toBeInTheDocument()
   })
 
+  it('replaces em/en dashes in the AI explanation with a plain hyphen', async () => {
+    mockedFetchProductExplanation.mockResolvedValue({
+      explanation: 'HamkorBank — Auto DAMAS 13–60 oy muddatga beriladi.',
+    })
+
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} />)
+
+    expect(await screen.findByText('HamkorBank - Auto DAMAS 13-60 oy muddatga beriladi.')).toBeInTheDocument()
+  })
+
   it("requests the AI note for exactly the featured product's own fields, not a separately-ranked pick", async () => {
     mockedFetchProductExplanation.mockResolvedValue({ explanation: 'NBU past stavka bilan ajralib turadi.' })
 
-    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} />)
 
     await screen.findByText('NBU past stavka bilan ajralib turadi.')
 
@@ -93,7 +103,7 @@ describe('MarketPulse featured card + AI note', () => {
   it('shows an error message instead of the stale "tez orada" placeholder when the request fails', async () => {
     mockedFetchProductExplanation.mockRejectedValue(new Error("AI izohini olib bo'lmadi: 500"))
 
-    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} />)
 
     expect(await screen.findByText("AI izohini olib bo'lmadi: 500")).toBeInTheDocument()
     expect(screen.queryByText(/tez orada/i)).not.toBeInTheDocument()
@@ -103,7 +113,7 @@ describe('MarketPulse featured card + AI note', () => {
     window.localStorage.setItem('bozor-tahlili-lang', 'ru')
     mockedFetchProductExplanation.mockResolvedValue({ explanation: 'NBU выделяется низкой ставкой.' })
 
-    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} updatedLabel={null} />)
+    renderWithLanguage(<MarketPulse category="mikroqarz" products={products} />)
 
     await screen.findByText('NBU выделяется низкой ставкой.')
 

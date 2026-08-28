@@ -77,6 +77,36 @@ $env:OPENAI_API_KEY = "sk-..."
 export OPENAI_API_KEY=sk-...
 ```
 
+`AUTH_SECRET_KEY` muhit o'zgaruvchisini o'rnating (JWT tokenlarni imzolash
+uchun majburiy — bo'lmasa backend `RuntimeError` bilan ishga tushmaydi; uzun,
+tasodifiy satr bo'lishi kerak, masalan
+`python -c "import secrets; print(secrets.token_hex(32))"` orqali
+generatsiya qiling). Birinchi marta ishga tushirishda `ADMIN_USERNAME` va
+`ADMIN_PASSWORD`ni ham o'rnating — `users` jadvali bo'sh bo'lsa, ular orqali
+birinchi admin akkaunt avtomatik yaratiladi (keyinchalik bu ikkalasini
+o'chirib qo'yish mumkin):
+
+```cmd
+:: Windows cmd
+set AUTH_SECRET_KEY=your-long-random-secret
+set ADMIN_USERNAME=admin
+set ADMIN_PASSWORD=change-me
+```
+
+```powershell
+# Windows PowerShell
+$env:AUTH_SECRET_KEY = "your-long-random-secret"
+$env:ADMIN_USERNAME = "admin"
+$env:ADMIN_PASSWORD = "change-me"
+```
+
+```bash
+# Unix/macOS
+export AUTH_SECRET_KEY=your-long-random-secret
+export ADMIN_USERNAME=admin
+export ADMIN_PASSWORD=change-me
+```
+
 ## Testlarni ishga tushirish
 
 ```bash

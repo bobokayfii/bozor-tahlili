@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { Product, UnavailableBank } from '../lib/types'
 import { isHouseBank } from '../lib/bank'
 import { getBankLogo } from '../lib/bankLogos'
@@ -30,7 +31,7 @@ function formatTerm(product: Product, lang: Lang): string {
   const unit = translate(lang, 'monthUnit')
   return product.term_min_months === product.term_max_months
     ? `${product.term_min_months} ${unit}`
-    : `${product.term_min_months}–${product.term_max_months} ${unit}`
+    : `${product.term_min_months}-${product.term_max_months} ${unit}`
 }
 
 // Reyting/muddat kabi sobit ustunlar har doim bir xil nisbatda qoladi;
@@ -137,10 +138,18 @@ export function ProductTable({ products, isLoading = false, schema, category, un
               <span className="rate-figure-value">
                 {product.rate_min === product.rate_max
                   ? `${product.rate_min}%`
-                  : `${product.rate_min}% – ${product.rate_max}%`}
+                  : `${product.rate_min}% - ${product.rate_max}%`}
               </span>
               <span className="rate-bar-track">
-                <span className="rate-bar-fill" style={{ width: `${fillPct}%` }} />
+                <span
+                  className="rate-bar-fill"
+                  style={
+                    {
+                      '--fill': `${fillPct}%`,
+                      animationDelay: `${Math.min(index * 30, 300)}ms`,
+                    } as CSSProperties
+                  }
+                />
               </span>
             </span>
             <span className="rate-term">{formatTerm(product, lang)}</span>
@@ -158,7 +167,7 @@ export function ProductTable({ products, isLoading = false, schema, category, un
       {unavailableBanks.map((item) => (
         <div className="rate-row rate-row-unavailable" key={item.bank} style={gridStyle}>
           <span className="rate-rank" aria-hidden="true">
-            —
+            -
           </span>
           <span className="rate-bank">
             {getBankLogo(item.bank) && <img src={getBankLogo(item.bank)} alt="" className="rate-bank-logo" />}

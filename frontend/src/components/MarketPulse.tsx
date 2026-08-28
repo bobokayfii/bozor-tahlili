@@ -11,7 +11,6 @@ import robotIcon from '../assets/icons/robot_icon_badge.png'
 interface MarketPulseProps {
   category: string | null
   products: Product[]
-  updatedLabel: string | null
 }
 
 // Jadval ham (ProductTable) aynan shu tartibda saralaydi: eng past
@@ -22,20 +21,11 @@ function pickFeatured(products: Product[]): Product {
   return [...products].sort((a, b) => a.rate_min - b.rate_min)[0]
 }
 
-interface BankRate {
-  bank: string
-  rate: number
-}
-
-function cheapestPerBank(products: Product[]): BankRate[] {
-  const best = new Map<string, number>()
-  for (const product of products) {
-    const current = best.get(product.bank)
-    if (current === undefined || product.rate_min < current) {
-      best.set(product.bank, product.rate_min)
-    }
-  }
-  return [...best.entries()].map(([bank, rate]) => ({ bank, rate })).sort((a, b) => a.rate - b.rate)
+// AI javobi backend/LLM tomonidan erkin matn sifatida kelgani uchun uzun
+// tire (—/–) ishlatib qo'yishi mumkin — saytda faqat oddiy tire ko'rinishi
+// uchun bu yerda tozalanadi.
+function normalizeDashes(text: string): string {
+  return text.replace(/[—–]/g, '-')
 }
 
 function formatRate(rate: number): string {
@@ -45,62 +35,17 @@ function formatRate(rate: number): string {
 function formatRateRange(product: Product): string {
   return product.rate_min === product.rate_max
     ? formatRate(product.rate_min)
-    : `${formatRate(product.rate_min)} – ${formatRate(product.rate_max)}`
+    : `${formatRate(product.rate_min)} - ${formatRate(product.rate_max)}`
 }
 
 function formatTermRange(product: Product, lang: Lang): string {
   const unit = translate(lang, 'monthUnit')
   return product.term_min_months === product.term_max_months
     ? `${product.term_min_months} ${unit}`
-    : `${product.term_min_months}–${product.term_max_months} ${unit}`
+    : `${product.term_min_months}-${product.term_max_months} ${unit}`
 }
 
-// Bozorni ikki qismga bo'lib tushuntiruvchi jumla quradi: eng past stavkada
-// nechta bank turibdi (barobar bo'lsa) va qolganlar qaysi oraliqda
-// raqobatlashmoqda. Sabab (masalan "dilerlik aksiyasi") taxmin qilinmaydi —
-// faqat ma'lumotning o'zidan kelib chiqadigan haqiqatlar aytiladi, chunki bu
-// matn har qanday kategoriya (avtokredit, mikroqarz va h.k.) uchun ishlaydi.
-function buildInsight(lang: Lang, bankRates: BankRate[], sqbRank: number): string {
-  const minRate = bankRates[0].rate
-  const tiedBest = bankRates.filter((entry) => entry.rate === minRate)
-  const rest = bankRates.filter((entry) => entry.rate > minRate)
-
-  if (lang === 'ru') {
-    const leadSentence =
-      tiedBest.length > 1
-        ? `${tiedBest.length} из ${bankRates.length} банков предлагают самую низкую ставку ${formatRate(minRate)}.`
-        : `Самую низкую ставку предлагает ${tiedBest[0].bank} — ${formatRate(minRate)}.`
-
-    const restSentence =
-      rest.length > 0
-        ? rest.length === 1
-          ? `Остался один банк со ставкой ${formatRate(rest[0].rate)}.`
-          : `Остальные ${rest.length} банков конкурируют в диапазоне ${formatRate(rest[0].rate)}–${formatRate(rest[rest.length - 1].rate)}.`
-        : ''
-
-    const rankSentence = sqbRank > 0 ? `SQB — ${sqbRank}-е место из ${bankRates.length} банков.` : ''
-
-    return [leadSentence, restSentence, rankSentence].filter(Boolean).join(' ')
-  }
-
-  const leadSentence =
-    tiedBest.length > 1
-      ? `${bankRates.length} bankdan ${tiedBest.length} tasi eng past ${formatRate(minRate)} stavkani taklif qilmoqda.`
-      : `Eng past stavkani ${tiedBest[0].bank} — ${formatRate(minRate)} miqdorida taklif qilmoqda.`
-
-  const restSentence =
-    rest.length > 0
-      ? rest.length === 1
-        ? `Qolgan bitta bank ${formatRate(rest[0].rate)} stavkada turibdi.`
-        : `Qolgan ${rest.length} bank ${formatRate(rest[0].rate)}–${formatRate(rest[rest.length - 1].rate)} oralig'ida raqobatlashmoqda.`
-      : ''
-
-  const rankSentence = sqbRank > 0 ? `SQB — ${bankRates.length} bankdan ${sqbRank}-o'rinda.` : ''
-
-  return [leadSentence, restSentence, rankSentence].filter(Boolean).join(' ')
-}
-
-export function MarketPulse({ category, products, updatedLabel }: MarketPulseProps) {
+export function MarketPulse({ category, products }: MarketPulseProps) {
   const { lang, t } = useLanguage()
   const [aiText, setAiText] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
@@ -136,7 +81,7 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
     })
       .then((data) => {
         if (ignore) return
-        setAiText(data.explanation)
+        setAiText(normalizeDashes(data.explanation))
       })
       .catch((err) => {
         if (ignore) return
@@ -153,10 +98,6 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
 
   if (products.length === 0) return null
 
-  const bankRates = cheapestPerBank(products)
-  const sqbRank = bankRates.findIndex((entry) => isHouseBank(entry.bank)) + 1
-  const insight = buildInsight(lang, bankRates, sqbRank)
-
   const featured = pickFeatured(products)
   const featuredLogo = getBankLogo(featured.bank)
   const featuredIsHouse = isHouseBank(featured.bank)
@@ -166,18 +107,6 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
       <div className="pulse-featured">
         <div className="pulse-featured-head">
           <span className="market-pulse-eyebrow">{t('pulseEyebrow')}</span>
-          <div className="market-pulse-meta">
-            <div className="meta-chip">
-              <span className="meta-chip-value">{bankRates.length}</span>
-              <span className="meta-chip-label">{t('pulseBankCount')}</span>
-            </div>
-            {updatedLabel && (
-              <div className="meta-chip">
-                <span className="meta-chip-value meta-chip-time">{updatedLabel}</span>
-                <span className="meta-chip-label">{t('pulseUpdated')}</span>
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="pulse-featured-body">
@@ -216,20 +145,6 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
           </div>
         </div>
 
-        {sqbRank > 0 && (
-          <p className="market-pulse-rank">
-            {lang === 'ru' ? (
-              <>
-                SQB — <strong>{sqbRank}</strong>-е место из <strong>{bankRates.length}</strong> банков
-              </>
-            ) : (
-              <>
-                SQB — <strong>{bankRates.length}</strong> bankdan <strong>{sqbRank}</strong>-o'rinda
-              </>
-            )}
-          </p>
-        )}
-
         <div className="pulse-ai-note">
           <span className="pulse-ai-badge">
             <img src={robotIcon} alt={t('pulseAiBadge')} className="pulse-ai-badge-icon" />
@@ -239,8 +154,6 @@ export function MarketPulse({ category, products, updatedLabel }: MarketPulsePro
           {!isAiLoading && !aiError && aiText && <span className="pulse-ai-text">{aiText}</span>}
         </div>
       </div>
-
-      <p className="market-pulse-insight">{insight}</p>
     </section>
   )
 }

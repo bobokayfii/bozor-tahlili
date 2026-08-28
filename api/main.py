@@ -1,29 +1,62 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Literal
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from auth.dependencies import AuthenticatedUser, get_current_user, require_admin
+from auth.security import create_access_token, hash_password, verify_password
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
-from db.models import ProductRow
+from db.models import ProductRow, UserRow
 from export_excel import build_all_categories_workbook, build_category_workbook
 from recommender.explain import FeaturedProduct, explain_featured_product, explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
 from scrapers.orchestrator import run_all_scrapers
 from unavailable_products import get_unavailable_banks
 
+logger = logging.getLogger(__name__)
+
 _engine = get_engine()
 init_db(_engine)
 SessionLocal = get_session_factory(_engine)
+
+if not os.environ.get("AUTH_SECRET_KEY"):
+    raise RuntimeError("AUTH_SECRET_KEY environment o'zgaruvchisi talab qilinadi (JWT token imzolash uchun)")
+
+
+def _bootstrap_admin_if_needed() -> None:
+    """Users jadvali bo'sh bo'lsa (birinchi marta ishga tushirilganda) va
+    ADMIN_USERNAME/ADMIN_PASSWORD env o'zgaruvchilar berilgan bo'lsa,
+    tizimga kirish uchun birinchi admin akkauntni avtomatik yaratadi."""
+    with SessionLocal() as session:
+        if session.execute(select(UserRow)).first() is not None:
+            return
+        admin_username = os.environ.get("ADMIN_USERNAME")
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+        if not admin_username or not admin_password:
+            logger.warning(
+                "Admin akkaunt topilmadi, ADMIN_USERNAME/ADMIN_PASSWORD env o'zgaruvchilarni sozlang"
+            )
+            return
+        session.add(UserRow(
+            username=admin_username,
+            password_hash=hash_password(admin_password),
+            role="admin",
+            created_at=datetime.now(timezone.utc),
+        ))
+        session.commit()
+
 
 # Netlify'dagi frontend production domeni ALLOWED_ORIGINS orqali qo'shiladi
 # (vergul bilan ajratilgan, masalan "https://my-site.netlify.app"). Localhost
@@ -73,6 +106,7 @@ def _run_manual_scrape() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    _bootstrap_admin_if_needed()
     # BackgroundScheduler alohida process talab qilmaydi — shu bitta
     # uvicorn worker ichida fon oqimida ishlaydi, shuning uchun Railway'da
     # bitta "web" xizmati ham API'ni, ham davriy scraping'ni bajaradi (SQLite
@@ -104,9 +138,35 @@ app.add_middleware(
     # qo'shiladi.
     allow_origin_regex=r"http://localhost:\d+",
     allow_origins=_extra_origins,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    username: str
+    role: str
+
+
+@app.post("/auth/login", response_model=LoginResponse)
+def login(request: LoginRequest):
+    with SessionLocal() as session:
+        user = session.execute(select(UserRow).where(UserRow.username == request.username)).scalar_one_or_none()
+    if user is None or not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Login yoki parol noto'g'ri")
+    token = create_access_token(user_id=user.id, username=user.username, role=user.role)
+    return LoginResponse(access_token=token, username=user.username, role=user.role)
+
+
+@app.get("/auth/me")
+def get_me(current_user: AuthenticatedUser = Depends(get_current_user)):
+    return {"username": current_user.username, "role": current_user.role}
 
 
 class RecommendRequest(BaseModel):
@@ -174,7 +234,7 @@ def _latest_per_bank_category_query():
 
 
 @app.get("/products")
-def list_products(category: str | None = None, bank: str | None = None):
+def list_products(category: str | None = None, bank: str | None = None, _: AuthenticatedUser = Depends(get_current_user)):
     with SessionLocal() as session:
         query = _latest_per_bank_category_query()
         if category:
@@ -186,17 +246,17 @@ def list_products(category: str | None = None, bank: str | None = None):
 
 
 @app.get("/categories")
-def list_categories():
+def list_categories(_: AuthenticatedUser = Depends(get_current_user)):
     return [{"key": c.key, "label": c.label_uz, "schema": c.schema} for c in CATEGORIES]
 
 
 @app.get("/unavailable-banks")
-def list_unavailable_banks(category: str):
+def list_unavailable_banks(category: str, _: AuthenticatedUser = Depends(get_current_user)):
     return [{"bank": item.bank, "reason": item.reason} for item in get_unavailable_banks(category)]
 
 
 @app.post("/recommend")
-def recommend(request: RecommendRequest):
+def recommend(request: RecommendRequest, _: AuthenticatedUser = Depends(get_current_user)):
     criteria = Criteria(
         category=request.category,
         amount_som=request.amount_som,
@@ -232,7 +292,7 @@ def recommend(request: RecommendRequest):
 
 
 @app.post("/explain-product")
-def explain_product(request: ExplainProductRequest):
+def explain_product(request: ExplainProductRequest, _: AuthenticatedUser = Depends(get_current_user)):
     """Frontend "Bozor pulsi" kartochkasi jadvaldagi eng past stavkali
     mahsulotni (mustaqil, oddiy hisob-kitob bilan) tanlaydi — bu endpoint
     esa /recommend'dagi kabi o'z ballash/saralashini ishlatmasdan, ANIQ
@@ -259,7 +319,7 @@ def explain_product(request: ExplainProductRequest):
 
 
 @app.get("/export-excel")
-def export_excel(category: str, language: str = "uz"):
+def export_excel(category: str, language: str = "uz", _: AuthenticatedUser = Depends(get_current_user)):
     """Joriy ochiq kategoriyani frontenddagi jadval bilan bir xil tartib
     va ustunlarda (rate_min bo'yicha saralangan) chiroyli formatlangan
     .xlsx faylga eksport qiladi — faqat shu kategoriya, butun sayt emas."""
@@ -289,7 +349,7 @@ def export_excel(category: str, language: str = "uz"):
 
 
 @app.get("/export-excel-all")
-def export_excel_all(language: str = "uz"):
+def export_excel_all(language: str = "uz", _: AuthenticatedUser = Depends(get_current_user)):
     """Barcha kategoriyalarni BITTA .xlsx faylida, har biri o'z nomi bilan
     alohida varaqda (sheet) eksport qiladi — hisobot uchun to'liq
     ma'lumotlar to'plami."""
@@ -317,7 +377,7 @@ def export_excel_all(language: str = "uz"):
 
 
 @app.post("/trigger-scrape")
-def trigger_scrape():
+def trigger_scrape(_: AuthenticatedUser = Depends(get_current_user)):
     """Buyurtmachi so'ragan "qo'lda yangilash" tugmasi uchun: barcha
     banklarni HOZIR qayta scrape qilishni boshlaydi. HTTP so'rovni
     bloklamaslik uchun run_all_scrapers alohida oqimda (thread) ishga
@@ -334,3 +394,77 @@ def trigger_scrape():
 
     threading.Thread(target=_run_manual_scrape, daemon=True).start()
     return {"status": "started"}
+
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str = Field(min_length=8)
+    role: Literal["admin", "user"]
+
+
+class UpdateUserRequest(BaseModel):
+    username: str | None = None
+    password: str | None = Field(default=None, min_length=8)
+    role: Literal["admin", "user"] | None = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+    created_at: str
+
+
+@app.get("/admin/users", response_model=list[UserResponse])
+def list_users(_: AuthenticatedUser = Depends(require_admin)):
+    with SessionLocal() as session:
+        rows = session.execute(select(UserRow).order_by(UserRow.id)).scalars().all()
+        return [
+            UserResponse(id=row.id, username=row.username, role=row.role, created_at=row.created_at.isoformat())
+            for row in rows
+        ]
+
+
+@app.post("/admin/users", response_model=UserResponse, status_code=201)
+def create_user(request: CreateUserRequest, _: AuthenticatedUser = Depends(require_admin)):
+    with SessionLocal() as session:
+        existing = session.execute(select(UserRow).where(UserRow.username == request.username)).scalar_one_or_none()
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Bu login band")
+        new_user = UserRow(
+            username=request.username,
+            password_hash=hash_password(request.password),
+            role=request.role,
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+        return UserResponse(
+            id=new_user.id, username=new_user.username, role=new_user.role,
+            created_at=new_user.created_at.isoformat(),
+        )
+
+
+@app.patch("/admin/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, request: UpdateUserRequest, current_user: AuthenticatedUser = Depends(require_admin)):
+    if user_id == current_user.id and request.role == "user":
+        raise HTTPException(status_code=400, detail="O'z rolingizni o'zgartira olmaysiz")
+    with SessionLocal() as session:
+        user = session.get(UserRow, user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+        if request.username is not None and request.username != user.username:
+            existing = session.execute(
+                select(UserRow).where(UserRow.username == request.username)
+            ).scalar_one_or_none()
+            if existing is not None:
+                raise HTTPException(status_code=409, detail="Bu login band")
+            user.username = request.username
+        if request.password:
+            user.password_hash = hash_password(request.password)
+        if request.role is not None:
+            user.role = request.role
+        session.commit()
+        session.refresh(user)
+        return UserResponse(id=user.id, username=user.username, role=user.role, created_at=user.created_at.isoformat())

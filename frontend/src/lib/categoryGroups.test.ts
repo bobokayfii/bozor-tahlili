@@ -35,17 +35,17 @@ describe('CATEGORY_GROUPS', () => {
 })
 
 describe('getCategoryHeading', () => {
-  it('uses "Group — shortLabel" for a category that belongs to a multi-key group', () => {
-    expect(getCategoryHeading('avtokredit', 'fallback', 'uz')).toBe('Avtokredit — Birlamchi bozor')
+  it('uses "Group - shortLabel" for a category that belongs to a multi-key group', () => {
+    expect(getCategoryHeading('avtokredit', 'fallback', 'uz')).toBe('Avtokredit - Birlamchi bozor')
     expect(getCategoryHeading('avtokredit_brend_ikkilamchi', 'fallback', 'uz')).toBe(
-      'Brendli avtokredit — Ikkilamchi bozor',
+      'Brendli avtokredit - Ikkilamchi bozor',
     )
   })
 
   it('uses the Russian group label and short label when lang is ru', () => {
-    expect(getCategoryHeading('avtokredit', 'fallback', 'ru')).toBe('Автокредит — Первичный рынок')
+    expect(getCategoryHeading('avtokredit', 'fallback', 'ru')).toBe('Автокредит - Первичный рынок')
     expect(getCategoryHeading('avtokredit_brend_ikkilamchi', 'fallback', 'ru')).toBe(
-      'Брендовый автокредит — Вторичный рынок',
+      'Брендовый автокредит - Вторичный рынок',
     )
   })
 

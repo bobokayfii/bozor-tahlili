@@ -2,11 +2,28 @@ import { useState } from 'react'
 import type { Category } from '../lib/types'
 import { CATEGORY_GROUPS, groupLabel, groupShortLabel, type CategoryGroup } from '../lib/categoryGroups'
 import { useLanguage } from '../lib/LanguageContext'
+import { UsersIcon } from './icons'
 
 interface SidebarProps {
   categories: Category[]
   activeCategory: string | null
   onSelect: (categoryKey: string) => void
+  isAdmin?: boolean
+  isAdminView?: boolean
+  onSelectAdmin?: () => void
+}
+
+// "SQB AI" always appears verbatim inside poweredByLabel (uz/ru), regardless
+// of word order, so it can be highlighted without a separate translation key.
+function poweredByParts(label: string) {
+  const [before, after] = label.split('SQB AI')
+  return (
+    <>
+      {before}
+      <strong>SQB AI</strong>
+      {after}
+    </>
+  )
 }
 
 function GroupIcon({ group }: { group: CategoryGroup }) {
@@ -44,7 +61,14 @@ function Chevron({ open }: { open: boolean }) {
   )
 }
 
-export function Sidebar({ categories, activeCategory, onSelect }: SidebarProps) {
+export function Sidebar({
+  categories,
+  activeCategory,
+  onSelect,
+  isAdmin = false,
+  isAdminView = false,
+  onSelectAdmin,
+}: SidebarProps) {
   const { lang, t } = useLanguage()
   const byKey = new Map(categories.map((category) => [category.key, category]))
 
@@ -131,7 +155,26 @@ export function Sidebar({ categories, activeCategory, onSelect }: SidebarProps) 
           )
         })}
       </ul>
-      <div className="sidebar-foot">{t('sidebarFooter')}</div>
+      {isAdmin && (
+        <div className="sidebar-admin-section">
+          <div className="sidebar-group-label">{t('adminSectionLabel')}</div>
+          <ul className="sidebar-tree">
+            <li>
+              <button
+                type="button"
+                className={isAdminView ? 'sidebar-item active' : 'sidebar-item'}
+                onClick={onSelectAdmin}
+              >
+                <UsersIcon />
+                {t('adminUsersNavLabel')}
+              </button>
+            </li>
+          </ul>
+        </div>
+      )}
+      <div className="sidebar-foot">
+        <span className="sidebar-powered-by">{poweredByParts(t('poweredByLabel'))}</span>
+      </div>
     </nav>
   )
 }

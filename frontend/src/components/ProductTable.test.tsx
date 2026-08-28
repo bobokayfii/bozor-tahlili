@@ -39,35 +39,35 @@ describe('ProductTable', () => {
     renderWithLanguage(<ProductTable products={[]} isLoading />)
     expect(screen.getByLabelText('Yuklanmoqda')).toBeInTheDocument()
     expect(
-      screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+      screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q - banklar sahifalari navbatda kuzatilmoqda."),
     ).not.toBeInTheDocument()
   })
 
   it('shows the empty-state message when there are no products', () => {
     renderWithLanguage(<ProductTable products={[]} />)
     expect(
-      screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+      screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q - banklar sahifalari navbatda kuzatilmoqda."),
     ).toBeInTheDocument()
   })
 
   it('renders one row per product with bank and rate range', () => {
     renderWithLanguage(<ProductTable products={[sampleProduct]} />)
     expect(screen.getByText('SQB')).toBeInTheDocument()
-    expect(screen.getByText('24.9% – 27.9%')).toBeInTheDocument()
+    expect(screen.getByText('24.9% - 27.9%')).toBeInTheDocument()
   })
 
   it('renders a single rate value (not "X%-X%") when rate_min equals rate_max', () => {
     const flatRateProduct: Product = { ...sampleProduct, rate_min: 0, rate_max: 0 }
     renderWithLanguage(<ProductTable products={[flatRateProduct]} />)
     expect(screen.getByText('0%')).toBeInTheDocument()
-    expect(screen.queryByText('0% – 0%')).not.toBeInTheDocument()
+    expect(screen.queryByText('0% - 0%')).not.toBeInTheDocument()
   })
 
-  it('renders a single term value (not "N–N oy") when term_min_months equals term_max_months', () => {
+  it('renders a single term value (not "N-N oy") when term_min_months equals term_max_months', () => {
     const flatTermProduct: Product = { ...sampleProduct, term_min_months: 48, term_max_months: 48 }
     renderWithLanguage(<ProductTable products={[flatTermProduct]} />)
     expect(screen.getByText('48 oy')).toBeInTheDocument()
-    expect(screen.queryByText('48–48 oy')).not.toBeInTheDocument()
+    expect(screen.queryByText('48-48 oy')).not.toBeInTheDocument()
   })
 
   it('ranks products by cheapest rate first and flags the SQB row', () => {
@@ -98,7 +98,7 @@ describe('ProductTable', () => {
       grace_period_months: null,
     }
     renderWithLanguage(<ProductTable products={[productWithoutExtras]} />)
-    expect(screen.getAllByText('—')).toHaveLength(1)
+    expect(screen.getAllByText('-')).toHaveLength(1)
     expect(screen.getByText("Yo'q")).toBeInTheDocument()
     expect(screen.getByText('Annuitet, Differensial')).toBeInTheDocument()
   })
@@ -137,7 +137,7 @@ describe('ProductTable', () => {
   it('shows the empty-state message when there are no products and no unavailable banks', () => {
     renderWithLanguage(<ProductTable products={[]} unavailableBanks={[]} />)
     expect(
-      screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+      screen.getByText("Bu toifa uchun hozircha ma'lumot yo'q - banklar sahifalari navbatda kuzatilmoqda."),
     ).toBeInTheDocument()
   })
 
@@ -158,7 +158,7 @@ describe('ProductTable', () => {
 
     expect(screen.getByText('TBC Bank')).toBeInTheDocument()
     expect(
-      screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q — banklar sahifalari navbatda kuzatilmoqda."),
+      screen.queryByText("Bu toifa uchun hozircha ma'lumot yo'q - banklar sahifalari navbatda kuzatilmoqda."),
     ).not.toBeInTheDocument()
   })
 
@@ -174,7 +174,7 @@ describe('ProductTable', () => {
     expect(screen.getByText('Первоначальный взнос')).toBeInTheDocument()
     expect(screen.getByText('Есть')).toBeInTheDocument()
     expect(screen.getByText('Аннуитет')).toBeInTheDocument()
-    expect(screen.getByText('12–60 мес.')).toBeInTheDocument()
+    expect(screen.getByText('12-60 мес.')).toBeInTheDocument()
     expect(screen.getByText('Продукт недоступен')).toBeInTheDocument()
     window.localStorage.removeItem('bozor-tahlili-lang')
   })

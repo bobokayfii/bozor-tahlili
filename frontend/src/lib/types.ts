@@ -70,3 +70,35 @@ export interface Product {
   special_terms: string | null
   scraped_at: string
 }
+
+export type UserRole = 'admin' | 'user'
+
+export interface AuthUser {
+  username: string
+  role: UserRole
+}
+
+export interface LoginResponse {
+  access_token: string
+  username: string
+  role: UserRole
+}
+
+export interface AdminUser {
+  id: number
+  username: string
+  role: UserRole
+  created_at: string
+}
+
+export interface CreateUserRequest {
+  username: string
+  password: string
+  role: UserRole
+}
+
+export interface UpdateUserRequest {
+  username?: string
+  password?: string
+  role?: UserRole
+}
