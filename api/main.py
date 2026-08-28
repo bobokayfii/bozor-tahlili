@@ -190,6 +190,18 @@ class ExplainProductRequest(BaseModel):
     language: str = "uz"
 
 
+def _utc_isoformat(value: datetime) -> str:
+    """Every stored timestamp is written as UTC (datetime.now(timezone.utc)),
+    but SQLite's DateTime column strips tzinfo on read, so a naive
+    isoformat() carries no "Z"/offset marker. Every browser's Date() parser
+    then reads a marker-less string as LOCAL time instead of UTC, silently
+    showing the wrong wall-clock time to anyone outside UTC+0. Re-attaching
+    the UTC tag before serializing fixes that at the source."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
+
+
 def _row_to_dict(row: ProductRow) -> dict:
     return {
         "bank": row.bank,
@@ -205,7 +217,7 @@ def _row_to_dict(row: ProductRow) -> dict:
         "grace_period_months": row.grace_period_months,
         "payment_method": row.payment_method,
         "special_terms": row.special_terms,
-        "scraped_at": row.scraped_at.isoformat(),
+        "scraped_at": _utc_isoformat(row.scraped_at),
     }
 
 
@@ -420,7 +432,7 @@ def list_users(_: AuthenticatedUser = Depends(require_admin)):
     with SessionLocal() as session:
         rows = session.execute(select(UserRow).order_by(UserRow.id)).scalars().all()
         return [
-            UserResponse(id=row.id, username=row.username, role=row.role, created_at=row.created_at.isoformat())
+            UserResponse(id=row.id, username=row.username, role=row.role, created_at=_utc_isoformat(row.created_at))
             for row in rows
         ]
 
@@ -442,7 +454,7 @@ def create_user(request: CreateUserRequest, _: AuthenticatedUser = Depends(requi
         session.refresh(new_user)
         return UserResponse(
             id=new_user.id, username=new_user.username, role=new_user.role,
-            created_at=new_user.created_at.isoformat(),
+            created_at=_utc_isoformat(new_user.created_at),
         )
 
 
@@ -467,4 +479,4 @@ def update_user(user_id: int, request: UpdateUserRequest, current_user: Authenti
             user.role = request.role
         session.commit()
         session.refresh(user)
-        return UserResponse(id=user.id, username=user.username, role=user.role, created_at=user.created_at.isoformat())
+        return UserResponse(id=user.id, username=user.username, role=user.role, created_at=_utc_isoformat(user.created_at))
