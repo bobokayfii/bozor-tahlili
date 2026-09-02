@@ -124,7 +124,7 @@ export function ProductTable({ products, isLoading = false, schema, category, un
           .join(' ')
 
         return (
-          <div className={rowClass} key={`${product.bank}-${product.product_name}-${index}`} style={gridStyle}>
+          <div className={rowClass} key={`${product.bank}-${product.product_name}`} style={gridStyle}>
             <span className="rate-rank">{String(index + 1).padStart(2, '0')}</span>
             <span className="rate-bank">
               {getBankLogo(product.bank) && (

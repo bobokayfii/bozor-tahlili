@@ -85,19 +85,22 @@ describe('MarketPulse featured card + AI note', () => {
 
     await screen.findByText('NBU past stavka bilan ajralib turadi.')
 
-    expect(mockedFetchProductExplanation).toHaveBeenCalledWith({
-      category: 'mikroqarz',
-      bank: 'NBU',
-      product_name: 'NBU Mikroqarz',
-      rate_min: 20.9,
-      rate_max: 23.9,
-      term_min_months: 6,
-      term_max_months: 48,
-      amount_max_som: 150_000_000,
-      requires_collateral: false,
-      down_payment_pct: null,
-      language: 'uz',
-    })
+    expect(mockedFetchProductExplanation).toHaveBeenCalledWith(
+      {
+        category: 'mikroqarz',
+        bank: 'NBU',
+        product_name: 'NBU Mikroqarz',
+        rate_min: 20.9,
+        rate_max: 23.9,
+        term_min_months: 6,
+        term_max_months: 48,
+        amount_max_som: 150_000_000,
+        requires_collateral: false,
+        down_payment_pct: null,
+        language: 'uz',
+      },
+      expect.any(AbortSignal),
+    )
   })
 
   it('shows an error message instead of the stale "tez orada" placeholder when the request fails', async () => {
@@ -120,7 +123,10 @@ describe('MarketPulse featured card + AI note', () => {
     expect(screen.getByText('Пульс рынка · Лучшее предложение')).toBeInTheDocument()
     expect(screen.getByText('Ставка')).toBeInTheDocument()
     expect(screen.getByText('Залог')).toBeInTheDocument()
-    expect(mockedFetchProductExplanation).toHaveBeenCalledWith(expect.objectContaining({ language: 'ru' }))
+    expect(mockedFetchProductExplanation).toHaveBeenCalledWith(
+      expect.objectContaining({ language: 'ru' }),
+      expect.any(AbortSignal),
+    )
     window.localStorage.removeItem('bozor-tahlili-lang')
   })
 })

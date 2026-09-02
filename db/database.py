@@ -13,6 +13,14 @@ _NEW_PRODUCT_COLUMNS = {
     "special_terms": "TEXT",
 }
 
+_NEW_USER_COLUMNS = {
+    # NOT NULL columns MUST carry a DEFAULT here - SQLite's ADD COLUMN
+    # rejects NOT NULL with no default outright on a non-empty table, which
+    # would otherwise surface as a production crash on init_db() rather
+    # than at review time.
+    "token_version": "INTEGER NOT NULL DEFAULT 0",
+}
+
 
 def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
     # Default SQLite journaling takes an exclusive file lock for the whole
@@ -36,27 +44,32 @@ def get_engine(db_path: Path | None = None):
     return engine
 
 
-def _ensure_product_columns(engine) -> None:
+def _ensure_columns(engine, table_name: str, new_columns: dict[str, str]) -> None:
     """SQLAlchemy's create_all() only creates missing tables, not missing
     columns on tables that already exist. Since data/bank_products.db is a
-    real append-only local file (not managed by a migration tool), new
-    nullable ProductRow columns are added here via ALTER TABLE so existing
-    databases pick them up without losing scraped history."""
+    real file (not managed by a migration tool), new columns are added here
+    via ALTER TABLE so existing databases pick them up without losing data.
+
+    Limitations - there is no path here for anything beyond adding a column:
+    renaming or dropping a column requires a manual ALTER TABLE plus a code
+    change outside this mechanism, and a column that becomes obsolete will
+    otherwise silently linger with stale data forever."""
     inspector = inspect(engine)
-    if "products" not in inspector.get_table_names():
+    if table_name not in inspector.get_table_names():
         return
-    existing = {col["name"] for col in inspector.get_columns("products")}
-    missing = {name: sql_type for name, sql_type in _NEW_PRODUCT_COLUMNS.items() if name not in existing}
+    existing = {col["name"] for col in inspector.get_columns(table_name)}
+    missing = {name: sql_type for name, sql_type in new_columns.items() if name not in existing}
     if not missing:
         return
     with engine.begin() as conn:
         for name, sql_type in missing.items():
-            conn.execute(text(f"ALTER TABLE products ADD COLUMN {name} {sql_type}"))
+            conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {sql_type}"))
 
 
 def init_db(engine) -> None:
     Base.metadata.create_all(engine)
-    _ensure_product_columns(engine)
+    _ensure_columns(engine, "products", _NEW_PRODUCT_COLUMNS)
+    _ensure_columns(engine, "users", _NEW_USER_COLUMNS)
 
 
 def get_session_factory(engine):

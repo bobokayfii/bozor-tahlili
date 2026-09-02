@@ -53,6 +53,16 @@ describe('ExportMenu', () => {
     )
   })
 
+  it('shows an error message instead of failing silently when the download rejects', async () => {
+    mockedDownloadFile.mockRejectedValueOnce(new Error('401'))
+    renderWithLanguage(<ExportMenu category="avtokredit" />)
+
+    await userEvent.click(screen.getByText("Excel'ga yuklash"))
+    await userEvent.click(screen.getByText('Joriy sahifani yuklash'))
+
+    expect(await screen.findByText("Yuklab bo'lmadi. Birozdan so'ng qayta urinib ko'ring.")).toBeInTheDocument()
+  })
+
   it('closes the menu when a click lands outside it', async () => {
     renderWithLanguage(
       <div>

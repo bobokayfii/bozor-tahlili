@@ -129,20 +129,20 @@ export async function fetchCategories(): Promise<Category[]> {
   return response.json()
 }
 
-export async function fetchProducts(category: string): Promise<Product[]> {
+export async function fetchProducts(category: string, signal?: AbortSignal): Promise<Product[]> {
   const url = new URL(`${API_BASE_URL}/products`)
   url.searchParams.set('category', category)
-  const response = await apiFetch(url)
+  const response = await apiFetch(url, { signal })
   if (!response.ok) {
     throw new Error(`Mahsulotlarni yuklab bo'lmadi: ${response.status}`)
   }
   return response.json()
 }
 
-export async function fetchUnavailableBanks(category: string): Promise<UnavailableBank[]> {
+export async function fetchUnavailableBanks(category: string, signal?: AbortSignal): Promise<UnavailableBank[]> {
   const url = new URL(`${API_BASE_URL}/unavailable-banks`)
   url.searchParams.set('category', category)
-  const response = await apiFetch(url)
+  const response = await apiFetch(url, { signal })
   if (!response.ok) {
     throw new Error(`Mavjud bo'lmagan banklar ro'yxatini yuklab bo'lmadi: ${response.status}`)
   }
@@ -203,11 +203,15 @@ export async function triggerScrapeRefresh(): Promise<TriggerScrapeStatus> {
   return 'started'
 }
 
-export async function fetchProductExplanation(request: ExplainProductRequest): Promise<ExplainProductResponse> {
+export async function fetchProductExplanation(
+  request: ExplainProductRequest,
+  signal?: AbortSignal,
+): Promise<ExplainProductResponse> {
   const response = await apiFetch(`${API_BASE_URL}/explain-product`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
+    signal,
   })
   if (!response.ok) {
     throw new Error(`AI izohini olib bo'lmadi: ${response.status}`)

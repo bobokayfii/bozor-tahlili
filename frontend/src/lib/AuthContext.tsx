@@ -21,7 +21,9 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // No stored token means there's nothing to restore - known synchronously
+  // at mount, so it's the initial value rather than an effect-driven reset.
+  const [isLoading, setIsLoading] = useState(() => Boolean(getToken()))
 
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null))
@@ -30,10 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = getToken()
-    if (!token) {
-      setIsLoading(false)
-      return
-    }
+    if (!token) return
     fetchCurrentUser()
       .then(setUser)
       .catch(() => {
@@ -58,6 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// Colocated with AuthProvider so callers have one import path; costs only
+// Vite's Fast Refresh doing a full reload instead of a component-only one
+// when this file changes, which doesn't justify splitting a one-line hook
+// into its own file.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext)
   if (!context) {

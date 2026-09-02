@@ -25,11 +25,12 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-def create_access_token(user_id: int, username: str, role: str) -> str:
+def create_access_token(user_id: int, username: str, role: str, token_version: int = 0) -> str:
     payload = {
         "user_id": user_id,
         "username": username,
         "role": role,
+        "token_version": token_version,
         "exp": datetime.now(timezone.utc) + timedelta(days=TOKEN_TTL_DAYS),
     }
     return jwt.encode(payload, _get_secret_key(), algorithm=ALGORITHM)

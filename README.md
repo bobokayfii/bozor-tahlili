@@ -15,9 +15,10 @@ db/            SQLAlchemy modellari va DB ulanishi (products, scrape_runs)
 scrapers/      Har bir bank uchun alohida scraper + umumiy base.py interfeysi
                va orchestrator.py (barchasini ketma-ket ishga tushiradi)
 recommender/   Qoida-asoslangan scoring (scoring.py) + OpenAI tushuntirish (explain.py)
-api/           FastAPI backend (GET /products, POST /recommend)
+api/           FastAPI backend (GET /products, POST /recommend) - lifespan
+               ichida o'zining APScheduler'ini ham ishga tushiradi, muntazam
+               scraping uchun ALOHIDA process/xizmat kerak emas
 frontend/      React/Vite/TypeScript UI
-scheduler.py   APScheduler orqali muntazam scraping
 tests/         pytest testlari (db/, recommender/, scrapers/, api/)
 data/          SQLite fayli (bank_products.db) — .gitignore'da, repo'ga kirmaydi
 ```
@@ -172,14 +173,22 @@ npm run dev
 Brauzerda `http://localhost:5173` ochiladi. Kategoriya sidebar'da tanlanadi,
 taqqoslash jadvali va "Tavsiya olish" bo'limi asosiy panelda ko'rsatiladi.
 
-## Scheduler'ni ishga tushirish (muntazam scraping uchun)
+## Muntazam scraping
 
-```bash
-.venv\Scripts\python.exe scheduler.py
-```
+Alohida scheduler process/skript ISHGA TUSHIRISH SHART EMAS va kerak ham
+emas — `api/main.py` FastAPI ilovasi ishga tushganda (`lifespan`) o'z ichida
+`APScheduler`'ni ham ishga tushiradi: deploy bo'lgan zahoti bir marta, keyin
+`SCRAPE_INTERVAL_HOURS` env o'zgaruvchisida ko'rsatilgan oraliqda (standart —
+24 soat) barcha ro'yxatdagi banklarni qayta scrape qiladi. Bitta process ham
+API'ga, ham scraping'ga xizmat qiladi.
 
-Standart holatda har 24 soatda barcha 5 ta scraperni ketma-ket ishga tushiradi
-(`scheduler.py`dagi `build_scheduler(..., interval_hours=24)`).
+**Diqqat:** shu bitta SQLite faylga (`data/bank_products.db`) faqat BITTA
+process yozishi kerak. Agar biror sabab bilan scraping'ni asosiy API'dan
+ALOHIDA process sifatida ishga tushirish zarurati tug'ilsa, avval ikkala
+process orasida umumiy (masalan, fayl darajasidagi yoki Redis) lock
+qo'shilishi shart — aks holda ikkala process bir vaqtda yozib, bir-birining
+ustidan yozib yuborishi yoki "database is locked" xatolariga olib kelishi
+mumkin.
 
 ## Qo'lda end-to-end tekshiruv (operator uchun qo'llanma)
 

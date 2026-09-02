@@ -47,6 +47,10 @@ export function LoginPage() {
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
+                // Deliberate: the first field on a dedicated, single-purpose
+                // login page - not mid-page or competing with other content,
+                // which is what the rule is meant to guard against.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
                 required
               />

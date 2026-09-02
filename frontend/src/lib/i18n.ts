@@ -45,6 +45,7 @@ export const UI_TEXT = {
     exportButton: "Excel'ga yuklash",
     exportCurrentPage: 'Joriy sahifani yuklash',
     exportAllCategories: 'Barcha kategoriyalarni yuklash',
+    exportFailed: "Yuklab bo'lmadi. Birozdan so'ng qayta urinib ko'ring.",
     refreshButton: 'Ma\'lumotlarni yangilash',
     refreshConfirmTitle: 'Ma\'lumotlarni qayta yig\'ish',
     refreshConfirmBody:
@@ -130,6 +131,7 @@ export const UI_TEXT = {
     exportButton: 'Скачать в Excel',
     exportCurrentPage: 'Скачать текущую страницу',
     exportAllCategories: 'Скачать все категории',
+    exportFailed: 'Не удалось скачать. Попробуйте ещё раз чуть позже.',
     refreshButton: 'Обновить данные',
     refreshConfirmTitle: 'Повторный сбор данных',
     refreshConfirmBody:

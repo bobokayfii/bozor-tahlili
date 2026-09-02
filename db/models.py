@@ -49,3 +49,9 @@ class UserRow(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(DateTime)
+    # JWTga login vaqtida bitta shu qiymat ham yozib qo'yiladi; har so'rovda
+    # solishtiriladi. Rol yoki parol o'zgartirilganda bu son oshiriladi —
+    # shu userning avval berilgan BARCHA eski tokenlari darhol yaroqsiz
+    # bo'lib qoladi (aks holda ular tabiiy muddati — 30 kun — tugagunga
+    # qadar eski huquq bilan ishlashda davom etardi).
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

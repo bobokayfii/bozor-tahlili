@@ -33,6 +33,11 @@ def client(tmp_path, monkeypatch):
         session.commit()
 
     monkeypatch.setattr(api_main, "SessionLocal", session_factory)
+    # get_current_user's token_version check (auth/dependencies.py) reads
+    # from its own module-level session factory, separate from
+    # api_main.SessionLocal above - both must point at this isolated DB, or
+    # the check silently queries the real data/bank_products.db instead.
+    monkeypatch.setattr("auth.dependencies._session_factory", session_factory)
     test_client = TestClient(api_main.app)
     token = create_access_token(user_id=1, username="test-admin", role="admin")
     test_client.headers.update({"Authorization": f"Bearer {token}"})

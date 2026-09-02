@@ -3,18 +3,20 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Literal
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from auth.dependencies import AuthenticatedUser, get_current_user, require_admin
+from auth.dependencies import AuthenticatedUser, configure_session_factory, get_current_user, require_admin
 from auth.security import create_access_token, hash_password, verify_password
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
@@ -30,9 +32,34 @@ logger = logging.getLogger(__name__)
 _engine = get_engine()
 init_db(_engine)
 SessionLocal = get_session_factory(_engine)
+configure_session_factory(SessionLocal)
 
 if not os.environ.get("AUTH_SECRET_KEY"):
     raise RuntimeError("AUTH_SECRET_KEY environment o'zgaruvchisi talab qilinadi (JWT token imzolash uchun)")
+
+# /auth/login'da mavjud bo'lmagan username uchun ham shu hash bilan bcrypt
+# ishga tushiriladi (pastga qarang) — aks holda "user topilmadi" javobi
+# "parol noto'g'ri" javobidan sezilarli tezroq qaytadi, bu esa vaqt
+# farqidan (timing) haqiqiy username'larni aniqlash imkonini beradi.
+_DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-constant-time-login")
+
+# Oddiy in-memory login rate-limiter — IP+username juftligi bo'yicha oyna
+# ichida urinishlar sonini cheklaydi (bcrypt brute-force'ga qarshi). Redis
+# yoki tashqi do'kon shart emas: bitta uvicorn worker ichida ishlagani
+# uchun (Railway'da ham shunday — _scrape_in_progress bayrog'idagi bilan
+# bir xil soddalik) shu yetarli.
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 300.0
+
+
+def _check_login_rate_limit(key: str) -> None:
+    now = time.monotonic()
+    attempts = _login_attempts[key]
+    attempts[:] = [attempt for attempt in attempts if now - attempt < _LOGIN_WINDOW_SECONDS]
+    if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Juda ko'p urinish. Birozdan so'ng qayta urinib ko'ring.")
+    attempts.append(now)
 
 
 def _bootstrap_admin_if_needed() -> None:
@@ -155,12 +182,21 @@ class LoginResponse(BaseModel):
 
 
 @app.post("/auth/login", response_model=LoginResponse)
-def login(request: LoginRequest):
+def login(request: LoginRequest, http_request: Request):
+    client_host = http_request.client.host if http_request.client else "unknown"
+    _check_login_rate_limit(f"{client_host}:{request.username}")
     with SessionLocal() as session:
         user = session.execute(select(UserRow).where(UserRow.username == request.username)).scalar_one_or_none()
-    if user is None or not verify_password(request.password, user.password_hash):
+    if user is None:
+        # Still runs bcrypt against a fixed hash so a nonexistent username
+        # doesn't return measurably faster than a wrong password for a real
+        # one - otherwise the response time alone lets an attacker enumerate
+        # valid usernames before starting the actual brute-force.
+        verify_password(request.password, _DUMMY_PASSWORD_HASH)
         raise HTTPException(status_code=401, detail="Login yoki parol noto'g'ri")
-    token = create_access_token(user_id=user.id, username=user.username, role=user.role)
+    if not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Login yoki parol noto'g'ri")
+    token = create_access_token(user_id=user.id, username=user.username, role=user.role, token_version=user.token_version)
     return LoginResponse(access_token=token, username=user.username, role=user.role)
 
 
@@ -171,22 +207,26 @@ def get_me(current_user: AuthenticatedUser = Depends(get_current_user)):
 
 class RecommendRequest(BaseModel):
     category: str
-    amount_som: int
-    term_months: int
+    amount_som: int = Field(ge=0)
+    term_months: int = Field(ge=0)
     collateral_ok: bool
 
 
 class ExplainProductRequest(BaseModel):
     category: str
-    bank: str
-    product_name: str
-    rate_min: float
-    rate_max: float
-    term_min_months: int
-    term_max_months: int
-    amount_max_som: int
+    # Matches ProductRow's own column limits (db/models.py) - this endpoint
+    # accepts these as free-form request fields rather than reading them
+    # back from a product row, so nothing else bounds how much of this
+    # authenticated-but-untrusted text reaches the LLM prompt otherwise.
+    bank: str = Field(max_length=100)
+    product_name: str = Field(max_length=200)
+    rate_min: float = Field(ge=0)
+    rate_max: float = Field(ge=0)
+    term_min_months: int = Field(ge=0)
+    term_max_months: int = Field(ge=0)
+    amount_max_som: int = Field(ge=0)
     requires_collateral: bool
-    down_payment_pct: float | None = None
+    down_payment_pct: float | None = Field(default=None, ge=0)
     language: str = "uz"
 
 
@@ -475,8 +515,10 @@ def update_user(user_id: int, request: UpdateUserRequest, current_user: Authenti
             user.username = request.username
         if request.password:
             user.password_hash = hash_password(request.password)
-        if request.role is not None:
+            user.token_version += 1
+        if request.role is not None and request.role != user.role:
             user.role = request.role
+            user.token_version += 1
         session.commit()
         session.refresh(user)
         return UserResponse(id=user.id, username=user.username, role=user.role, created_at=_utc_isoformat(user.created_at))
