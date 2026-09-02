@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { createUser, updateUser } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
+import { useModalFocusTrap } from '../lib/useModalFocusTrap'
 import { PasswordInput } from './PasswordInput'
 import type { AdminUser, UserRole } from '../lib/types'
 
@@ -20,16 +21,7 @@ export function UserFormModal({ user, onClose, onSaved }: UserFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  const dialogRef = useModalFocusTrap(true, onClose)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -58,11 +50,17 @@ export function UserFormModal({ user, onClose, onSaved }: UserFormModalProps) {
 
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
+      {/* onClick only stops the overlay's close-on-click from firing for
+          clicks inside the dialog - it's event-bubbling containment, not
+          a user-facing affordance, so it needs no keyboard equivalent. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
       <div
         className="modal-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="user-form-title"
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="user-form-title" className="modal-title">

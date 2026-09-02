@@ -26,6 +26,11 @@ def client(tmp_path, monkeypatch):
         session.commit()
 
     monkeypatch.setattr(api_main, "SessionLocal", session_factory)
+    # get_current_user's token_version check (auth/dependencies.py) reads
+    # from its own module-level session factory, separate from
+    # api_main.SessionLocal above - both must point at this isolated DB, or
+    # the check silently queries the real data/bank_products.db instead.
+    monkeypatch.setattr("auth.dependencies._session_factory", session_factory)
     return TestClient(api_main.app)
 
 
@@ -46,6 +51,17 @@ def test_login_with_wrong_password_returns_401(client):
 def test_login_with_unknown_username_returns_401(client):
     response = client.post("/auth/login", json={"username": "nobody", "password": "whatever"})
     assert response.status_code == 401
+
+
+def test_login_is_rate_limited_after_too_many_attempts(client):
+    # A dedicated username (never used by another test) so this doesn't
+    # share its counter with, or get tripped up by, anyone else's attempts -
+    # _login_attempts is a module-level dict that outlives any one test.
+    for _ in range(api_main._LOGIN_MAX_ATTEMPTS):
+        client.post("/auth/login", json={"username": "rate-limit-probe", "password": "wrong"})
+
+    response = client.post("/auth/login", json={"username": "rate-limit-probe", "password": "wrong"})
+    assert response.status_code == 429
 
 
 def test_me_returns_the_authenticated_user(client):

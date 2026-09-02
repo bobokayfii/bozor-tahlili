@@ -10,6 +10,7 @@ interface ExportMenuProps {
 export function ExportMenu({ category }: ExportMenuProps) {
   const { lang, t } = useLanguage()
   const [isOpen, setIsOpen] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -29,12 +30,20 @@ export function ExportMenu({ category }: ExportMenuProps) {
 
   async function handleExportCurrent() {
     setIsOpen(false)
-    await downloadFile(getExportExcelUrl(category as string, lang), `${category}.xlsx`)
+    try {
+      await downloadFile(getExportExcelUrl(category as string, lang), `${category}.xlsx`)
+    } catch {
+      setExportError(t('exportFailed'))
+    }
   }
 
   async function handleExportAll() {
     setIsOpen(false)
-    await downloadFile(getExportAllExcelUrl(lang), 'bozor-tahlili-barcha-kategoriyalar.xlsx')
+    try {
+      await downloadFile(getExportAllExcelUrl(lang), 'bozor-tahlili-barcha-kategoriyalar.xlsx')
+    } catch {
+      setExportError(t('exportFailed'))
+    }
   }
 
   return (
@@ -53,6 +62,20 @@ export function ExportMenu({ category }: ExportMenuProps) {
           </button>
           <button type="button" className="export-menu-item" role="menuitem" onClick={handleExportAll}>
             {t('exportAllCategories')}
+          </button>
+        </div>
+      )}
+
+      {exportError && (
+        <div className="refresh-status refresh-status-error" role="status">
+          <span>{exportError}</span>
+          <button
+            type="button"
+            className="refresh-status-close"
+            aria-label={t('closeLabel')}
+            onClick={() => setExportError(null)}
+          >
+            ×
           </button>
         </div>
       )}

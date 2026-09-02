@@ -121,6 +121,7 @@ export function Sidebar({
 
           const isOpen = expanded.has(group.label)
           const groupIsActive = availableKeys.includes(activeCategory ?? '')
+          const submenuId = `sidebar-submenu-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 
           return (
             <li key={group.label} className="sidebar-tree-group">
@@ -129,6 +130,7 @@ export function Sidebar({
                 className={groupIsActive ? 'sidebar-item sidebar-parent active' : 'sidebar-item sidebar-parent'}
                 onClick={() => toggleGroup(group.label)}
                 aria-expanded={isOpen}
+                aria-controls={submenuId}
               >
                 <span className="sidebar-parent-label">
                   <GroupIcon group={group} />
@@ -137,7 +139,7 @@ export function Sidebar({
                 <Chevron open={isOpen} />
               </button>
               {isOpen && (
-                <ul className="sidebar-submenu">
+                <ul className="sidebar-submenu" id={submenuId}>
                   {availableKeys.map((key) => (
                     <li key={key}>
                       <button

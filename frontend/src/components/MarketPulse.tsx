@@ -53,6 +53,10 @@ export function MarketPulse({ category, products }: MarketPulseProps) {
 
   useEffect(() => {
     if (!category || products.length === 0) {
+      // Resets state ahead of an async outcome, not deriving it from props
+      // during render - the featured product genuinely changes async (a
+      // fetch keyed on it follows below), so this can't move out of the effect.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAiText(null)
       setAiError(null)
       return
@@ -63,22 +67,26 @@ export function MarketPulse({ category, products }: MarketPulseProps) {
     // ikkalasi hech qachon boshqa-boshqa bankni ko'rsatib qolmaydi.
     const featured = pickFeatured(products)
     let ignore = false
+    const controller = new AbortController()
     setIsAiLoading(true)
     setAiError(null)
 
-    fetchProductExplanation({
-      category,
-      bank: featured.bank,
-      product_name: featured.product_name,
-      rate_min: featured.rate_min,
-      rate_max: featured.rate_max,
-      term_min_months: featured.term_min_months,
-      term_max_months: featured.term_max_months,
-      amount_max_som: featured.amount_max_som,
-      requires_collateral: featured.requires_collateral,
-      down_payment_pct: featured.down_payment_pct,
-      language: lang,
-    })
+    fetchProductExplanation(
+      {
+        category,
+        bank: featured.bank,
+        product_name: featured.product_name,
+        rate_min: featured.rate_min,
+        rate_max: featured.rate_max,
+        term_min_months: featured.term_min_months,
+        term_max_months: featured.term_max_months,
+        amount_max_som: featured.amount_max_som,
+        requires_collateral: featured.requires_collateral,
+        down_payment_pct: featured.down_payment_pct,
+        language: lang,
+      },
+      controller.signal,
+    )
       .then((data) => {
         if (ignore) return
         setAiText(normalizeDashes(data.explanation))
@@ -92,6 +100,7 @@ export function MarketPulse({ category, products }: MarketPulseProps) {
       })
 
     return () => {
+      controller.abort()
       ignore = true
     }
   }, [category, products, lang])

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { triggerScrapeRefresh } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
+import { useModalFocusTrap } from '../lib/useModalFocusTrap'
 import { RefreshIcon } from './icons'
 
 type StatusMessage = { kind: 'success' | 'warning' | 'error'; text: string } | null
@@ -10,6 +11,12 @@ export function RefreshDataButton() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusMessage, setStatusMessage] = useState<StatusMessage>(null)
+  // Stable reference: this component stays mounted while the dialog itself
+  // is conditionally rendered, so an unstable callback would re-run the
+  // trap's setup/teardown (and re-steal focus) on every unrelated re-render
+  // while the dialog is open, not just on open/close transitions.
+  const closeConfirm = useCallback(() => setIsConfirmOpen(false), [])
+  const dialogRef = useModalFocusTrap(isConfirmOpen, closeConfirm)
 
   async function handleConfirm() {
     setIsConfirmOpen(false)
@@ -43,12 +50,18 @@ export function RefreshDataButton() {
       </button>
 
       {isConfirmOpen && (
-        <div className="modal-overlay" role="presentation" onClick={() => setIsConfirmOpen(false)}>
+        <div className="modal-overlay" role="presentation" onClick={closeConfirm}>
+          {/* onClick only stops the overlay's close-on-click from firing for
+              clicks inside the dialog - it's event-bubbling containment, not
+              a user-facing affordance, so it needs no keyboard equivalent. */}
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
           <div
             className="modal-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="refresh-confirm-title"
+            ref={dialogRef}
+            tabIndex={-1}
             onClick={(event) => event.stopPropagation()}
           >
             <h2 id="refresh-confirm-title" className="modal-title">
@@ -56,7 +69,7 @@ export function RefreshDataButton() {
             </h2>
             <p className="modal-body">{t('refreshConfirmBody')}</p>
             <div className="modal-actions">
-              <button type="button" className="modal-btn modal-btn-secondary" onClick={() => setIsConfirmOpen(false)}>
+              <button type="button" className="modal-btn modal-btn-secondary" onClick={closeConfirm}>
                 {t('refreshConfirmCancel')}
               </button>
               <button type="button" className="modal-btn modal-btn-primary" onClick={handleConfirm}>

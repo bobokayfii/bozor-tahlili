@@ -33,6 +33,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
 }
 
+// Colocated with LanguageProvider so callers have one import path; costs only
+// Vite's Fast Refresh doing a full reload instead of a component-only one
+// when this file changes, which doesn't justify splitting a one-line hook
+// into its own file.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useLanguage(): LanguageContextValue {
   const context = useContext(LanguageContext)
   if (!context) {

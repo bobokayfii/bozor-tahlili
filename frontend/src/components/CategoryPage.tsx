@@ -35,13 +35,14 @@ export function CategoryPage({ categories }: CategoryPageProps) {
   useEffect(() => {
     if (!categoryKey) return
     let ignore = false
+    const controller = new AbortController()
 
     async function loadProducts() {
       setIsLoading(true)
       try {
         const [data, unavailable] = await Promise.all([
-          fetchProducts(categoryKey as string),
-          fetchUnavailableBanks(categoryKey as string),
+          fetchProducts(categoryKey as string, controller.signal),
+          fetchUnavailableBanks(categoryKey as string, controller.signal),
         ])
         if (ignore) return
         setProducts(data)
@@ -57,6 +58,7 @@ export function CategoryPage({ categories }: CategoryPageProps) {
     loadProducts()
     return () => {
       ignore = true
+      controller.abort()
     }
   }, [categoryKey])
 

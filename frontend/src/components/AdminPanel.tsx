@@ -8,25 +8,27 @@ export function AdminPanel() {
   const { lang, t } = useLanguage()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // null message = generic failure, translated at render time so this
+  // effect doesn't need `t` (and therefore `lang`) in its deps - switching
+  // language shouldn't re-fetch the user list.
+  const [loadError, setLoadError] = useState<{ message: string | null } | null>(null)
   const [editingUser, setEditingUser] = useState<AdminUser | 'new' | null>(null)
 
   useEffect(() => {
+    async function loadUsers() {
+      setIsLoading(true)
+      try {
+        const data = await fetchUsers()
+        setUsers(data)
+        setLoadError(null)
+      } catch (err) {
+        setLoadError({ message: err instanceof Error ? err.message : null })
+      } finally {
+        setIsLoading(false)
+      }
+    }
     loadUsers()
   }, [])
-
-  async function loadUsers() {
-    setIsLoading(true)
-    try {
-      const data = await fetchUsers()
-      setUsers(data)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('adminLoadFailed'))
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   function handleSaved(saved: AdminUser) {
     setUsers((prev) => {
@@ -53,7 +55,7 @@ export function AdminPanel() {
         </button>
       </div>
 
-      {error && <p className="error-state">{error}</p>}
+      {loadError && <p className="error-state">{loadError.message ?? t('adminLoadFailed')}</p>}
 
       {!isLoading && (
         <div className="admin-users-board rate-board">

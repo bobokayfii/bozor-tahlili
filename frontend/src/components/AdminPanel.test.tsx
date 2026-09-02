@@ -39,6 +39,20 @@ describe('AdminPanel', () => {
     expect(screen.getByText('Yangi user')).toBeInTheDocument()
   })
 
+  it('shows the API error message when loading users fails', async () => {
+    mockedFetchUsers.mockRejectedValue(new Error("Serverga ulanib bo'lmadi"))
+    renderWithLanguage(<AdminPanel />)
+
+    expect(await screen.findByText("Serverga ulanib bo'lmadi")).toBeInTheDocument()
+  })
+
+  it('falls back to a generic message when loading users fails without one', async () => {
+    mockedFetchUsers.mockRejectedValue('network down')
+    renderWithLanguage(<AdminPanel />)
+
+    expect(await screen.findByText("Userlarni yuklab bo'lmadi")).toBeInTheDocument()
+  })
+
   it('opens the edit modal pre-filled for an existing user', async () => {
     mockedFetchUsers.mockResolvedValue([
       { id: 3, username: 'bob', role: 'user', created_at: '2026-01-01T00:00:00Z' },
