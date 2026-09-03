@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { Sidebar } from './Sidebar'
+import { Sidebar, type AdminPage } from './Sidebar'
 import { CategoryPage } from './CategoryPage'
 import { AdminPanel } from './AdminPanel'
+import { ScrapeStatusPanel } from './ScrapeStatusPanel'
 import { ExportMenu } from './ExportMenu'
 import { RefreshDataButton } from './RefreshDataButton'
 import { LanguageDropdown } from './LanguageDropdown'
@@ -33,15 +34,20 @@ export function Dashboard({ user }: DashboardProps) {
       })
   }, [])
 
-  const isAdminView = location.pathname === '/admin'
+  const isAdminView = location.pathname.startsWith('/admin')
   const activeCategoryKey = isAdminView ? null : location.pathname.slice(1) || null
+  const activeAdminPage: AdminPage | null = !isAdminView
+    ? null
+    : location.pathname === '/admin/scrape-status'
+      ? 'scrape-status'
+      : 'users'
 
   function handleSelectCategory(categoryKey: string) {
     navigate(`/${categoryKey}`)
   }
 
-  function handleSelectAdmin() {
-    navigate('/admin')
+  function handleSelectAdminPage(page: AdminPage) {
+    navigate(page === 'users' ? '/admin' : '/admin/scrape-status')
   }
 
   return (
@@ -73,8 +79,8 @@ export function Dashboard({ user }: DashboardProps) {
           activeCategory={activeCategoryKey}
           onSelect={handleSelectCategory}
           isAdmin={user.role === 'admin'}
-          isAdminView={isAdminView}
-          onSelectAdmin={handleSelectAdmin}
+          activeAdminPage={activeAdminPage}
+          onSelectAdminPage={handleSelectAdminPage}
         />
         <main className="main-content">
           {error && <p className="error-state">{error}</p>}
@@ -86,6 +92,10 @@ export function Dashboard({ user }: DashboardProps) {
             <Route
               path="admin"
               element={user.role === 'admin' ? <AdminPanel /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="admin/scrape-status"
+              element={user.role === 'admin' ? <ScrapeStatusPanel /> : <Navigate to="/" replace />}
             />
             <Route path=":categoryKey" element={<CategoryPage categories={categories} />} />
           </Routes>

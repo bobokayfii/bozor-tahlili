@@ -103,3 +103,17 @@ export function UsersIcon() {
     </svg>
   )
 }
+
+export function ActivityIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M1.5 8.5h3l1.6-4.8 3 9.6 1.6-4.8h3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

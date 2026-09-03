@@ -1602,18 +1602,6 @@ button {
   color: var(--ink-soft);
 }
 
-.scrape-status-panel {
-  margin-top: 40px;
-}
-
-.page-head h2 {
-  font-weight: 800;
-  font-size: 20px;
-  letter-spacing: -0.01em;
-  margin: 0 0 6px;
-  color: var(--ink);
-}
-
 .scrape-status-board .rate-board-head,
 .scrape-status-board .rate-row {
   grid-template-columns: minmax(0, 1.2fr) 150px minmax(0, 1fr) 130px;

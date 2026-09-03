@@ -18,6 +18,7 @@ vi.mock('../lib/api', () => ({
   fetchUsers: vi.fn(),
   createUser: vi.fn(),
   updateUser: vi.fn(),
+  fetchScrapeRuns: vi.fn().mockResolvedValue([]),
 }))
 
 const mockedUseAuth = vi.mocked(useAuth)
@@ -64,6 +65,17 @@ describe('Dashboard', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Foydalanuvchilar' }))
 
     expect(await screen.findByText('Foydalanuvchilarni boshqarish')).toBeInTheDocument()
+  })
+
+  it('shows the Scraperlar holati sidebar link only for admins and navigates via it, in its own page', async () => {
+    mockedFetchCategories.mockResolvedValue(categories)
+    renderDashboard('admin')
+    await screen.findByText('Avtokredit')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Scraperlar holati' }))
+
+    expect(await screen.findByRole('heading', { name: 'Scraperlar holati' })).toBeInTheDocument()
+    expect(screen.queryByText('Foydalanuvchilarni boshqarish')).not.toBeInTheDocument()
   })
 
   it('shows the refresh-data button for an admin', async () => {
