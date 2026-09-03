@@ -20,8 +20,8 @@ export function LoginPage() {
     setError(null)
     try {
       await login(username, password)
-    } catch {
-      setError(t('authError'))
+    } catch (err) {
+      setError(err instanceof Error && err.message === 'RATE_LIMITED' ? t('authRateLimited') : t('authError'))
     } finally {
       setIsSubmitting(false)
     }
