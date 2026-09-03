@@ -102,3 +102,14 @@ export interface UpdateUserRequest {
   password?: string
   role?: UserRole
 }
+
+export type ScrapeRunStatus = 'success' | 'failed' | 'running' | 'never_run'
+
+export interface ScrapeRun {
+  bank: string
+  status: ScrapeRunStatus
+  started_at: string | null
+  finished_at: string | null
+  error_message: string | null
+  products_found: number
+}

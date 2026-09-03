@@ -1602,6 +1602,58 @@ button {
   color: var(--ink-soft);
 }
 
+.scrape-status-panel {
+  margin-top: 40px;
+}
+
+.page-head h2 {
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+
+.scrape-status-board .rate-board-head,
+.scrape-status-board .rate-row {
+  grid-template-columns: minmax(0, 1.2fr) 150px minmax(0, 1fr) 130px;
+}
+
+.scrape-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.scrape-status-badge-success {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.scrape-status-badge-failed {
+  background: var(--signal-soft);
+  color: var(--negative);
+}
+
+.scrape-status-badge-running {
+  background: var(--house-soft);
+  color: var(--house);
+}
+
+.scrape-status-badge-never_run {
+  background: var(--paper-sunk);
+  color: var(--ink-faint);
+}
+
+.scrape-error-message {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
 .admin-edit-btn {
   padding: 5px 14px;
   border-radius: 999px;

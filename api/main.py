@@ -20,11 +20,12 @@ from auth.dependencies import AuthenticatedUser, configure_session_factory, get_
 from auth.security import create_access_token, hash_password, verify_password
 from categories import CATEGORIES
 from db.database import get_engine, get_session_factory, init_db
-from db.models import ProductRow, UserRow
+from db.models import ProductRow, ScrapeRunRow, UserRow
 from export_excel import build_all_categories_workbook, build_category_workbook
 from recommender.explain import FeaturedProduct, explain_featured_product, explain_recommendation
 from recommender.scoring import Criteria, top_recommendations
 from scrapers.orchestrator import run_all_scrapers
+from scrapers.registry import ALL_SCRAPERS
 from unavailable_products import get_unavailable_banks
 
 logger = logging.getLogger(__name__)
@@ -522,3 +523,63 @@ def update_user(user_id: int, request: UpdateUserRequest, current_user: Authenti
         session.commit()
         session.refresh(user)
         return UserResponse(id=user.id, username=user.username, role=user.role, created_at=_utc_isoformat(user.created_at))
+
+
+class ScrapeRunResponse(BaseModel):
+    bank: str
+    status: str
+    started_at: str | None
+    finished_at: str | None
+    error_message: str | None
+    products_found: int
+
+
+# ScrapeRunRow biror bank uchun mos qator yozmagan bo'lishi mumkin — hech
+# qachon ishlamagan yoki avval registry.py'dan olib tashlangan (keyin qayta
+# qo'shilgan) bank. Bunday holatlar ham "never_run" sifatida ko'rinsin,
+# aks holda operator o'sha bankning umuman tekshirilmaganini bilmay qoladi.
+_SCRAPE_STATUS_SORT_ORDER = {"failed": 0, "running": 1, "never_run": 2, "success": 3}
+
+
+@app.get("/admin/scrape-runs", response_model=list[ScrapeRunResponse])
+def list_scrape_runs(_: AuthenticatedUser = Depends(require_admin)):
+    with SessionLocal() as session:
+        latest_started_at = (
+            select(ScrapeRunRow.bank, func.max(ScrapeRunRow.started_at).label("started_at"))
+            .group_by(ScrapeRunRow.bank)
+            .subquery()
+        )
+        rows = (
+            session.execute(
+                select(ScrapeRunRow).join(
+                    latest_started_at,
+                    (ScrapeRunRow.bank == latest_started_at.c.bank)
+                    & (ScrapeRunRow.started_at == latest_started_at.c.started_at),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        latest_by_bank = {row.bank: row for row in rows}
+
+    results = []
+    for scraper_cls in ALL_SCRAPERS:
+        bank = scraper_cls.bank_name
+        run = latest_by_bank.get(bank)
+        if run is None:
+            results.append(ScrapeRunResponse(
+                bank=bank, status="never_run", started_at=None, finished_at=None,
+                error_message=None, products_found=0,
+            ))
+        else:
+            results.append(ScrapeRunResponse(
+                bank=bank,
+                status=run.status,
+                started_at=_utc_isoformat(run.started_at),
+                finished_at=_utc_isoformat(run.finished_at) if run.finished_at is not None else None,
+                error_message=run.error_message,
+                products_found=run.products_found,
+            ))
+
+    results.sort(key=lambda r: (_SCRAPE_STATUS_SORT_ORDER.get(r.status, 99), r.bank))
+    return results
