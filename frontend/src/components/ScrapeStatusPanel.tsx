@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchScrapeRuns } from '../lib/api'
+import { getBankLogo } from '../lib/bankLogos'
 import { useLanguage } from '../lib/LanguageContext'
 import type { ScrapeRun, ScrapeRunStatus } from '../lib/types'
 
@@ -71,25 +72,28 @@ export function ScrapeStatusPanel() {
             <span>{t('scrapeColLastRun')}</span>
             <span>{t('scrapeColProductsFound')}</span>
           </div>
-          {runs.map((run) => (
-            <div className="rate-row" key={run.bank}>
-              <span className="rate-bank-name">{run.bank}</span>
-              <span>
-                <span className={`scrape-status-badge scrape-status-badge-${run.status}`}>
-                  {statusLabel(run.status)}
+          {runs
+            .filter((run) => run.status !== 'no_products')
+            .map((run) => (
+              <div className="rate-row" key={run.bank}>
+                <span className="rate-bank">
+                  {getBankLogo(run.bank) && <img src={getBankLogo(run.bank)} alt="" className="rate-bank-logo" />}
+                  <span className="rate-bank-name">{run.bank}</span>
                 </span>
-              </span>
-              <span className="rate-term">{formatRunTime(run.finished_at ?? run.started_at, lang)}</span>
-              <span className="rate-term">
-                {run.status === 'success' || run.status === 'no_products' ? run.products_found : '-'}
-              </span>
-              {run.status === 'failed' && run.error_message && (
-                <span className="scrape-error-message" style={{ gridColumn: '1 / -1' }}>
-                  {run.error_message}
+                <span>
+                  <span className={`scrape-status-badge scrape-status-badge-${run.status}`}>
+                    {statusLabel(run.status)}
+                  </span>
                 </span>
-              )}
-            </div>
-          ))}
+                <span className="rate-term">{formatRunTime(run.finished_at ?? run.started_at, lang)}</span>
+                <span className="rate-term">{run.status === 'success' ? run.products_found : '-'}</span>
+                {run.status === 'failed' && run.error_message && (
+                  <span className="scrape-error-message" style={{ gridColumn: '1 / -1' }}>
+                    {run.error_message}
+                  </span>
+                )}
+              </div>
+            ))}
         </div>
       )}
     </div>
