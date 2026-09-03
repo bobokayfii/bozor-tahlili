@@ -45,6 +45,8 @@ export function ScrapeStatusPanel() {
         return t('scrapeStatusFailed')
       case 'running':
         return t('scrapeStatusRunning')
+      case 'no_products':
+        return t('scrapeStatusNoProducts')
       default:
         return t('scrapeStatusNeverRun')
     }
@@ -78,7 +80,9 @@ export function ScrapeStatusPanel() {
                 </span>
               </span>
               <span className="rate-term">{formatRunTime(run.finished_at ?? run.started_at, lang)}</span>
-              <span className="rate-term">{run.status === 'success' ? run.products_found : '-'}</span>
+              <span className="rate-term">
+                {run.status === 'success' || run.status === 'no_products' ? run.products_found : '-'}
+              </span>
               {run.status === 'failed' && run.error_message && (
                 <span className="scrape-error-message" style={{ gridColumn: '1 / -1' }}>
                   {run.error_message}

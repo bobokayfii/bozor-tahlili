@@ -45,6 +45,20 @@ describe('ScrapeStatusPanel', () => {
     expect(screen.getByText('12')).toBeInTheDocument()
   })
 
+  it('shows a bank that ran without error but found zero products as needing attention', async () => {
+    mockedFetchScrapeRuns.mockResolvedValue([
+      {
+        bank: 'Kapitalbank', status: 'no_products', started_at: '2026-09-03T10:00:00Z',
+        finished_at: '2026-09-03T10:01:00Z', error_message: null, products_found: 0,
+      },
+    ])
+    renderWithLanguage(<ScrapeStatusPanel />)
+
+    expect(await screen.findByText('Kapitalbank')).toBeInTheDocument()
+    expect(screen.getByText('Diqqat talab (0 mahsulot)')).toBeInTheDocument()
+    expect(screen.getByText('0')).toBeInTheDocument()
+  })
+
   it('shows a bank that has never run without a timestamp', async () => {
     mockedFetchScrapeRuns.mockResolvedValue([
       { bank: 'NewBank', status: 'never_run', started_at: null, finished_at: null, error_message: null, products_found: 0 },

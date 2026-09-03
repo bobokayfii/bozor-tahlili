@@ -538,7 +538,7 @@ class ScrapeRunResponse(BaseModel):
 # qachon ishlamagan yoki avval registry.py'dan olib tashlangan (keyin qayta
 # qo'shilgan) bank. Bunday holatlar ham "never_run" sifatida ko'rinsin,
 # aks holda operator o'sha bankning umuman tekshirilmaganini bilmay qoladi.
-_SCRAPE_STATUS_SORT_ORDER = {"failed": 0, "running": 1, "never_run": 2, "success": 3}
+_SCRAPE_STATUS_SORT_ORDER = {"failed": 0, "running": 1, "no_products": 2, "never_run": 3, "success": 4}
 
 
 @app.get("/admin/scrape-runs", response_model=list[ScrapeRunResponse])
@@ -572,9 +572,17 @@ def list_scrape_runs(_: AuthenticatedUser = Depends(require_admin)):
                 error_message=None, products_found=0,
             ))
         else:
+            # A run that raised nothing but still found zero products is a
+            # real, actionable problem the "success" label hides: a bank
+            # switching to a JS-rendered page or turning on a Cloudflare
+            # bot-challenge produces exactly this (confirmed live for
+            # Asakabank/AgroBank/Kapitalbank) - no exception, just nothing
+            # parseable, so it looked identical to a healthy bank at a
+            # glance until this override.
+            status = "no_products" if run.status == "success" and run.products_found == 0 else run.status
             results.append(ScrapeRunResponse(
                 bank=bank,
-                status=run.status,
+                status=status,
                 started_at=_utc_isoformat(run.started_at),
                 finished_at=_utc_isoformat(run.finished_at) if run.finished_at is not None else None,
                 error_message=run.error_message,
