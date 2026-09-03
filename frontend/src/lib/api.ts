@@ -9,6 +9,7 @@ import type {
   Product,
   RecommendRequest,
   RecommendResponse,
+  ScrapeRun,
   UnavailableBank,
   UpdateUserRequest,
 } from './types'
@@ -78,6 +79,14 @@ export async function fetchUsers(): Promise<AdminUser[]> {
   const response = await apiFetch(`${API_BASE_URL}/admin/users`)
   if (!response.ok) {
     throw new Error(`Userlarni yuklab bo'lmadi: ${response.status}`)
+  }
+  return response.json()
+}
+
+export async function fetchScrapeRuns(): Promise<ScrapeRun[]> {
+  const response = await apiFetch(`${API_BASE_URL}/admin/scrape-runs`)
+  if (!response.ok) {
+    throw new Error(`Scraper holatini yuklab bo'lmadi: ${response.status}`)
   }
   return response.json()
 }
