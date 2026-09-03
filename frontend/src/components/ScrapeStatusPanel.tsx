@@ -57,7 +57,7 @@ export function ScrapeStatusPanel() {
     <div className="scrape-status-panel">
       <div className="page-head">
         <div>
-          <h2>{t('scrapeStatusTitle')}</h2>
+          <h1>{t('scrapeStatusTitle')}</h1>
           <p className="page-subtitle">{t('scrapeStatusSubtitle')}</p>
         </div>
       </div>

@@ -2,15 +2,17 @@ import { useState } from 'react'
 import type { Category } from '../lib/types'
 import { CATEGORY_GROUPS, groupLabel, groupShortLabel, type CategoryGroup } from '../lib/categoryGroups'
 import { useLanguage } from '../lib/LanguageContext'
-import { UsersIcon } from './icons'
+import { ActivityIcon, UsersIcon } from './icons'
+
+export type AdminPage = 'users' | 'scrape-status'
 
 interface SidebarProps {
   categories: Category[]
   activeCategory: string | null
   onSelect: (categoryKey: string) => void
   isAdmin?: boolean
-  isAdminView?: boolean
-  onSelectAdmin?: () => void
+  activeAdminPage?: AdminPage | null
+  onSelectAdminPage?: (page: AdminPage) => void
 }
 
 // "SQB AI" always appears verbatim inside poweredByLabel (uz/ru), regardless
@@ -66,8 +68,8 @@ export function Sidebar({
   activeCategory,
   onSelect,
   isAdmin = false,
-  isAdminView = false,
-  onSelectAdmin,
+  activeAdminPage = null,
+  onSelectAdminPage,
 }: SidebarProps) {
   const { lang, t } = useLanguage()
   const byKey = new Map(categories.map((category) => [category.key, category]))
@@ -164,11 +166,21 @@ export function Sidebar({
             <li>
               <button
                 type="button"
-                className={isAdminView ? 'sidebar-item active' : 'sidebar-item'}
-                onClick={onSelectAdmin}
+                className={activeAdminPage === 'users' ? 'sidebar-item active' : 'sidebar-item'}
+                onClick={() => onSelectAdminPage?.('users')}
               >
                 <UsersIcon />
                 {t('adminUsersNavLabel')}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                className={activeAdminPage === 'scrape-status' ? 'sidebar-item active' : 'sidebar-item'}
+                onClick={() => onSelectAdminPage?.('scrape-status')}
+              >
+                <ActivityIcon />
+                {t('scrapeStatusTitle')}
               </button>
             </li>
           </ul>

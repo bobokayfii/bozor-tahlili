@@ -126,33 +126,70 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: 'Foydalanuvchilar' })).toBeInTheDocument()
   })
 
-  it('calls onSelectAdmin when the Foydalanuvchilar button is clicked', async () => {
-    const onSelectAdmin = vi.fn()
+  it('renders a separate Scraperlar holati nav item under Boshqaruv', () => {
+    renderWithLanguage(
+      <Sidebar categories={categories} activeCategory="kredit_karta" onSelect={() => {}} isAdmin />,
+    )
+    expect(screen.getByRole('button', { name: 'Scraperlar holati' })).toBeInTheDocument()
+  })
+
+  it('calls onSelectAdminPage with "users" when the Foydalanuvchilar button is clicked', async () => {
+    const onSelectAdminPage = vi.fn()
     renderWithLanguage(
       <Sidebar
         categories={categories}
         activeCategory="kredit_karta"
         onSelect={() => {}}
         isAdmin
-        onSelectAdmin={onSelectAdmin}
+        onSelectAdminPage={onSelectAdminPage}
       />,
     )
 
     await userEvent.click(screen.getByRole('button', { name: 'Foydalanuvchilar' }))
 
-    expect(onSelectAdmin).toHaveBeenCalledOnce()
+    expect(onSelectAdminPage).toHaveBeenCalledWith('users')
   })
 
-  it('marks the Foydalanuvchilar button active when isAdminView is true', () => {
+  it('calls onSelectAdminPage with "scrape-status" when the Scraperlar holati button is clicked', async () => {
+    const onSelectAdminPage = vi.fn()
+    renderWithLanguage(
+      <Sidebar
+        categories={categories}
+        activeCategory="kredit_karta"
+        onSelect={() => {}}
+        isAdmin
+        onSelectAdminPage={onSelectAdminPage}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Scraperlar holati' }))
+
+    expect(onSelectAdminPage).toHaveBeenCalledWith('scrape-status')
+  })
+
+  it('marks the Foydalanuvchilar button active when activeAdminPage is "users"', () => {
     renderWithLanguage(
       <Sidebar
         categories={categories}
         activeCategory={null}
         onSelect={() => {}}
         isAdmin
-        isAdminView
+        activeAdminPage="users"
       />,
     )
     expect(screen.getByRole('button', { name: 'Foydalanuvchilar' })).toHaveClass('active')
+  })
+
+  it('marks the Scraperlar holati button active when activeAdminPage is "scrape-status"', () => {
+    renderWithLanguage(
+      <Sidebar
+        categories={categories}
+        activeCategory={null}
+        onSelect={() => {}}
+        isAdmin
+        activeAdminPage="scrape-status"
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Scraperlar holati' })).toHaveClass('active')
   })
 })

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchUsers } from '../lib/api'
 import { useLanguage } from '../lib/LanguageContext'
-import { ScrapeStatusPanel } from './ScrapeStatusPanel'
 import { UserFormModal } from './UserFormModal'
 import type { AdminUser } from '../lib/types'
 
@@ -99,8 +98,6 @@ export function AdminPanel() {
           onSaved={handleSaved}
         />
       )}
-
-      <ScrapeStatusPanel />
     </div>
   )
 }
