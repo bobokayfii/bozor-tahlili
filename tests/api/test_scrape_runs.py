@@ -60,6 +60,56 @@ def test_list_scrape_runs_shows_only_the_latest_run_per_bank(client):
     assert row["error_message"] is None
 
 
+def test_list_scrape_runs_flags_a_zero_product_success_as_no_products(client):
+    # A scraper can raise nothing and still find zero products - e.g. a bank
+    # switching to a JS-rendered page, or turning on a Cloudflare
+    # bot-challenge (both confirmed live for real banks). That's a real,
+    # actionable problem "success" would otherwise hide.
+    bank = ALL_SCRAPERS[0].bank_name
+    with api_main.SessionLocal() as session:
+        session.add(ScrapeRunRow(
+            bank=bank,
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+            status="success",
+            error_message=None,
+            products_found=0,
+        ))
+        session.commit()
+
+    response = client.get("/admin/scrape-runs")
+    data = response.json()
+    row = next(r for r in data if r["bank"] == bank)
+    assert row["status"] == "no_products"
+
+
+def test_list_scrape_runs_sorts_no_products_before_never_run_and_success(client):
+    empty_bank = ALL_SCRAPERS[0].bank_name
+    success_bank = ALL_SCRAPERS[1].bank_name
+    with api_main.SessionLocal() as session:
+        session.add(ScrapeRunRow(
+            bank=success_bank,
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+            status="success",
+            products_found=3,
+        ))
+        session.add(ScrapeRunRow(
+            bank=empty_bank,
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+            status="success",
+            products_found=0,
+        ))
+        session.commit()
+
+    response = client.get("/admin/scrape-runs")
+    data = response.json()
+    statuses_in_order = [row["status"] for row in data]
+    assert statuses_in_order.index("no_products") < statuses_in_order.index("success")
+    assert statuses_in_order.index("no_products") < statuses_in_order.index("never_run")
+
+
 def test_list_scrape_runs_sorts_failed_and_running_before_success_and_never_run(client):
     failed_bank = ALL_SCRAPERS[0].bank_name
     success_bank = ALL_SCRAPERS[1].bank_name

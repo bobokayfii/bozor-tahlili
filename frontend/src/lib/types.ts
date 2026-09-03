@@ -103,7 +103,7 @@ export interface UpdateUserRequest {
   role?: UserRole
 }
 
-export type ScrapeRunStatus = 'success' | 'failed' | 'running' | 'never_run'
+export type ScrapeRunStatus = 'success' | 'failed' | 'running' | 'never_run' | 'no_products'
 
 export interface ScrapeRun {
   bank: string

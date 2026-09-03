@@ -1648,6 +1648,11 @@ button {
   color: var(--ink-faint);
 }
 
+.scrape-status-badge-no_products {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .scrape-error-message {
   font-size: 12.5px;
   font-style: italic;
