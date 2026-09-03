@@ -61,6 +61,12 @@ export async function login(username: string, password: string): Promise<LoginRe
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   })
+  if (response.status === 429) {
+    // Distinct from a plain wrong-password 401 so the UI doesn't tell
+    // someone their (possibly correct) password is wrong when they're
+    // actually rate-limited (api/main.py's login rate limiter).
+    throw new Error('RATE_LIMITED')
+  }
   if (!response.ok) {
     throw new Error("Login yoki parol noto'g'ri")
   }

@@ -40,4 +40,19 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText("Login yoki parol noto'g'ri")).toBeInTheDocument()
   })
+
+  it('shows a distinct message when rate-limited, instead of implying the password is wrong', async () => {
+    const mockLogin = vi.fn().mockRejectedValue(new Error('RATE_LIMITED'))
+    mockedUseAuth.mockReturnValue({ user: null, isLoading: false, login: mockLogin, logout: vi.fn() })
+    renderWithLanguage(<LoginPage />)
+
+    await userEvent.type(screen.getByLabelText('Login'), 'admin')
+    await userEvent.type(screen.getByLabelText('Parol'), 'correct-but-rate-limited')
+    await userEvent.click(screen.getByRole('button', { name: 'Kirish' }))
+
+    expect(
+      await screen.findByText("Juda ko'p urinish. Iltimos, bir necha daqiqadan so'ng qayta urinib ko'ring."),
+    ).toBeInTheDocument()
+    expect(screen.queryByText("Login yoki parol noto'g'ri")).not.toBeInTheDocument()
+  })
 })

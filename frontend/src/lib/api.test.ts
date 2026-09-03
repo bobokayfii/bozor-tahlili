@@ -208,6 +208,11 @@ describe('api client', () => {
     await expect(login('admin', 'wrong')).rejects.toThrow("Login yoki parol noto'g'ri")
   })
 
+  it('login throws a distinguishable error when rate-limited', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429 }))
+    await expect(login('admin', 'secret')).rejects.toThrow('RATE_LIMITED')
+  })
+
   it('fetchCurrentUser returns the parsed user on success', async () => {
     const mockUser = { username: 'admin', role: 'admin' }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => mockUser }))
